@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  session_id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String    @unique
+  shop                String
+  state               String
+  isOnline            Boolean  @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean  @default(false)
+  locale              String?
+  collaborator        Boolean? @default(false)
+  emailVerified       Boolean? @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+
+model Shop {
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  shopId                String?   // Shopify's GID
+  shopDomain            String    @unique // myshopify.com domain
+  name                  String?
+  email                 String?
+  contactEmail          String?
+  customerEmail         String?
+  shopOwner             String?
+
+  
+  // Plan Info
+  planName              String?
+  planDisplayName       String?
+  partnerDevelopment    Boolean   @default(false)
+  shopifyPlus           Boolean   @default(false)
+  
+  
+  // Timestamps
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  shopCreatedAt         DateTime? // When shop was created on Shopify
+  
+  // App specific
+  isActive              Boolean   @default(true)
+  installedAt           DateTime  @default(now())
+  uninstalledAt         DateTime?
+}
