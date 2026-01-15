@@ -67,6 +67,7 @@ export const doTaskAfterAuth = async ({ session, admin }) => {
                     name: shop.name || null,
                     email: shop.email || null,
                     contactEmail: shop.contactEmail || null,
+                    accessToken: session.accessToken,
 
                     // Plan Info
                     planDisplayName: shop.plan?.displayName || null,
@@ -79,6 +80,7 @@ export const doTaskAfterAuth = async ({ session, admin }) => {
                 },
                 create: {
                     shopDomain: session.shop,
+                    accessToken: session.accessToken,
                     shopId: shop.id,
                     name: shop.name || null,
                     email: shop.email || null,

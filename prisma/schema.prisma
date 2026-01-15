@@ -44,6 +44,7 @@ model Shop {
   contactEmail          String?
   customerEmail         String?
   shopOwner             String?
+  accessToken           String
 
   
   // Plan Info
