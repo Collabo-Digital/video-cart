@@ -2,6 +2,7 @@
 // import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { BlockStack, Card, Icon, InlineGrid, InlineStack, Page, Text } from '@shopify/polaris';
+import { ArchiveIcon } from '@shopify/polaris-icons';
 import { useState } from "react";
 import DateRangePicker from "../components/DatePicker/DatePicker.jsx";
 import Chart from "../components/Chart/Chart.jsx";
@@ -15,16 +16,19 @@ export default function Index() {
   const conversion = [{
     title: "Video viewers",
     count: 10,
-    // icon: 'video'
+    icon: ArchiveIcon
   }, {
     title: "Video views",
-    count: 20
+    count: 20,
+    icon: ArchiveIcon
   }, {
     title: "Video conversions",
-    count: 30
+    count: 30,
+    icon: ArchiveIcon
   }, {
     title: "Video ATC",
-    count: 30
+    count: 30,
+    icon: ArchiveIcon
   }];
 
 
@@ -46,7 +50,7 @@ export default function Index() {
         {conversion.map((element, index) => (
           <Card key={index} >
             <InlineStack>
-              <Icon source={element.icon} />
+              {element.icon && <Icon source={element.icon} />}
               <BlockStack>
                 <Text as="h2" variant="bodyMd">
                   {element.title}

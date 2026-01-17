@@ -64,3 +64,23 @@ model Shop {
   installedAt           DateTime  @default(now())
   uninstalledAt         DateTime?
 }
+
+model Video {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+
+  title            String?
+
+  serviceProvider  String   @default("mux")
+
+  videoUploadId    String   @unique
+  videoAssetId     String   @unique
+  videoPlaybackId  String?
+
+  status           String @default("PROCESSING")
+
+  duration         Float?
+  aspectRatio      String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
