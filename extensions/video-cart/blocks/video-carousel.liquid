@@ -1,0 +1,30 @@
+{% schema %}
+{
+  "name": "Video Carousel",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Carousel Title",
+      "default": "Shop Our Videos"
+    },
+    {
+      "type": "range",
+      "id": "videos_count",
+      "min": 5,
+      "max": 20,
+      "step": 5,
+      "label": "Number of Videos",
+      "default": 10
+    }
+  ]
+}
+{% endschema %}
+
+<div class="shoppable-video-carousel" data-videos-count="{{ block.settings.videos_count }}">
+  <h2>{{ block.settings.title }}</h2>
+  <div id="video-carousel"></div>
+</div>
+
+<script src="{{ 'bundle-video-cart.iife.js' | asset_url }}" defer></script>

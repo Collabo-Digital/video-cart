@@ -401,7 +401,6 @@ async function someOperation() {
  * [Description of what this endpoint does]
  */
 
-import { json } from 'react-router';
 import { authenticate } from '~/config/shopify.server';
 import { [actionFunction] } from '~/services/[domain]/[action].service';
 
@@ -411,7 +410,15 @@ export const [loader|action] = async ({ request, params }) => {
 
   // 2. Validate method (for actions)
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 
   try {
@@ -423,19 +430,35 @@ export const [loader|action] = async ({ request, params }) => {
     const result = await [actionFunction]({ param1, param2 });
 
     // 5. Return response
-    return json({
-      success: true,
-      data: result,
-    }, { status: 200 });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: result,
+      }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     
   } catch (error) {
     console.error('[Action] error:', error);
     
-    return json({
-      success: false,
-      error: error.message,
-      code: error.code || 'OPERATION_FAILED',
-    }, { status: error.statusCode || 500 });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        code: error.code || 'OPERATION_FAILED',
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```
@@ -443,7 +466,7 @@ export const [loader|action] = async ({ request, params }) => {
 **Route Structure:**
 - `loader` - GET requests (read data)
 - `action` - POST/PUT/PATCH/DELETE (write data)
-- Always return `json()` responses
+- Always return `new Response()` with JSON (React Router v7)
 - Always wrap in try/catch
 - Always log errors
 
@@ -824,21 +847,45 @@ import styles from './styles.module.css';
 export const action = async ({ request }) => {
   try {
     const result = await uploadVideo(data);
-    return json({ success: true, data: result });
+    return new Response(
+      JSON.stringify({ success: true, data: result }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Upload failed:', error);
-    return json({
-      success: false,
-      error: error.message,
-      code: error.code || 'UPLOAD_FAILED',
-    }, { status: error.statusCode || 500 });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        code: error.code || 'UPLOAD_FAILED',
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 
 // ❌ Bad - No error handling
 export const action = async ({ request }) => {
   const result = await uploadVideo(data);
-  return json(result);
+  return new Response(
+    JSON.stringify(result),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 };
 ```
 
@@ -926,7 +973,6 @@ export async function tagVideo(videoId, tags) {
 **Step 3: Add Route** (`app/routes/api/v1/videos/tag.$id.jsx`)
 
 ```javascript
-import { json } from 'react-router';
 import { authenticate } from '~/config/shopify.server';
 import { tagVideo } from '~/services/video/tagging.service';
 
@@ -934,21 +980,45 @@ export const action = async ({ request, params }) => {
   await authenticate.admin(request);
   
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
   
   try {
     const { tags } = await request.json();
     const video = await tagVideo(params.id, tags);
     
-    return json({ success: true, data: video });
+    return new Response(
+      JSON.stringify({ success: true, data: video }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Tag video error:', error);
-    return json({
-      success: false,
-      error: error.message,
-      code: error.code,
-    }, { status: error.statusCode || 500 });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        code: error.code,
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```
@@ -982,16 +1052,31 @@ export const action = async ({ request }) => {
 ```javascript
 // ✅ Good - Route (thin)
 // app/routes/webhooks/mux.jsx
-import { json } from 'react-router';
 import { handleMuxWebhook } from '~/services/mux/webhook.service';
 
 export const action = async ({ request }) => {
   try {
     await handleMuxWebhook(request);
-    return json({ received: true });
+    return new Response(
+      JSON.stringify({ received: true }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Webhook error:', error);
-    return json({ error: error.message }, { status: 400 });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 

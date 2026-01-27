@@ -35,11 +35,13 @@ export async function createUploadUrl(options = {}) {
  */
 export async function getUploadStatus(uploadId) {
   const upload = await mux.video.uploads.retrieve(uploadId);
+  const asset = await mux.video.assets.retrieve(upload.asset_id);
 
   return {
     id: upload.id,
     status: upload.status,
     assetId: upload.asset_id,
     error: upload.error,
+    playbackId: asset.playback_ids,
   };
 }

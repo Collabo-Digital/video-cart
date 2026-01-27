@@ -91,7 +91,6 @@ app/
 **Step 1:** Create route handler
 ```typescript
 // app/routes/api+/v1+/videos+/delete.$id.tsx
-import { json } from 'react-router';
 import { authenticate } from '~/config/shopify.server';
 import { deleteVideo } from '~/services/video/delete.service';
 
@@ -99,19 +98,43 @@ export const action = async ({ request, params }) => {
   await authenticate.admin(request);
   
   if (request.method !== 'DELETE') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 
   try {
     await deleteVideo(params.id);
-    return json({ success: true });
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Delete video error:', error);
-    return json({
-      success: false,
-      error: error.message,
-      code: error.code,
-    }, { status: error.statusCode || 500 });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        code: error.code,
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```
@@ -150,7 +173,7 @@ export async function deleteVideo(videoId) {
 **Create route:**
 ```typescript
 // app/routes/app+/analytics.tsx
-import { json, useLoaderData } from 'react-router';
+import { useLoaderData } from 'react-router';
 import { Page } from '@shopify/polaris';
 import { authenticate } from '~/config/shopify.server';
 import { getVideoAnalytics } from '~/services/video/analytics.service';
@@ -158,7 +181,15 @@ import { getVideoAnalytics } from '~/services/video/analytics.service';
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
   const analytics = await getVideoAnalytics();
-  return json({ analytics });
+  return new Response(
+    JSON.stringify({ analytics }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 };
 
 export default function AnalyticsPage() {
@@ -253,12 +284,28 @@ export const action = async ({ request }) => {
   
   // ❌ Validation in route
   if (body.size > 500 * 1024 * 1024) {
-    return json({ error: 'Too large' }, { status: 400 });
+    return new Response(
+      JSON.stringify({ error: 'Too large' }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
   
   // ❌ Direct Prisma in route
   const video = await prisma.video.create({ data: body });
-  return json(video);
+  return new Response(
+    JSON.stringify(video),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 };
 ```
 
@@ -270,13 +317,29 @@ export const action = async ({ request }) => {
   try {
     const body = await request.json();
     const video = await uploadVideo(body); // Service handles it
-    return json({ success: true, data: video });
+    return new Response(
+      JSON.stringify({ success: true, data: video }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Upload failed:', error);
-    return json({
-      error: error.message,
-      code: error.code,
-    }, { status: error.statusCode || 500 });
+    return new Response(
+      JSON.stringify({
+        error: error.message,
+        code: error.code,
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```

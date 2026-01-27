@@ -26,12 +26,11 @@ export function renderWidget(config) {
   if (config.position) {
     container.style.cssText = `
       position: fixed;
-      ${config.position}
       z-index: ${config.zIndex || 9999};
     `;
   }
   
-  document.body.appendChild(container);
+  document.getElementById('video-carousel').appendChild(container);
   
   // Render Solid component
   const Component = definition.component;

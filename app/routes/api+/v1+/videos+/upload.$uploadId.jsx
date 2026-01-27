@@ -40,7 +40,6 @@ export const loader = async ({ request, params }) => {
         },
       }
     );
-    
   } catch (error) {
     console.error('Upload status error:', error);
     

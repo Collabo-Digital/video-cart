@@ -186,7 +186,6 @@ export async function [actionName](params) {
 /**
  * [METHOD] /api/v1/[resource]/[action]
  */
-import { json } from 'react-router';
 import { authenticate } from '~/config/shopify.server';
 import { [action] } from '~/services/[domain]/[action].service';
 
@@ -197,14 +196,30 @@ export const [loader|action] = async ({ request, params }) => {
     const body = await request.json().catch(() => ({}));
     const result = await [action](body);
     
-    return json({ success: true, data: result });
+    return new Response(
+      JSON.stringify({ success: true, data: result }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Error:', error);
-    return json({
-      success: false,
-      error: error.message,
-      code: error.code || 'OPERATION_FAILED',
-    }, { status: error.statusCode || 500 });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        code: error.code || 'OPERATION_FAILED',
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```
@@ -356,12 +371,28 @@ export const action = async ({ request }) => {
   
   // ❌ DON'T: Business logic here
   if (body.size > 500 * 1024 * 1024) {
-    return json({ error: 'Too large' }, { status: 400 });
+    return new Response(
+      JSON.stringify({ error: 'Too large' }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
   
   // ❌ DON'T: Direct Prisma in route
   const video = await prisma.video.create({ data: body });
-  return json(video);
+  return new Response(
+    JSON.stringify(video),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 };
 
 // ❌ Direct Prisma in service
@@ -394,10 +425,26 @@ export const action = async ({ request }) => {
   try {
     const body = await request.json();
     const result = await uploadVideo(body); // Call service
-    return json({ success: true, data: result });
+    return new Response(
+      JSON.stringify({ success: true, data: result }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Upload failed:', error);
-    return json({ error: error.message }, { status: 500 });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 

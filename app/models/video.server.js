@@ -13,7 +13,7 @@ import prisma from '../config/database.server';
  */
 export async function findAll(filters = {}) {
   const { status, limit = 50, offset = 0 } = filters;
-  
+
   return prisma.video.findMany({
     where: status ? { status } : undefined,
     orderBy: { createdAt: 'desc' },
@@ -37,8 +37,8 @@ export async function findById(id) {
  * @returns {Promise<Object|null>} Video object or null
  */
 export async function findByUploadId(uploadId) {
-  return prisma.video.findUnique({ 
-    where: { videoUploadId: uploadId } 
+  return prisma.video.findUnique({
+    where: { videoUploadId: uploadId }
   });
 }
 
@@ -71,7 +71,7 @@ export async function updateById(id, data) {
  */
 export async function upsertByUploadId(data) {
   const { uploadId, ...videoData } = data;
-  
+
   return prisma.video.upsert({
     where: { videoUploadId: uploadId },
     update: videoData,
@@ -98,7 +98,7 @@ export async function deleteById(id) {
  */
 export async function count(filters = {}) {
   const { status } = filters;
-  
+
   return prisma.video.count({
     where: status ? { status } : undefined,
   });

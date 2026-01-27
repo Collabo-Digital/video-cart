@@ -5,9 +5,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -18,7 +15,7 @@ model Session {
   id                  String    @unique
   shop                String
   state               String
-  isOnline            Boolean  @default(false)
+  isOnline            Boolean   @default(false)
   scope               String?
   expires             DateTime?
   accessToken         String
@@ -26,61 +23,107 @@ model Session {
   firstName           String?
   lastName            String?
   email               String?
-  accountOwner        Boolean  @default(false)
+  accountOwner        Boolean   @default(false)
   locale              String?
-  collaborator        Boolean? @default(false)
-  emailVerified       Boolean? @default(false)
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
 
-
 model Shop {
-  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
-  shopId                String?   // Shopify's GID
-  shopDomain            String    @unique // myshopify.com domain
-  name                  String?
-  email                 String?
-  contactEmail          String?
-  customerEmail         String?
-  shopOwner             String?
-  accessToken           String
-
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  shopId             String?
+  shopDomain         String    @unique
+  name               String?
+  email              String?
+  contactEmail       String?
+  customerEmail      String?
+  shopOwner          String?
+  accessToken        String
   
   // Plan Info
-  planName              String?
-  planDisplayName       String?
-  partnerDevelopment    Boolean   @default(false)
-  shopifyPlus           Boolean   @default(false)
-  
+  planName           String?
+  planDisplayName    String?
+  partnerDevelopment Boolean   @default(false)
+  shopifyPlus        Boolean   @default(false)
   
   // Timestamps
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  shopCreatedAt         DateTime? // When shop was created on Shopify
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  shopCreatedAt      DateTime?
   
   // App specific
-  isActive              Boolean   @default(true)
-  installedAt           DateTime  @default(now())
-  uninstalledAt         DateTime?
+  isActive           Boolean   @default(true)
+  installedAt        DateTime  @default(now())
+  uninstalledAt      DateTime?
+  
+  // Relations
+  feeds              Feed[]
 }
 
 model Video {
-  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String?
+  serviceProvider String   @default("mux")
+  videoUploadId   String   @unique
+  videoAssetId    String   @unique
+  videoPlaybackId String?
+  status          String   @default("PROCESSING")
+  duration        Float?
+  aspectRatio     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  feedVideos      FeedVideo[]
+}
 
-  title            String?
+model Feed {
+  id             String      @id @default(auto()) @map("_id") @db.ObjectId
+  widgetId       String      @unique @default(uuid())
+  feedName       String
+  shopDomain     String
+  widgetType     String      @default("carousel") // carousel | grid
+  isEnabled      Boolean     @default(true)
+  
+  // Settings
+  autoplay       Boolean     @default(false)
+  showControls   Boolean     @default(true)
+  showTitle      Boolean     @default(true)
+  
+  // Timestamps
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  
+  // Relations
+  shop           Shop        @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
+  videos         FeedVideo[]
+  
+  @@index([shopDomain])
+}
 
-  serviceProvider  String   @default("mux")
-
-  videoUploadId    String   @unique
-  videoAssetId     String   @unique
-  videoPlaybackId  String?
-
-  status           String @default("PROCESSING")
-
-  duration         Float?
-  aspectRatio      String?
-
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+// Junction table for Feed-Video many-to-many relationship
+model FeedVideo {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  feedId          String   @db.ObjectId
+  videoId         String  
+  playbackId      String
+  
+  // Product tagging
+  productsTagged  String[] @default([]) // Array of product IDs
+  
+  // Order in feed
+  position        Int      @default(0)
+  
+  // Timestamps
+  addedAt         DateTime @default(now())
+  
+  // Relations
+  feed            Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  
+  @@unique([feedId, videoId])
+  @@index([feedId])
+  @@index([videoId])
 }
