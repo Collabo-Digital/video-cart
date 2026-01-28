@@ -1,34 +1,22 @@
-import { InputBox } from './components/InputBox';
+import { VideoCarousel } from './components/VideoCarousel';
 import { registerWidget } from './core/registry';
-import { initWidgets } from './runtime';
+import { initFeeds } from './runtime';
 
-// Register the InputBox widget
 registerWidget({
-  type: 'input-box',
-  component: InputBox,
+  type: 'carousel',
+  component: VideoCarousel,
 });
 
-// Initialize from global config
-function init() {
-  // const config = window.__video_cart_config__;
-  let config = {
-    isActive : true,
-    shop:'',
-    type:"input-box"
-  }
-
-  window.__video_cart_config__ = config
-
-  console.log(' ⚡️Initializing widgets⚡️', config);
-  
-  if (config?.isActive) {
-    initWidgets(config);
-  } else {
-    console.warn('No widget config found');
-  }
+if (typeof window !== 'undefined') {
+  window.VideoCartWidgets = { initFeeds };
+  window.dispatchEvent(new Event('video-cart-ready'));
 }
 
-// Auto-start
+function init() {
+  console.log("initFeeds");
+  initFeeds();
+}
+
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {

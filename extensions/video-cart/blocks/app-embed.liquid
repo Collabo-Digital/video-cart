@@ -7,12 +7,20 @@
 {% endschema %}
 
 <script>
+  // Set app URL - this should be your app's public URL
+  // You can set this via environment variable or app metafield
+  window.__video_cart_app_url__ = window.__video_cart_app_url__ || 
+    {% if app.metafields.app_url %}
+      {{ app.metafields.app_url | json }};
+    {% else %}
+      null; // Set this manually: window.__video_cart_app_url__ = 'https://your-app-url.com';
+    {% endif %}
+  
   window.__video_cart_config__ = {
     shop: {{ shop.permanent_domain | json }},
     enabled: {{ block.settings.enabled | json }},
     isActive: true,
     position: 'video-carousel'
-
   };
 </script>
 

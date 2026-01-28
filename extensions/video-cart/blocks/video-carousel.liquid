@@ -5,26 +5,373 @@
   "settings": [
     {
       "type": "text",
-      "id": "title",
-      "label": "Carousel Title",
-      "default": "Shop Our Videos"
+      "id": "feed_id",
+      "label": "Feed ID",
+      "info": "Enter the Feed ID from the dropdown below, then click Save in the theme editor"
     },
     {
-      "type": "range",
-      "id": "videos_count",
-      "min": 5,
-      "max": 20,
-      "step": 5,
-      "label": "Number of Videos",
-      "default": 10
+      "type": "paragraph",
+      "content": "Use the dropdown below (visible only in theme editor) to select a feed, then copy the Feed ID and paste it in the field above."
     }
   ]
 }
 {% endschema %}
 
-<div class="shoppable-video-carousel" data-videos-count="{{ block.settings.videos_count }}">
-  <h2>{{ block.settings.title }}</h2>
-  <div id="video-carousel"></div>
-</div>
+{% comment %} Feed Selector UI - Visible only in theme editor {% endcomment %}
+{% if request.design_mode %}
+  <div class="video-feed-selector" style="padding: 16px; background: #f6f6f7; border: 1px dashed #d1d5db; border-radius: 8px; margin-bottom: 16px;">
+    <label for="feed-select-{{ block.id }}" style="display: block; font-size: 13px; font-weight: 600; color: #202223; margin-bottom: 8px;">
+      📺 Select Video Feed
+    </label>
+    <select id="feed-select-{{ block.id }}" style="width: 100%; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; background: white; color: #202223; margin-bottom: 8px;">
+      <option value="">Loading feeds...</option>
+    </select>
+    
+    <div style="font-size: 12px; color: #6d7175; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor" style="opacity: 0.6;">
+        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+      </svg>
+      <span>This selector is visible only to you in the theme editor.</span>
+    </div>
+    
+    {% comment %} Display current feed status {% endcomment %}
+    <div id="feed-status-{{ block.id }}" style="padding: 8px 12px; background: {% if block.settings.feed_id %}#d1fae5{% else %}#fef3c7{% endif %}; border-radius: 6px; margin-bottom: 8px; font-size: 13px;">
+      {% if block.settings.feed_id %}
+        <div style="color: #065f46; font-weight: 600;">✓ Feed Active</div>
+        <div style="color: #047857; margin-top: 4px;">Feed ID: <code style="background: white; padding: 2px 6px; border-radius: 3px; font-size: 11px;">{{ block.settings.feed_id }}</code></div>
+      {% else %}
+        <div style="color: #92400e; font-weight: 600;">⚠ No Feed Selected</div>
+        <div style="color: #b45309; margin-top: 4px; font-size: 12px;">Select a feed below and follow the instructions</div>
+      {% endif %}
+    </div>
+    
+    {% comment %} Instructions box {% endcomment %}
+    <div id="instructions-{{ block.id }}" style="display: none; padding: 12px; background: #dbeafe; border: 1px solid #3b82f6; border-radius: 6px; margin-bottom: 8px;">
+      <div style="font-size: 13px; font-weight: 600; color: #1e40af; margin-bottom: 8px;">📋 How to Save Feed:</div>
+      <ol style="margin: 0; padding-left: 20px; font-size: 12px; color: #1e3a8a; line-height: 1.6;">
+        <li>Copy the Feed ID shown below</li>
+        <li>Scroll up to the "Feed ID" setting</li>
+        <li>Paste the Feed ID there</li>
+        <li>Click <strong>Save</strong> in the theme editor toolbar</li>
+      </ol>
+      <div id="copy-feed-id-{{ block.id }}" style="margin-top: 8px; padding: 8px; background: white; border-radius: 4px; font-family: monospace; font-size: 12px; color: #1e40af; word-break: break-all; cursor: pointer; border: 2px dashed #3b82f6;" onclick="
+        const text = this.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalBg = this.style.background;
+          this.style.background = '#10b981';
+          this.style.color = 'white';
+          this.style.borderColor = '#10b981';
+          const originalText = this.innerHTML;
+          this.innerHTML = '✓ Copied to clipboard!';
+          setTimeout(() => {
+            this.style.background = originalBg;
+            this.style.color = '#1e40af';
+            this.style.borderColor = '#3b82f6';
+            this.innerHTML = originalText;
+          }, 2000);
+        });
+      ">
+        Click to copy Feed ID
+      </div>
+    </div>
+  </div>
+  
+  <script>
+  (function() {
+    const blockId = '{{ block.id }}';
+    const shop = '{{ shop.permanent_domain }}';
+    const currentFeedId = '{{ block.settings.feed_id }}'.trim();
+    const select = document.getElementById('feed-select-' + blockId);
+    const feedStatus = document.getElementById('feed-status-' + blockId);
+    const instructions = document.getElementById('instructions-' + blockId);
+    const copyFeedId = document.getElementById('copy-feed-id-' + blockId);
+    
+    async function loadFeeds() {
+      try {
+        const apiUrl = '/apps/video-widget/feeds/list';
+        
+        console.log('Fetching feeds via app proxy:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Response error:', errorText);
+          throw new Error('HTTP error! status: ' + response.status);
+        }
+        
+        const result = await response.json();
+        console.log('Feeds loaded:', result);
+        
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch feeds');
+        }
+        
+        if (!result.data || result.data.length === 0) {
+          select.innerHTML = '<option value="">No feeds available - Create one in your app admin</option>';
+          select.disabled = true;
+          return;
+        }
+        
+        // Populate dropdown with feeds
+        select.innerHTML = '<option value="">-- Select a feed --</option>';
+        
+        let currentFeedFound = false;
+        
+        result.data.forEach(function(feed) {
+          const option = document.createElement('option');
+          option.value = feed.id;
+          
+          // Format the date
+          const date = new Date(feed.createdAt);
+          const formattedDate = date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          
+          // Create option text with feed info
+          const videoText = feed.videoCount === 1 ? '1 video' : feed.videoCount + ' videos';
+          option.textContent = feed.feedName + ' (' + videoText + ') - ' + formattedDate;
+          
+          // Store feed data on the option
+          option.dataset.feedId = feed.id;
+          option.dataset.feedName = feed.feedName;
+          option.dataset.videoCount = feed.videoCount;
+          
+          // Pre-select if this is the current feed
+          if (feed.id === currentFeedId) {
+            option.selected = true;
+            currentFeedFound = true;
+          }
+          
+          select.appendChild(option);
+        });
+        
+        select.disabled = false;
+        
+        // Handle selection change
+        select.addEventListener('change', function() {
+          const selectedOption = this.options[this.selectedIndex];
+          const selectedFeedId = selectedOption.value;
+          
+          if (selectedFeedId) {
+            const feedName = selectedOption.dataset.feedName;
+            const videoCount = selectedOption.dataset.videoCount;
+            
+            // Show instructions
+            instructions.style.display = 'block';
+            
+            // Update the copy box with the Feed ID
+            copyFeedId.textContent = selectedFeedId;
+            copyFeedId.title = 'Click to copy: ' + selectedFeedId;
+            
+            // Update status if this is different from current
+            if (selectedFeedId !== currentFeedId) {
+              feedStatus.style.background = '#fef3c7';
+              feedStatus.innerHTML = 
+                '<div style="color: #92400e; font-weight: 600;">⚠ Feed Not Saved Yet</div>' +
+                '<div style="color: #b45309; margin-top: 4px; font-size: 12px;">Selected: <strong>' + feedName + '</strong> (' + videoCount + ' videos)</div>' +
+                '<div style="color: #b45309; margin-top: 4px; font-size: 12px;">Follow instructions below to save</div>';
+            }
+            
+            console.log('Feed selected:', {
+              id: selectedFeedId,
+              name: feedName,
+              videos: videoCount
+            });
+          } else {
+            instructions.style.display = 'none';
+          }
+        });
+        
+        // If current feed is selected, show the copy option
+        if (currentFeedFound) {
+          const selectedOption = select.options[select.selectedIndex];
+          if (selectedOption && selectedOption.value) {
+            // Don't show instructions for already-saved feed, but make copy available
+            copyFeedId.textContent = currentFeedId;
+            copyFeedId.title = 'Click to copy: ' + currentFeedId;
+          }
+        }
+        
+      } catch (error) {
+        console.error('Error loading feeds:', error);
+        select.innerHTML = '<option value="">Error: ' + error.message + '</option>';
+        select.disabled = true;
+        
+        // Show error message
+        feedStatus.style.background = '#fee2e2';
+        feedStatus.innerHTML = 
+          '<div style="color: #991b1b; font-weight: 600;">✗ Error Loading Feeds</div>' +
+          '<div style="color: #b91c1c; margin-top: 4px; font-size: 12px;">' + error.message + '</div>';
+      }
+    }
+    
+    // Load feeds when in design mode
+    if (shop) {
+      loadFeeds();
+    }
+  })();
+  </script>
+{% endif %}
 
-<script src="{{ 'bundle-video-cart.iife.js' | asset_url }}" defer></script>
+{% comment %} Storefront rendering {% endcomment %}
+{% if block.settings.feed_id != blank %}
+  <div class="shoppable-video-carousel" 
+       data-feed-id="{{ block.settings.feed_id }}" 
+       data-container-id="video-carousel-{{ block.id }}"
+       data-shop="{{ shop.permanent_domain }}">
+    <div id="video-carousel-{{ block.id }}" style="min-height: 300px;">
+      <div style="text-align: center; padding: 40px; color: #6d7175;">
+        <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+        <p style="margin-top: 16px; font-size: 14px;">Loading videos...</p>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+  <script src="{{ 'bundle-video-cart.iife.js' | asset_url }}" defer></script>
+  <script>
+    (function() {
+      const feedId = '{{ block.settings.feed_id }}'.trim();
+      const containerId = 'video-carousel-{{ block.id }}';
+      const shop = '{{ shop.permanent_domain }}';
+      
+      console.log('Video widget initializing:', { 
+        feedId: feedId, 
+        containerId: containerId,
+        feedIdLength: feedId.length,
+        feedIdEmpty: feedId === ''
+      });
+      
+      // Validate feed ID exists
+      if (!feedId || feedId === '') {
+        console.error('Feed ID is empty! Cannot initialize widget.');
+        const container = document.getElementById(containerId);
+        if (container) {
+          container.innerHTML = '<div style="text-align: center; padding: 40px; color: #dc2626;"><p>⚠️ No feed ID configured. Please select a feed in the theme editor.</p></div>';
+        }
+        return;
+      }
+      
+      function initFeedWidget() {
+        const container = document.getElementById(containerId);
+        if (!container) {
+          console.error('Container not found:', containerId);
+          return;
+        }
+        
+        if (container.dataset.initialized === 'true') {
+          console.log('Widget already initialized');
+          return;
+        }
+        
+        container.dataset.initialized = 'true';
+        
+        console.log('Fetching feed data from:', '/apps/video-widget/feeds/' + feedId);
+        
+        // Fetch feed data from app proxy
+        fetch('/apps/video-widget/feeds/' + feedId)
+          .then(function(response) {
+            console.log('Feed fetch response status:', response.status);
+            if (!response.ok) {
+              throw new Error('Failed to fetch feed: ' + response.status + ' ' + response.statusText);
+            }
+            // Check if response is JSON before parsing
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              return response.text().then(function(text) {
+                console.error('Non-JSON response received:', text.substring(0, 200));
+                throw new Error('Expected JSON but received ' + contentType);
+              });
+            }
+            return response.json();
+          })
+          .then(function(result) {
+            console.log('Feed data loaded:', result);
+            
+            if (!result.success || !result.data) {
+              throw new Error(result.error || 'Invalid feed data');
+            }
+            
+            const feedData = result.data;
+            
+            console.log('Feed details:', {
+              id: feedData.id,
+              name: feedData.feedName,
+              videoCount: feedData.videos ? feedData.videos.length : 0,
+              widgetType: feedData.widgetType
+            });
+            
+            // Initialize widget config
+            if (!window.__video_cart_feeds__) {
+              window.__video_cart_feeds__ = [];
+            }
+            
+            window.__video_cart_feeds__.push({
+              feedId: feedId,
+              containerId: containerId,
+              shop: shop,
+              feedData: feedData
+            });
+            
+            console.log('Widget config added to queue:', window.__video_cart_feeds__);
+            
+            // Render the widget
+            if (window.VideoCartWidgets && window.VideoCartWidgets.initFeeds) {
+              console.log('VideoCartWidgets available, initializing now');
+              window.VideoCartWidgets.initFeeds();
+            } else {
+              console.log('VideoCartWidgets not ready, waiting for bundle...');
+              window.addEventListener('video-cart-ready', function() {
+                console.log('video-cart-ready event received');
+                if (window.VideoCartWidgets && window.VideoCartWidgets.initFeeds) {
+                  console.log('Initializing VideoCartWidgets');
+                  window.VideoCartWidgets.initFeeds();
+                }
+              });
+            }
+          })
+          .catch(function(error) {
+            console.error('Error loading feed:', error);
+            container.innerHTML = 
+              '<div style="text-align: center; padding: 40px; color: #dc2626;">' +
+              '<p style="font-weight: 600; margin-bottom: 8px;">⚠️ Error Loading Video Feed</p>' +
+              '<p style="font-size: 14px; color: #6b7280;">' + error.message + '</p>' +
+              '<p style="font-size: 12px; color: #9ca3af; margin-top: 8px;">Feed ID: ' + feedId + '</p>' +
+              '</div>';
+          });
+      }
+      
+      // Initialize when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFeedWidget);
+      } else {
+        initFeedWidget();
+      }
+    })();
+  </script>
+{% else %}
+  {% comment %} No feed selected - show placeholder {% endcomment %}
+  {% if request.design_mode %}
+    <div style="padding: 40px; text-align: center; background: #f6f6f7; border: 2px dashed #d1d5db; border-radius: 8px; color: #6d7175;">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" style="margin: 0 auto 16px; opacity: 0.4;">
+        <rect x="2" y="2" width="20" height="20" rx="2" stroke-width="2"/>
+        <path d="M10 8l6 4-6 4V8z" fill="currentColor"/>
+      </svg>
+      <p style="font-size: 16px; font-weight: 600; margin-bottom: 8px; color: #374151;">No Feed Selected</p>
+      <p style="font-size: 14px; color: #6b7280;">Use the selector above to choose a video feed</p>
+    </div>
+  {% endif %}
+{% endif %}
