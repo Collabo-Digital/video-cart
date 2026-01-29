@@ -1,65 +1,10 @@
-// import { Box, VideoThumbnail, Modal } from "@shopify/polaris";
-// import { useState, useCallback } from "react";
-
-// export default function VideoDisplay({ video }) {
-//   console.log("video", video);
-//   const [active, setActive] = useState(false);
-
-//   // Toggle Modal visibility
-//   const handleChange = useCallback(() => setActive(!active), [active]);
-
-  
-//   // Note: For Mux, you'd usually get the playbackId from your video object
-//   const playbackId = video?.playbackId[0]?.id || ""; 
-
-//   return (
-//     <>
-//       <Box 
-//         background="bg-fill-active" 
-//         style={{ width: "200px", height: "250px", border: "0.5px solid gray", overflow: 'hidden', borderRadius: '8px' }}
-//       >
-//         <VideoThumbnail
-//           videoLength={60}
-//           onClick={handleChange} // Opens the modal
-//           thumbnailUrl={`https://image.mux.com/${playbackId}/animated.gif`}
-//         />
-//       </Box>
-
-//       <Modal
-//         open={active}
-//         onClose={handleChange}
-//         title="Video Preview"
-       
-//       >
-//         <Modal.Section>
-//           <div style={{ position: 'relative', paddingTop: '56.25%' }}>
-//             <iframe
-//               src={`https://stream.mux.com/${playbackId}.m3u8`} // Update logic based on your player
-//               style={{
-//                 position: 'absolute',
-//                 top: 0,
-//                 left: 0,
-//                 width: '100%',
-//                 height: '100%',
-//                 border: 0
-//               }}
-//               allow="autoplay; fullscreen; picture-in-picture"
-//               allowFullScreen
-//             />
-//           </div>
-          
-//         </Modal.Section>
-//       </Modal>
-//     </>
-//   );
-// }
-
 
 import { Box, VideoThumbnail, Modal, InlineStack, Button, Text, BlockStack } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { DeleteIcon } from '@shopify/polaris-icons';
+import ResourcePicker from "../ResourcePicker/ResourcePicker";
 
-export default function VideoDisplay({ video, onRemove }) {
+export default function VideoDisplay({ video, onRemove, shopify }) {
   const [active, setActive] = useState(false);
 
   const handleChange = useCallback(() => setActive(!active), [active]);
@@ -70,7 +15,7 @@ export default function VideoDisplay({ video, onRemove }) {
     if (typeof video?.playbackId === 'string') {
       return video.playbackId;
     }
-    
+
     // Array format from API
     if (Array.isArray(video?.playbackId) && video.playbackId.length > 0) {
       const firstItem = video.playbackId[0];
@@ -83,10 +28,21 @@ export default function VideoDisplay({ video, onRemove }) {
         return firstItem;
       }
     }
-    
+
     // Fallback options
     return video?.videoPlaybackId || video?.assetId || '';
   };
+
+  const handleTagProducts = useCallback(() => {
+    shopify.resourcePicker({
+                    type: 'product',
+                    multiple: true,
+               }).then((result) => {
+                console.log('result', result);
+               }).catch((error) => {
+                console.error('error', error);
+               });
+  }, [shopify]);
 
   const playbackId = getPlaybackId();
   const videoTitle = video?.title || video?.fileName || 'Untitled Video';
@@ -145,32 +101,13 @@ export default function VideoDisplay({ video, onRemove }) {
 
   return (
     <BlockStack gap="200">
-      <InlineStack align="space-between" blockAlign="center">
-        <BlockStack gap="100">
-          <Text as="p" variant="bodySm" fontWeight="semibold">
-            {videoTitle}
-          </Text>
-          <Text as="p" variant="bodyXs" tone="subdued">
-            ID: {playbackId.substring(0, 20)}...
-          </Text>
-        </BlockStack>
-        {onRemove && (
-          <Button
-            icon={DeleteIcon}
-            onClick={onRemove}
-            variant="plain"
-            tone="critical"
-            size="slim"
-            accessibilityLabel="Remove video"
-          />
-        )}
-      </InlineStack>
+
 
       <Box
         background="bg-surface-secondary"
         style={{
-          width: "200px",
-          height: "250px",
+          width: "100%",
+          height: "200px",
           border: "1px solid var(--p-color-border)",
           overflow: 'hidden',
           borderRadius: '8px',
@@ -180,7 +117,7 @@ export default function VideoDisplay({ video, onRemove }) {
         onClick={handleChange}
       >
         <VideoThumbnail
-          videoLength={videoDuration}
+          // videoLength={videoDuration}
           thumbnailUrl={`https://image.mux.com/${playbackId}/thumbnail.png?width=400&height=500&fit_mode=smartcrop&time=1`}
         />
         <div style={{
@@ -195,7 +132,29 @@ export default function VideoDisplay({ video, onRemove }) {
         }}>
           Click to preview
         </div>
+
       </Box>
+
+
+      <BlockStack gap="100">
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="p" variant="bodySm" fontWeight="semibold">
+          {videoTitle}
+        </Text>
+        {onRemove && (
+            <Button
+              icon={DeleteIcon}
+              onClick={onRemove}
+              variant="plain"
+              tone="critical"
+              size="slim"
+              accessibilityLabel="Remove video"
+            />
+          )}
+        </InlineStack>
+        <ResourcePicker />
+      </BlockStack>
+
 
       <Modal
         open={active}
@@ -220,7 +179,7 @@ export default function VideoDisplay({ video, onRemove }) {
               Your browser does not support the video tag.
             </video>
           </div>
-          
+
           <BlockStack gap="200" inlineAlign="start">
             <Text as="p" variant="bodySm" tone="subdued">
               Playback ID: {playbackId}

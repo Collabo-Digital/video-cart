@@ -45,6 +45,8 @@ export const loader = async ({ params, request }) => {
     // Get feed with shop validation
     const feed = await getFeedById(feedId, shop);
 
+    console.log('feed------->', feed);
+
     if (!feed) {
       return new Response(
         JSON.stringify({ error: 'Feed not found' }),
@@ -63,6 +65,19 @@ export const loader = async ({ params, request }) => {
         JSON.stringify({ error: 'Feed is disabled' }),
         {
           status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+          },
+        }
+      );
+    }
+
+    if (feed.isDeleted) {
+      return new Response(
+        JSON.stringify({ error: 'Feed is deleted' }),
+        {
+          status: 404,
           headers: {
             'Content-Type': 'application/json',
             'Access-Control-Allow-Origin': '*',
@@ -109,6 +124,7 @@ export const loader = async ({ params, request }) => {
         autoplay: feed.autoplay,
         showControls: feed.showControls,
         showTitle: feed.showTitle,
+        ...(feed.settings || {}),
       },
       videos: readyVideos.sort((a, b) => a.position - b.position),
     };

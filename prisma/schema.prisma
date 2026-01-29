@@ -86,11 +86,13 @@ model Feed {
   shopDomain     String
   widgetType     String      @default("carousel") // carousel | grid
   isEnabled      Boolean     @default(true)
+  isDeleted      Boolean     @default(false)
   
   // Settings
   autoplay       Boolean     @default(false)
   showControls   Boolean     @default(true)
   showTitle      Boolean     @default(true)
+  settings       Json?
   
   // Timestamps
   createdAt      DateTime    @default(now())
@@ -101,6 +103,7 @@ model Feed {
   videos         FeedVideo[]
   
   @@index([shopDomain])
+  @@index([isDeleted])
 }
 
 // Junction table for Feed-Video many-to-many relationship

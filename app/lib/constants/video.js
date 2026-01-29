@@ -17,3 +17,8 @@ export const VIDEO_STATUS = {
   ASSET_CREATED: 'asset_created',
   PREPARING: 'preparing',
 };
+
+export const SOCIAL_SOURCE = {
+  INSTAGRAM: 'instagram',
+  TIKTOK: 'tiktok',
+};

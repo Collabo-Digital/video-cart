@@ -31,7 +31,9 @@ export const loader = async ({ request }) => {
     const feeds = await getFeedsByShop(shop);
 
     // Return simplified feed data for selector
-    const feedList = feeds.map((feed) => ({
+    const feedList = feeds
+    .filter((feed) => feed.isEnabled && !feed.isDeleted)
+    .map((feed) => ({
       id: feed.id,
       feedName: feed.feedName,
       widgetType: feed.widgetType,

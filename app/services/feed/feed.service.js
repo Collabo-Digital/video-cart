@@ -55,7 +55,7 @@ export async function getFeedById(feedId, shopDomain) {
  * @returns {Promise<Object>} Created feed
  */
 export async function createFeed(data) {
-  const { feedName, shopDomain, widgetType, isEnabled, videos = [] } = data;
+  const { feedName, shopDomain, widgetType, isEnabled, settings, videos = [] } = data;
 
   if (!feedName || feedName.trim().length < 3) {
     throw new Error('Feed name must be at least 3 characters');
@@ -70,6 +70,7 @@ export async function createFeed(data) {
     shopDomain,
     widgetType: widgetType || 'carousel',
     isEnabled: isEnabled !== false,
+    settings: settings || undefined,
     videos: {
       create: videos.map((video, index) => ({
         videoId: video.id,
@@ -94,7 +95,7 @@ export async function updateFeed(feedId, data) {
     throw new Error('Feed ID is required');
   }
 
-  const { feedName, widgetType, isEnabled } = data;
+  const { feedName, widgetType, isEnabled, settings } = data;
 
   const updateData = {};
 
@@ -111,6 +112,10 @@ export async function updateFeed(feedId, data) {
 
   if (isEnabled !== undefined) {
     updateData.isEnabled = isEnabled;
+  }
+
+  if (settings !== undefined) {
+    updateData.settings = settings || null;
   }
 
   return FeedModel.updateById(feedId, updateData);

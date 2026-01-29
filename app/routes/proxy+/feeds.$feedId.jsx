@@ -46,6 +46,13 @@ export const loader = async ({ request, params }) => {
       }, { status: 403 });
     }
 
+    if (feed.isDeleted) {
+      return Response.json({
+        success: false,
+        error: "Feed is deleted",
+      }, { status: 404 });
+    }
+
     // Fetch full video data for each feed video
     const videosWithData = await Promise.all(
       (feed.videos || []).map(async (feedVideo) => {
@@ -71,10 +78,10 @@ export const loader = async ({ request, params }) => {
       })
     );
 
-    // // Filter out null results and videos that aren't ready
-    // const readyVideos = videosWithData
-    //   .filter(v => v !== null && v.status === 'READY' && v.playbackId)
-    //   .sort((a, b) => a.position - b.position);
+    // Filter out null results and videos that aren't ready
+    const readyVideos = videosWithData
+      .filter(v => v !== null && v.status === 'READY' && v.playbackId)
+      .sort((a, b) => a.position - b.position);
 
     // Return feed data formatted for storefront
     return Response.json({
@@ -84,7 +91,7 @@ export const loader = async ({ request, params }) => {
         feedName: feed.feedName,
         widgetType: feed.widgetType || 'carousel', // Default to carousel if not set
         isEnabled: feed.isEnabled,
-        videos: feed.videos,
+        videos: feed.videos || [],
         settings: {
           autoplay: feed.autoplay,
           showControls: feed.showControls,

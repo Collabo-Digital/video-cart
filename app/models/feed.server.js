@@ -12,10 +12,14 @@ import prisma from '../config/database.server';
  * @returns {Promise<Array>} Array of feed objects
  */
 export async function findAll(filters = {}) {
-  const { shopDomain, limit = 50, offset = 0 } = filters;
+  const { shopDomain, limit = 50, offset = 0, includeDeleted = false } = filters;
+
+  const where = {};
+  if (shopDomain) where.shopDomain = shopDomain;
+  if (!includeDeleted) where.isDeleted = false;
 
   return prisma.feed.findMany({
-    where: shopDomain ? { shopDomain } : undefined,
+    where: Object.keys(where).length ? where : undefined,
     include: {
       videos: {
         orderBy: {
@@ -40,6 +44,7 @@ export async function findById(id, shopDomain = null) {
   if (shopDomain) {
     where.shopDomain = shopDomain;
   }
+  where.isDeleted = false;
 
   return prisma.feed.findUnique({
     where,

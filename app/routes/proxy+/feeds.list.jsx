@@ -20,7 +20,7 @@ export const loader = async ({ request }) => {
     const feeds = await getFeedsByShop(session.shop);
 
     const feedList = feeds
-      .filter(feed => feed.isEnabled) // Only return enabled feeds
+      .filter(feed => feed.isEnabled && !feed.isDeleted) // Only return enabled + not deleted
       .map((feed) => ({
         id: feed.id,
         feedName: feed.feedName,
@@ -40,7 +40,6 @@ export const loader = async ({ request }) => {
     return Response.json({
       success: false,
       error: error.message || 'Failed to fetch feeds',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     }, { status: 500 });
   }
 };

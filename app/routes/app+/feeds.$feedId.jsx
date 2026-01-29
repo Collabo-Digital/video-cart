@@ -15,6 +15,7 @@ import {
   InlineGrid,
   InlineStack,
   Button,
+  Tabs,
 } from "@shopify/polaris";
 import { useEffect, useState, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
@@ -35,6 +36,7 @@ export const loader = async ({ params, request }) => {
     }
 
     const feed = await getFeedById(params.feedId, session.shop);
+    console.log('feed------->', feed);
     return { mode: "edit", feed };
   } catch (error) {
     console.error('Feed loader error:', error);
@@ -86,6 +88,7 @@ export default function FeedEditorPage() {
   const [uploadedVideos, setUploadedVideos] = useState([]);
   const [error, setError] = useState(null);
   const [hasVideoChanges, setHasVideoChanges] = useState(false);
+  const [selected, setSelected] = useState(0);
 
   const {
     control,
@@ -103,6 +106,22 @@ export default function FeedEditorPage() {
   const widgetTypeOptions = [
     { label: "Carousel", value: "carousel" },
     { label: "Grid", value: "grid" },
+  ];
+
+   const tabs = [
+    {
+      id: 'feeds-settings',
+      index: 0,
+      content: 'Settings',
+      accessibilityLabel: 'Settings',
+      panelID: 'feeds-settings-content',
+    },
+    {
+      id: 'feeds-analytics',
+      index: 1,
+      content: 'Analytics',
+      panelID: 'feeds-analytics-content',
+    },
   ];
 
   const hasChanges = isDirty || hasVideoChanges;
@@ -138,6 +157,8 @@ export default function FeedEditorPage() {
     setError(null);
   }, []);
 
+
+
   const handleRemoveVideo = useCallback((index) => {
     setUploadedVideos((prev) => prev.filter((_, i) => i !== index));
     setHasVideoChanges(true);
@@ -166,6 +187,10 @@ export default function FeedEditorPage() {
       shopify.saveBar.hide('feed-save-bar');
     }
   }, [uploadedVideos, watch, submit, shopify]);
+
+  const handleTabChange = useCallback((selected) => {
+    setSelected(selected);
+  }, []);
 
   const handleDiscard = useCallback(() => {
     // Reset form to original values
@@ -198,6 +223,8 @@ export default function FeedEditorPage() {
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="400">
+                <Text variant="headingMd" as="h2">Import Videos</Text>
+                <VideoUploader setUploadedVideo={handleVideoUpload} />
                 <Text variant="headingMd" as="h2">
                   Videos
                 </Text>
@@ -213,17 +240,20 @@ export default function FeedEditorPage() {
                     <Text variant="headingSm" as="h3">
                       Uploaded Videos ({uploadedVideos.length})
                     </Text>
-                    {uploadedVideos.map((video, index) => (
+                    <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
+                      {uploadedVideos.map((video, index) => (
                       <VideoDisplay
                         key={video.id || video.videoId || index}
                         video={video}
                         onRemove={() => handleRemoveVideo(index)}
+                        shopify={shopify}
                       />
                     ))}
+                    </InlineGrid>
                   </BlockStack>
                 )}
 
-                <VideoUploader setUploadedVideo={handleVideoUpload} />
+                
               </BlockStack>
             </Card>
           </BlockStack>
@@ -232,9 +262,7 @@ export default function FeedEditorPage() {
           <BlockStack gap="400">
             <Card>
               <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">
-                  Feed Settings
-                </Text>
+                <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
 
                 <Controller
                   name="feedName"
