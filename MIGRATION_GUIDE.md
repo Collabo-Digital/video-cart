@@ -523,7 +523,6 @@ export const headers = (headersArgs) => {
 
 **Videos Page** (`routes/app+/videos.tsx`):
 ```typescript
-import { json } from 'react-router';
 import { Page, Frame } from "@shopify/polaris";
 import { useLoaderData } from "react-router";
 import { authenticate } from "~/config/shopify.server";
@@ -534,7 +533,15 @@ import VideoDisplay from "~/components/features/video/VideoDisplay/VideoDisplay"
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
   const videos = await VideoModel.findAll();
-  return json({ videos });
+  return new Response(
+    JSON.stringify({ videos }),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
 };
 
 export default function VideosPage() {
@@ -553,7 +560,6 @@ export default function VideosPage() {
 
 **API Routes** (`routes/api+/v1+/videos+/upload.tsx`):
 ```typescript
-import { json } from 'react-router';
 import { authenticate } from '~/config/shopify.server';
 import { createUploadUrl } from '~/services/video/upload.service';
 
@@ -561,38 +567,85 @@ export const action = async ({ request }) => {
   await authenticate.admin(request);
 
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 
   try {
     const uploadData = await createUploadUrl();
-    return json({ success: true, data: uploadData });
+    return new Response(
+      JSON.stringify({ success: true, data: uploadData }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Upload creation error:', error);
-    return json({
-      success: false,
-      error: error.message,
-    }, { status: 500 });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+      }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```
 
 **Webhooks** (`routes/webhooks+/mux.tsx`):
 ```typescript
-import { json } from 'react-router';
 import { handleMuxWebhook } from '~/services/mux/webhook.service';
 
 export const action = async ({ request }) => {
   if (request.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, { status: 405 });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      {
+        status: 405,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 
   try {
     await handleMuxWebhook(request);
-    return json({ received: true });
+    return new Response(
+      JSON.stringify({ received: true }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   } catch (error) {
     console.error('Mux webhook error:', error);
-    return json({ error: error.message }, { status: 400 });
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
 };
 ```
