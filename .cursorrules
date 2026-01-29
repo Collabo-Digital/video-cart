@@ -1,0 +1,721 @@
+# Video Cart - Cursor AI Rules
+
+## 📋 Overview
+
+This project follows a **clean layered architecture**. All code MUST adhere to the patterns defined in `ARCHITECTURE.md`.
+
+**Before writing ANY code, read `ARCHITECTURE.md` for complete specifications.**
+
+---
+
+## 🎯 Core Architecture Rules
+
+### Layer Separation (CRITICAL)
+
+```
+Routes (HTTP) → Services (Business Logic) → Models (Data Access) → Database
+```
+
+**NEVER skip layers. NEVER mix responsibilities.**
+
+### Layer Rules
+
+1. **Routes** (`app/routes/`)
+   - ✅ Handle HTTP only (max 50 lines)
+   - ✅ Call services or models
+   - ✅ Return JSON responses
+   - ❌ NO business logic
+   - ❌ NO direct Prisma usage
+
+2. **Services** (`app/services/`)
+   - ✅ Business logic ONLY
+   - ✅ Orchestrate models
+   - ✅ External API calls
+   - ❌ NO HTTP handling (req/res)
+   - ❌ NO direct Prisma
+
+3. **Models** (`app/models/`)
+   - ✅ Database operations ONLY
+   - ✅ Use Prisma directly
+   - ❌ NO business logic
+   - ❌ NO external APIs
+
+4. **Components** (`app/components/`)
+   - ✅ Split into `ui/` (generic) and `features/` (domain-specific)
+   - ✅ Extract logic to hooks
+   - ❌ NO business logic
+   - ❌ NO direct API calls
+
+---
+
+## 📁 File Placement Rules
+
+### When Creating New Files
+
+**Ask: "What type of code is this?"**
+
+| Type | Location | Naming |
+|------|----------|--------|
+| Database operation | `app/models/[entity].server.js` | `video.server.js` |
+| Business logic | `app/services/[domain]/[action].service.js` | `upload.service.js` |
+| API endpoint | `app/routes/api+/v1+/[resource]+/[action].tsx` | `upload.tsx` |
+| Admin page | `app/routes/app+/[page].tsx` | `videos.tsx` |
+| Webhook | `app/routes/webhooks+/[name].tsx` | `mux.tsx` |
+| Auth route | `app/routes/auth+/[name].tsx` | `login.tsx` |
+| Generic UI | `app/components/ui/[Component]/` | `Button/Button.jsx` |
+| Domain UI | `app/components/features/[domain]/[Component]/` | `video/VideoCard/` |
+| Utility function | `app/lib/utils/[category].js` | `validation.js` |
+| Constant | `app/lib/constants/[domain].js` | `video.js` |
+| Error class | `app/lib/errors/[Domain]Error.js` | `VideoUploadError.js` |
+| Custom hook | `app/lib/hooks/use[Name].js` | `useDebounce.js` |
+
+### Flat Routes Convention (Hybrid Mode)
+
+This project uses **remix-flat-routes** with hybrid mode (`+` character for nesting).
+
+**Route Structure:**
+```
+routes/
+├── _index.tsx                    → /
+├── app+/                         → /app/* (namespace)
+│   ├── _layout.tsx              → Layout for /app/*
+│   ├── _index.tsx               → /app
+│   └── videos.tsx               → /app/videos
+├── api+/v1+/videos+/            → /api/v1/videos/* (nested namespaces)
+│   └── upload.tsx               → POST /api/v1/videos/upload
+├── auth+/                        → /auth/*
+│   ├── $.tsx                    → /auth/* (catch-all)
+│   └── login.tsx                → /auth/login
+└── webhooks+/                    → /webhooks/*
+    └── mux.tsx                  → /webhooks/mux
+```
+
+**Naming Patterns:**
+- `_index.tsx` - Index route (root of parent)
+- `_layout.tsx` - Layout wrapper for nested routes
+- `folder+/` - Namespace (adds to URL path)
+- `$param.tsx` - Dynamic parameter
+- `$.tsx` - Catch-all splat route
+
+---
+
+## 📝 Naming Conventions
+
+### Files
+- Models: `[entity].server.js`
+- Services: `[action].service.js`
+- Routes: `[action].jsx` or `[resource].$id.jsx`
+- Components: `PascalCase.jsx`
+- Hooks: `use[Name].js`
+- Tests: `[filename].test.js`
+
+### Functions
+- Find: `findById()`, `findAll()`, `findByEmail()`
+- CRUD: `create()`, `updateById()`, `deleteById()`
+- Service: `uploadVideo()`, `processOrder()`, `calculateTotal()`
+- Handlers: `handleClick()`, `handleSubmit()`
+- Hooks: `useVideoUpload()`, `useAsync()`
+
+### Variables
+- camelCase for variables: `videoId`, `userName`
+- UPPER_SNAKE_CASE for constants: `MAX_SIZE`, `API_URL`
+- PascalCase for components: `VideoCard`, `Button`
+
+---
+
+## 🔧 Code Templates
+
+### Model Template
+
+```javascript
+/**
+ * [Entity] Model - Data Access Layer
+ */
+import prisma from '~/config/database.server';
+
+export async function findAll(filters = {}) {
+  return prisma.[entity].findMany({
+    where: filters.status ? { status: filters.status } : undefined,
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+export async function findById(id) {
+  return prisma.[entity].findUnique({ where: { id } });
+}
+
+export async function create(data) {
+  return prisma.[entity].create({ data });
+}
+
+export async function updateById(id, data) {
+  return prisma.[entity].update({ where: { id }, data });
+}
+
+export async function deleteById(id) {
+  return prisma.[entity].delete({ where: { id } });
+}
+```
+
+### Service Template
+
+```javascript
+/**
+ * [Domain] [Action] Service
+ */
+import * as [Entity]Model from '~/models/[entity].server';
+import { [Error]Class } from '~/lib/errors/[Error]Class';
+
+export async function [actionName](params) {
+  // 1. Validate
+  if (!params.required) {
+    throw new [Error]Class('Message', 'ERROR_CODE');
+  }
+  
+  // 2. Business logic
+  const result = await processLogic(params);
+  
+  // 3. Data operations
+  return [Entity]Model.create(result);
+}
+```
+
+### Route Template
+
+```javascript
+/**
+ * [METHOD] /api/v1/[resource]/[action]
+ */
+import { authenticate } from '~/config/shopify.server';
+import { [action] } from '~/services/[domain]/[action].service';
+
+export const [loader|action] = async ({ request, params }) => {
+  await authenticate.admin(request);
+  
+  try {
+    const body = await request.json().catch(() => ({}));
+    const result = await [action](body);
+    
+    return new Response(
+      JSON.stringify({ success: true, data: result }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Error:', error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        code: error.code || 'OPERATION_FAILED',
+      }),
+      {
+        status: error.statusCode || 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  }
+};
+```
+
+### Component Template
+
+```javascript
+/**
+ * [ComponentName]
+ */
+import { useState } from 'react';
+import { Card, Button } from '@shopify/polaris';
+
+export function ComponentName({ prop1, onAction }) {
+  const [state, setState] = useState(null);
+  
+  return (
+    <Card>
+      {/* Component content */}
+      <Button onClick={() => onAction?.(state)}>
+        Action
+      </Button>
+    </Card>
+  );
+}
+```
+
+---
+
+## ✅ Required Practices
+
+### 1. JSDoc Comments
+
+**ALWAYS add JSDoc to exported functions:**
+
+```javascript
+/**
+ * Description of what function does
+ * @param {Type} param - Description
+ * @returns {Promise<Type>} Description
+ * @throws {ErrorClass} When condition
+ */
+export async function functionName(param) {
+  // Implementation
+}
+```
+
+### 2. Error Handling
+
+**Routes MUST have try/catch:**
+
+```javascript
+export const action = async ({ request }) => {
+  try {
+    const result = await service();
+    return json({ success: true, data: result });
+  } catch (error) {
+    console.error('Action failed:', error);
+    return json({
+      success: false,
+      error: error.message,
+      code: error.code,
+    }, { status: error.statusCode || 500 });
+  }
+};
+```
+
+**Services MUST throw custom errors:**
+
+```javascript
+import { VideoError } from '~/lib/errors/VideoError';
+
+export async function uploadVideo(data) {
+  if (!data.file) {
+    throw new VideoError('File required', 'FILE_REQUIRED');
+  }
+  // Process...
+}
+```
+
+### 3. Validation
+
+**Validate ALL inputs:**
+
+```javascript
+// In services
+export async function createVideo(data) {
+  if (!data.title) {
+    throw new VideoError('Title required', 'TITLE_REQUIRED');
+  }
+  
+  if (data.size > MAX_SIZE) {
+    throw new VideoError('File too large', 'FILE_TOO_LARGE');
+  }
+  
+  return VideoModel.create(data);
+}
+```
+
+### 4. Constants
+
+**Use constants, NOT magic values:**
+
+```javascript
+// ❌ BAD
+if (file.size > 524288000) { ... }
+
+// ✅ GOOD
+import { VIDEO_CONFIG } from '~/lib/constants/video';
+if (file.size > VIDEO_CONFIG.MAX_SIZE_BYTES) { ... }
+```
+
+### 5. Imports Organization
+
+**Order imports consistently:**
+
+```javascript
+// 1. External libraries
+import { useState } from 'react';
+import { Button } from '@shopify/polaris';
+
+// 2. Config
+import { authenticate } from '~/config/shopify.server';
+
+// 3. Models
+import * as VideoModel from '~/models/video.server';
+
+// 4. Services
+import { uploadVideo } from '~/services/video/upload.service';
+
+// 5. Utils & Constants
+import { formatDate } from '~/lib/utils/dates';
+import { VIDEO_CONFIG } from '~/lib/constants/video';
+
+// 6. Styles
+import styles from './styles.module.css';
+```
+
+---
+
+## 🚫 Forbidden Patterns
+
+### NEVER Do This
+
+```javascript
+// ❌ Business logic in route
+export const action = async ({ request }) => {
+  const body = await request.json();
+  
+  // ❌ DON'T: Business logic here
+  if (body.size > 500 * 1024 * 1024) {
+    return new Response(
+      JSON.stringify({ error: 'Too large' }),
+      {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  }
+  
+  // ❌ DON'T: Direct Prisma in route
+  const video = await prisma.video.create({ data: body });
+  return new Response(
+    JSON.stringify(video),
+    {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+};
+
+// ❌ Direct Prisma in service
+export async function uploadVideo(data) {
+  // ❌ DON'T: Use Prisma in service
+  return prisma.video.create({ data });
+}
+
+// ❌ Business logic in model
+export async function create(data) {
+  // ❌ DON'T: Validation in model
+  if (!data.title) throw new Error('Title required');
+  
+  // ❌ DON'T: External API call in model
+  await fetch('https://api.example.com');
+  
+  return prisma.video.create({ data });
+}
+
+// ❌ Magic values
+const MAX_SIZE = 500; // ❌ Should be in constants
+if (size > 500) { } // ❌ Should use constant
+```
+
+### DO This Instead
+
+```javascript
+// ✅ Route (thin controller)
+export const action = async ({ request }) => {
+  try {
+    const body = await request.json();
+    const result = await uploadVideo(body); // Call service
+    return new Response(
+      JSON.stringify({ success: true, data: result }),
+      {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('Upload failed:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+  }
+};
+
+// ✅ Service (business logic)
+export async function uploadVideo(data) {
+  // Validation
+  validateVideoFile(data.file);
+  
+  // Business logic
+  const muxAsset = await uploadToMux(data.file);
+  
+  // Data operation
+  return VideoModel.create({ ...muxAsset, ...data });
+}
+
+// ✅ Model (data access only)
+export async function create(data) {
+  return prisma.video.create({ data });
+}
+
+// ✅ Constants
+import { VIDEO_CONFIG } from '~/lib/constants/video';
+if (size > VIDEO_CONFIG.MAX_SIZE_BYTES) { }
+```
+
+---
+
+## 🎯 Decision Flow
+
+### Creating New Code
+
+```
+1. Is it database CRUD?
+   YES → Create/update in `app/models/[entity].server.js`
+   
+2. Is it business logic?
+   YES → Create/update in `app/services/[domain]/[action].service.js`
+   
+3. Is it an HTTP endpoint?
+   YES → Create in `app/routes/api/v1/[resource]/[action].jsx`
+   
+4. Is it reusable UI?
+   YES → Generic? `app/components/ui/[Component]/`
+         Domain-specific? `app/components/features/[domain]/[Component]/`
+   
+5. Is it a helper function?
+   YES → `app/lib/utils/[category].js`
+   
+6. Is it a constant?
+   YES → `app/lib/constants/[domain].js`
+   
+7. Is it a custom error?
+   YES → `app/lib/errors/[Domain]Error.js`
+```
+
+### Refactoring Existing Code
+
+```
+1. Does route have business logic?
+   YES → Extract to service
+   
+2. Does route use Prisma directly?
+   YES → Extract to model
+   
+3. Are there magic values?
+   YES → Move to constants
+   
+4. Is code repeated?
+   YES → Extract to utility
+   
+5. Is component too large (>150 lines)?
+   YES → Split into smaller components
+   
+6. Is logic in component?
+   YES → Extract to custom hook
+```
+
+---
+
+## 📊 File Size Limits
+
+| File Type | Max Lines | Action if Exceeded |
+|-----------|-----------|-------------------|
+| Route | 50 | Extract to service |
+| Service | 200 | Split into multiple services |
+| Model | 300 | Split by entity |
+| Component | 150 | Split into smaller components |
+| Utility | 100 | Split by category |
+
+---
+
+## 🧪 Testing Requirements
+
+### Test Location
+Place tests next to the file:
+```
+app/models/video.server.js
+app/models/video.server.test.js
+```
+
+### Test Structure
+```javascript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+describe('ModuleName', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  
+  describe('functionName', () => {
+    it('should do expected behavior', async () => {
+      // Arrange
+      const input = {};
+      
+      // Act
+      const result = await functionName(input);
+      
+      // Assert
+      expect(result).toEqual(expected);
+    });
+  });
+});
+```
+
+### Mock Dependencies
+```javascript
+// Mock Prisma in model tests
+vi.mock('~/config/database.server');
+
+// Mock models in service tests
+vi.mock('~/models/video.server');
+```
+
+---
+
+## 📋 Pre-Commit Checklist
+
+Before submitting code, verify:
+
+- [ ] Code follows layer separation (Route → Service → Model)
+- [ ] No business logic in routes (max 50 lines)
+- [ ] No Prisma calls outside models
+- [ ] All exported functions have JSDoc comments
+- [ ] Errors are handled with try/catch
+- [ ] Custom errors thrown with codes
+- [ ] Constants used instead of magic values
+- [ ] Input validation performed
+- [ ] File is under size limit
+- [ ] Imports are organized correctly
+- [ ] No console.logs (except error logging)
+- [ ] Tests written and passing
+- [ ] Function names follow conventions
+
+---
+
+## 💡 Common Patterns
+
+### Pattern: Create Entity
+```
+User Request → Route → Service.createEntity() → Model.create() → Database
+```
+
+### Pattern: List Entities
+```
+User Request → Route → Model.findAll() → Database
+```
+
+### Pattern: Complex Workflow
+```
+User Request → Route → Service.complexFlow() 
+  → Model1.find()
+  → ExternalAPI.call()
+  → Model2.create()
+  → Return result
+```
+
+### Pattern: Error Flow
+```
+Service throws CustomError 
+  → Route catches 
+  → Returns JSON { success: false, error, code, statusCode }
+```
+
+---
+
+## 🔍 Code Review Focus
+
+When reviewing AI-generated code, check:
+
+1. **Layer Separation**: Is code in the correct layer?
+2. **Responsibilities**: Does each function have ONE purpose?
+3. **Error Handling**: Are errors properly caught and logged?
+4. **Validation**: Are inputs validated before use?
+5. **Constants**: Are magic values replaced with constants?
+6. **Documentation**: Do functions have JSDoc?
+7. **Testing**: Are tests included?
+8. **Naming**: Do names follow conventions?
+
+---
+
+## 📚 Reference Documentation
+
+**Full specifications:** Read `ARCHITECTURE.md` for complete details.
+
+**Key sections:**
+- Layer Specifications (Models, Services, Routes, Components)
+- Code Templates (copy-paste ready)
+- Examples (before/after refactoring)
+- Testing Guidelines
+
+---
+
+## 🎓 Learning Path
+
+**For new developers:**
+
+1. Read `ARCHITECTURE.md` (20 min)
+2. Review existing code patterns
+3. Start with small changes
+4. Ask: "Which layer does this belong in?"
+
+**For AI assistants:**
+
+1. Always reference `ARCHITECTURE.md` before generating code
+2. Follow templates exactly
+3. Apply layer separation strictly
+4. Use constants from `lib/constants/`
+5. Generate tests alongside code
+
+---
+
+## ⚡ Quick Tips
+
+- **Route too long?** Extract to service
+- **Repeated logic?** Extract to utility
+- **Magic numbers?** Add to constants
+- **Complex component?** Split into smaller ones or extract hook
+- **Business logic?** Goes in services, NOT routes
+- **Database operation?** Goes in models, ONLY models
+
+---
+
+## 🚀 Common Tasks
+
+### Add New API Endpoint
+1. Create route in `app/routes/api/v1/[resource]/`
+2. Create service in `app/services/[domain]/`
+3. Create/update model in `app/models/`
+4. Add constants if needed
+5. Add tests
+
+### Add New Feature
+1. Define models (data)
+2. Create services (logic)
+3. Create routes (HTTP)
+4. Create components (UI)
+5. Add tests
+
+### Refactor Existing Code
+1. Identify mixed concerns
+2. Extract to appropriate layer
+3. Add constants for magic values
+4. Add error handling
+5. Add tests
+
+---
+
+**Remember:** When in doubt, check `ARCHITECTURE.md` or ask "Does this belong in this layer?"
+
+**Goal:** Clean, maintainable, testable code that anyone can understand.
+
+---
+
+**Last Updated:** January 22, 2026
