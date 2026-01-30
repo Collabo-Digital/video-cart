@@ -7,7 +7,7 @@
  */
 
 import { authenticate } from '../../config/shopify.server';
-import { getFeedsByShop } from '../../services/feed/feed.service';
+import { getFeedsByShop } from '../../services/feed/feed.service.server';
 
 export const loader = async ({ request }) => {
   try {

@@ -84,6 +84,21 @@ export async function updateById(id, data) {
 }
 
 /**
+ * Update productsTagged for each video in a feed
+ * @param {string} feedId - Feed ID
+ * @param {Array<{ videoId: string, productsTagged: Array<{ id, title?, handle?, image?, images?, productType?, status?, vendor? }> }>} videos - Videos with productsTagged (JSON array of product objects)
+ */
+export async function updateVideosProductsTagged(feedId, videos) {
+  if (!videos || !Array.isArray(videos)) return;
+  for (const v of videos) {
+    await prisma.feedVideo.updateMany({
+      where: { feedId, videoId: v.videoId },
+      data: { productsTagged: v.productsTagged ?? [] },
+    });
+  }
+}
+
+/**
  * Delete feed by ID
  * @param {string} id - Feed ID
  * @returns {Promise<Object>} Deleted feed object

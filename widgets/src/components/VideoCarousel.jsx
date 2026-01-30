@@ -48,10 +48,12 @@ export function VideoCarousel({ feed, videos, settings, widgetId, onEvent }) {
     onEvent?.('video_pause', { feedId: feed?.id, videoId });
   };
 
-  // Handle product click
-  const handleProductClick = (productId) => {
+  // Handle product click (product can be object { id, handle, title, image } or legacy string id)
+  const handleProductClick = (product) => {
+    const productId = typeof product === 'object' && product != null
+      ? (product.handle || product.id)
+      : product;
     onEvent?.('product_click', { feedId: feed?.id, productId });
-    // Navigate to product page
     if (productId) {
       window.location.href = `/products/${productId}`;
     }
@@ -200,35 +202,45 @@ export function VideoCarousel({ feed, videos, settings, widgetId, onEvent }) {
           </h4>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px;">
             <For each={currentVideo()?.productsTagged || []}>
-              {(productId) => (
-                <button
-                  onClick={() => handleProductClick(productId)}
-                  style={{
-                    padding: '12px',
-                    background: 'white',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = '#3b82f6';
-                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = '#d1d5db';
-                    e.currentTarget.style.boxShadow = 'none';
-                  }}
-                >
-                  <div style="font-size: 14px; color: #202223; font-weight: 500;">
-                    Product {productId}
-                  </div>
-                  <div style="font-size: 12px; color: #6d7175; margin-top: 4px;">
-                    View →
-                  </div>
-                </button>
-              )}
+              {(product) => {
+                const isObject = typeof product === 'object' && product != null;
+                const title = isObject ? (product.title || `Product ${product.id}`) : `Product ${product}`;
+                const imageUrl = isObject ? product.image : null;
+                return (
+                  <button
+                    onClick={() => handleProductClick(product)}
+                    style={{
+                      padding: '12px',
+                      background: 'white',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = '#3b82f6';
+                      e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    {imageUrl && (
+                      <div style={{ width: '100%', aspectRatio: '1', marginBottom: '8px', borderRadius: '4px', overflow: 'hidden', background: '#f1f2f4' }}>
+                        <img src={imageUrl} alt={title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      </div>
+                    )}
+                    <div style="font-size: 14px; color: #202223; font-weight: 500;">
+                      {title}
+                    </div>
+                    <div style="font-size: 12px; color: #6d7175; margin-top: 4px;">
+                      View →
+                    </div>
+                  </button>
+                );
+              }}
             </For>
           </div>
         </div>

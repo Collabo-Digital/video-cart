@@ -1,13 +1,33 @@
-
 import { Box, VideoThumbnail, Modal, InlineStack, Button, Text, BlockStack } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import { DeleteIcon } from '@shopify/polaris-icons';
 import ResourcePicker from "../ResourcePicker/ResourcePicker";
 
-export default function VideoDisplay({ video, onRemove, shopify }) {
+/**
+ * VideoDisplay
+ *
+ * Renders a single video card (thumbnail, title, remove, product tagging) and a modal player.
+ * Tagged products are passed up via onTaggedProductsChange; persistence happens on feed save.
+ *
+ * @param {Object} props
+ * @param {Object} props.video - Video object (playbackId, title, taggedProducts/productsTagged)
+ * @param {number} props.index - Index in the feed's video list
+ * @param {function(): void} [props.onRemove] - Called when user removes this video
+ * @param {Object} [props.shopify] - App Bridge instance (optional)
+ * @param {function(number, Array): void} [props.onTaggedProductsChange] - Callback (index, products) when tagged products change
+ */
+export default function VideoDisplay({ video, index, onRemove, shopify, onTaggedProductsChange }) {
   const [active, setActive] = useState(false);
 
   const handleChange = useCallback(() => setActive(!active), [active]);
+
+  const taggedProducts =
+    video?.taggedProducts ??
+    (video?.productsTagged || []).map((item) =>
+      typeof item === "object" && item !== null
+        ? { ...item, id: item.id != null ? String(item.id) : "" }
+        : { id: String(item), title: "", image: null }
+    );
 
   // Extract playback ID from various possible structures
   const getPlaybackId = () => {
@@ -33,16 +53,12 @@ export default function VideoDisplay({ video, onRemove, shopify }) {
     return video?.videoPlaybackId || video?.assetId || '';
   };
 
-  const handleTagProducts = useCallback(() => {
-    shopify.resourcePicker({
-                    type: 'product',
-                    multiple: true,
-               }).then((result) => {
-                console.log('result', result);
-               }).catch((error) => {
-                console.error('error', error);
-               });
-  }, [shopify]);
+  const handleTaggedProductsChange = useCallback(
+    (products) => {
+      onTaggedProductsChange?.(index, products);
+    },
+    [index, onTaggedProductsChange]
+  );
 
   const playbackId = getPlaybackId();
   const videoTitle = video?.title || video?.fileName || 'Untitled Video';
@@ -152,7 +168,10 @@ export default function VideoDisplay({ video, onRemove, shopify }) {
             />
           )}
         </InlineStack>
-        <ResourcePicker />
+        <ResourcePicker
+          selectedProducts={taggedProducts}
+          onProductsSelected={handleTaggedProductsChange}
+        />
       </BlockStack>
 
 

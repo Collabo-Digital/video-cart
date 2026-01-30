@@ -4,7 +4,7 @@
  */
 
 import { authenticate } from "../../config/shopify.server";
-import { getFeedById } from "../../services/feed/feed.service";
+import { getFeedById } from "../../services/feed/feed.service.server";
 import * as VideoModel from "../../models/video.server";
 
 export const loader = async ({ request, params }) => {

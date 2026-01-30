@@ -1,10 +1,11 @@
 /**
  * Feed Service
- * 
- * Handles feed business logic and workflows.
+ *
+ * Handles feed business logic and workflows. Server-only (uses models).
  */
 
 import * as FeedModel from '../../models/feed.server';
+import { updateVideosProductsTagged as updateFeedVideosProductsTagged } from '../../models/feed.server';
 
 /**
  * Get all feeds for a shop
@@ -73,9 +74,9 @@ export async function createFeed(data) {
     settings: settings || undefined,
     videos: {
       create: videos.map((video, index) => ({
-        videoId: video.id,
+        videoId: video.videoId ?? video.id,
         playbackId: video.playbackId,
-        position: index,
+        position: video.position ?? index,
         productsTagged: video.productsTagged || [],
       })),
     },
@@ -95,7 +96,7 @@ export async function updateFeed(feedId, data) {
     throw new Error('Feed ID is required');
   }
 
-  const { feedName, widgetType, isEnabled, settings } = data;
+  const { feedName, widgetType, isEnabled, settings, videos } = data;
 
   const updateData = {};
 
@@ -118,5 +119,11 @@ export async function updateFeed(feedId, data) {
     updateData.settings = settings || null;
   }
 
-  return FeedModel.updateById(feedId, updateData);
+  const result = await FeedModel.updateById(feedId, updateData);
+
+  if (videos && Array.isArray(videos) && videos.length > 0) {
+    await updateFeedVideosProductsTagged(feedId, videos);
+  }
+
+  return result;
 }

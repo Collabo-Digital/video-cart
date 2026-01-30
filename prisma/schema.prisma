@@ -113,8 +113,8 @@ model FeedVideo {
   videoId         String  
   playbackId      String
   
-  // Product tagging
-  productsTagged  String[] @default([]) // Array of product IDs
+  // Product tagging: array of product objects (id, title, handle, image, etc.) as JSON
+  productsTagged  Json     @default("[]")
   
   // Order in feed
   position        Int      @default(0)

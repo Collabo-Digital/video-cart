@@ -5,7 +5,7 @@
  * This endpoint is public (no auth required) as it's called from the storefront.
  */
 
-import { getFeedById } from '../../../../services/feed/feed.service';
+import { getFeedById } from '../../../../services/feed/feed.service.server';
 import * as VideoModel from '../../../../models/video.server';
 
 export const loader = async ({ params, request }) => {

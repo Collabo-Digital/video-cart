@@ -22,7 +22,8 @@ import { useForm, Controller } from "react-hook-form";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { SaveBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../../config/shopify.server";
-import { getFeedById, createFeed, updateFeed } from "../../services/feed/feed.service";
+import { getFeedById, createFeed, updateFeed } from "../../services/feed/feed.service.server";
+import { prepareVideosPayload } from "../../lib/utils/feed";
 import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
 import { redirect, useLoaderData, useNavigation, useSubmit } from "react-router";
@@ -36,7 +37,6 @@ export const loader = async ({ params, request }) => {
     }
 
     const feed = await getFeedById(params.feedId, session.shop);
-    console.log('feed------->', feed);
     return { mode: "edit", feed };
   } catch (error) {
     console.error('Feed loader error:', error);
@@ -49,7 +49,7 @@ export const action = async ({ params, request }) => {
     const { session } = await authenticate.admin(request);
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
-    const videos = JSON.parse(data.videos || "[]");
+    const parsedVideos = JSON.parse(data.videos || "[]");
 
     if (params.feedId === "new") {
       const feed = await createFeed({
@@ -57,7 +57,7 @@ export const action = async ({ params, request }) => {
         shopDomain: session.shop,
         widgetType: data.widgetType,
         isEnabled: data.isEnabled === "true",
-        videos,
+        videos: parsedVideos,
       });
 
       return redirect(`/app/feeds/${feed.id}`);
@@ -67,6 +67,7 @@ export const action = async ({ params, request }) => {
       feedName: data.feedName,
       widgetType: data.widgetType,
       isEnabled: data.isEnabled === "true",
+      videos: parsedVideos,
     });
 
     return redirect(`/app/feeds/${params.feedId}`);
@@ -129,7 +130,18 @@ export default function FeedEditorPage() {
 
   useEffect(() => {
     if (feed?.videos) {
-      setUploadedVideos(feed.videos);
+      setUploadedVideos(
+        feed.videos.map((v) => ({
+          ...v,
+          taggedProducts:
+            v.taggedProducts ??
+            (v.productsTagged || []).map((item) =>
+              typeof item === "object" && item !== null
+                ? { ...item, id: item.id != null ? String(item.id) : "" }
+                : { id: String(item), title: "", image: null }
+            ),
+        }))
+      );
     }
   }, [feed]);
 
@@ -164,6 +176,15 @@ export default function FeedEditorPage() {
     setHasVideoChanges(true);
   }, []);
 
+  const handleTaggedProductsChange = useCallback((videoIndex, products) => {
+    setUploadedVideos((prev) =>
+      prev.map((v, i) =>
+        i === videoIndex ? { ...v, taggedProducts: products } : v
+      )
+    );
+    setHasVideoChanges(true);
+  }, []);
+
   const handleSave = useCallback(() => {
     if (!uploadedVideos.length) {
       setError("Upload at least one video");
@@ -171,13 +192,14 @@ export default function FeedEditorPage() {
     }
 
     const values = watch();
+    const videosPayload = prepareVideosPayload(uploadedVideos);
 
     submit(
       {
         feedName: values.feedName,
         widgetType: values.widgetType[0],
         isEnabled: values.isEnabled,
-        videos: JSON.stringify(uploadedVideos),
+        videos: JSON.stringify(videosPayload),
       },
       { method: "post" }
     );
@@ -245,8 +267,10 @@ export default function FeedEditorPage() {
                       <VideoDisplay
                         key={video.id || video.videoId || index}
                         video={video}
+                        index={index}
                         onRemove={() => handleRemoveVideo(index)}
                         shopify={shopify}
+                        onTaggedProductsChange={handleTaggedProductsChange}
                       />
                     ))}
                     </InlineGrid>

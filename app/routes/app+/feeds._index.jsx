@@ -12,7 +12,7 @@ import {
   IndexTable,
   EmptyState,
 } from "@shopify/polaris";
-import { getFeedsByShop } from "../../services/feed/feed.service";
+import { getFeedsByShop } from "../../services/feed/feed.service.server";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import { PlusIcon } from '@shopify/polaris-icons';
