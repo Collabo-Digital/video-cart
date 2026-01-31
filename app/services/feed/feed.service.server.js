@@ -53,6 +53,7 @@ export async function getFeedById(feedId, shopDomain) {
  * @param {string} data.widgetType - Widget type (carousel|grid)
  * @param {boolean} data.isEnabled - Whether feed is enabled
  * @param {Array} data.videos - Array of video objects with id, playbackId, position
+ * @param {Object} [data.settings] - Structured settings: { general: {}, design: {}, translation: {} }
  * @returns {Promise<Object>} Created feed
  */
 export async function createFeed(data) {
@@ -126,4 +127,21 @@ export async function updateFeed(feedId, data) {
   }
 
   return result;
+}
+
+/**
+ * Delete feed by ID with shop validation
+ * @param {string} feedId - Feed ID
+ * @param {string} shopDomain - Shop domain for security
+ * @returns {Promise<Object>} Deleted feed
+ */
+export async function deleteFeed(feedId, shopDomain) {
+  if (!feedId) {
+    throw new Error('Feed ID is required');
+  }
+  if (!shopDomain) {
+    throw new Error('Shop domain is required');
+  }
+  await getFeedById(feedId, shopDomain);
+  return FeedModel.deleteById(feedId);
 }

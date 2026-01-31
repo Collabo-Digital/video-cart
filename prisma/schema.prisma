@@ -92,6 +92,10 @@ model Feed {
   autoplay       Boolean     @default(false)
   showControls   Boolean     @default(true)
   showTitle      Boolean     @default(true)
+  // Structured settings: { general: {}, design: {}, translation: {} }
+  // - general: options from General accordion (extensible)
+  // - design: design/display options (extensible)
+  // - translation: UI strings (carouselTitle, carouselDescription, addToCartText, etc.)
   settings       Json?
   
   // Timestamps

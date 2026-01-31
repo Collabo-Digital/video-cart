@@ -8,17 +8,14 @@ import {
   Page,
   Card,
   Text,
-  TextField,
-  ChoiceList,
   Banner,
   BlockStack,
   InlineGrid,
   InlineStack,
-  Button,
   Tabs,
 } from "@shopify/polaris";
 import { useEffect, useState, useCallback } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { SaveBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../../config/shopify.server";
@@ -27,6 +24,7 @@ import { prepareVideosPayload } from "../../lib/utils/feed";
 import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
 import { redirect, useLoaderData, useNavigation, useSubmit } from "react-router";
+import { Accordion } from "../../components/Accordion/Accordion";
 
 export const loader = async ({ params, request }) => {
   try {
@@ -50,6 +48,7 @@ export const action = async ({ params, request }) => {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
     const parsedVideos = JSON.parse(data.videos || "[]");
+    const parsedSettings = data.settings ? JSON.parse(data.settings) : undefined;
 
     if (params.feedId === "new") {
       const feed = await createFeed({
@@ -57,6 +56,7 @@ export const action = async ({ params, request }) => {
         shopDomain: session.shop,
         widgetType: data.widgetType,
         isEnabled: data.isEnabled === "true",
+        settings: parsedSettings,
         videos: parsedVideos,
       });
 
@@ -67,6 +67,7 @@ export const action = async ({ params, request }) => {
       feedName: data.feedName,
       widgetType: data.widgetType,
       isEnabled: data.isEnabled === "true",
+      settings: parsedSettings,
       videos: parsedVideos,
     });
 
@@ -99,17 +100,21 @@ export default function FeedEditorPage() {
   } = useForm({
     defaultValues: {
       feedName: feed?.feedName ?? "",
-      widgetType: [feed?.widgetType ?? "carousel"],
+      widgetType: feed?.widgetType ?? "carousel",
       isEnabled: feed?.isEnabled ?? true,
+      settings: {
+        general: feed?.settings?.general ?? {},
+        design: feed?.settings?.design ?? {},
+        translation: {
+          carouselTitle: feed?.settings?.translation?.carouselTitle ?? feed?.settings?.carouselTitle ?? "",
+          carouselDescription: feed?.settings?.translation?.carouselDescription ?? feed?.settings?.carouselDescription ?? "",
+          addToCartText: feed?.settings?.translation?.addToCartText ?? feed?.settings?.addToCartText ?? "",
+        },
+      },
     },
   });
 
-  const widgetTypeOptions = [
-    { label: "Carousel", value: "carousel" },
-    { label: "Grid", value: "grid" },
-  ];
-
-   const tabs = [
+  const tabs = [
     {
       id: 'feeds-settings',
       index: 0,
@@ -193,12 +198,14 @@ export default function FeedEditorPage() {
 
     const values = watch();
     const videosPayload = prepareVideosPayload(uploadedVideos);
+    const settingsPayload = values.settings ?? { general: {}, design: {}, translation: {} };
 
     submit(
       {
         feedName: values.feedName,
-        widgetType: values.widgetType[0],
+        widgetType: values.widgetType,
         isEnabled: values.isEnabled,
+        settings: JSON.stringify(settingsPayload),
         videos: JSON.stringify(videosPayload),
       },
       { method: "post" }
@@ -218,8 +225,13 @@ export default function FeedEditorPage() {
     // Reset form to original values
     reset({
       feedName: feed?.feedName ?? "",
-      widgetType: [feed?.widgetType ?? "carousel"],
+      widgetType: feed?.widgetType ?? "carousel",
       isEnabled: feed?.isEnabled ?? true,
+      settings: {
+        carouselTitle: feed?.settings?.carouselTitle ?? "",
+        carouselDescription: feed?.settings?.carouselDescription ?? "",
+        addToCartText: feed?.settings?.addToCartText ?? "",
+      },
     });
 
     // Reset videos to original
@@ -232,174 +244,84 @@ export default function FeedEditorPage() {
       shopify.saveBar.hide('feed-save-bar');
     }
   }, [feed, reset, shopify]);
-  
+
   return (
     <>
-    <Page
-      title={mode === "create" ? "Create Feed" : "Edit Feed"}
-      backAction={{ content: "Feeds", url: "/app/feeds" }}
-    >
-      <BlockStack gap="400">
-        <InlineGrid columns={{ xs: 1, md: "2fr 1fr" }} gap="400">
-          {/* Left Column: Videos */}
-          <BlockStack gap="400">
-            <Card>
-              <BlockStack gap="400">
-                <Text variant="headingMd" as="h2">Import Videos</Text>
-                <VideoUploader setUploadedVideo={handleVideoUpload} />
-                <Text variant="headingMd" as="h2">
-                  Videos
-                </Text>
+      <Page
+        title={mode === "create" ? "Create Feed" : "Edit Feed"}
+        backAction={{ content: "Feeds", url: "/app/feeds" }}
+      >
+        <BlockStack gap="400">
+          <InlineGrid columns={{ xs: 1, md: "2fr 1fr" }} gap="400">
+            {/* Left Column: Videos */}
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="400">
+                  <Text variant="headingMd" as="h2">Import Videos</Text>
+                  <VideoUploader setUploadedVideo={handleVideoUpload} />
+                  <Text variant="headingMd" as="h2">
+                    Videos
+                  </Text>
 
-                {error && (
-                  <Banner tone="critical" onDismiss={() => setError(null)}>
-                    {error}
-                  </Banner>
-                )}
-
-                {uploadedVideos.length > 0 && (
-                  <BlockStack gap="300">
-                    <Text variant="headingSm" as="h3">
-                      Uploaded Videos ({uploadedVideos.length})
-                    </Text>
-                    <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
-                      {uploadedVideos.map((video, index) => (
-                      <VideoDisplay
-                        key={video.id || video.videoId || index}
-                        video={video}
-                        index={index}
-                        onRemove={() => handleRemoveVideo(index)}
-                        shopify={shopify}
-                        onTaggedProductsChange={handleTaggedProductsChange}
-                      />
-                    ))}
-                    </InlineGrid>
-                  </BlockStack>
-                )}
-
-                
-              </BlockStack>
-            </Card>
-          </BlockStack>
-
-          {/* Right Column: Settings */}
-          <BlockStack gap="400">
-            <Card padding="0">
-              <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
-            </Card>
-            <Card>
-              <BlockStack gap="400">
-                
-
-                <Controller
-                  name="feedName"
-                  control={control}
-                  rules={{
-                    required: "Feed name is required",
-                    minLength: {
-                      value: 3,
-                      message: "Feed name must be at least 3 characters",
-                    },
-                  }}
-                  render={({ field }) => (
-                    <TextField
-                      label="Feed Name"
-                      placeholder="e.g., Homepage Video Feed"
-                      autoComplete="off"
-                      value={field.value}
-                      onChange={field.onChange}
-                      error={errors.feedName?.message}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="widgetType"
-                  control={control}
-                  render={({ field }) => (
-                    <ChoiceList
-                      title="Widget Type"
-                      choices={widgetTypeOptions}
-                      selected={field.value}
-                      onChange={field.onChange}
-                    />
-                  )}
-                />
-
-                <Controller
-                  name="isEnabled"
-                  control={control}
-                  render={({ field }) => (
-                    <ChoiceList
-                      title="Status"
-                      choices={[
-                        { label: "Enabled", value: true },
-                        { label: "Disabled", value: false },
-                      ]}
-                      selected={[field.value]}
-                      onChange={(value) => field.onChange(value[0])}
-                    />
-                  )}
-                />
-              </BlockStack>
-            </Card>
-
-            <Card>
-              <BlockStack gap="300">
-                <Text variant="headingSm" as="h3">
-                  Summary
-                </Text>
-                <BlockStack gap="200">
-                  <InlineStack align="space-between">
-                    <Text variant="bodyMd" as="p" tone="subdued">
-                      Videos
-                    </Text>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">
-                      {uploadedVideos.length}
-                    </Text>
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text variant="bodyMd" as="p" tone="subdued">
-                      Type
-                    </Text>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">
-                      {watch("widgetType")[0] || "Not selected"}
-                    </Text>
-                  </InlineStack>
-                  <InlineStack align="space-between">
-                    <Text variant="bodyMd" as="p" tone="subdued">
-                      Status
-                    </Text>
-                    <Text variant="bodyMd" as="p" fontWeight="semibold">
-                      {watch("isEnabled") ? "Enabled" : "Disabled"}
-                    </Text>
-                  </InlineStack>
-                  {hasChanges && (
-                    <Banner tone="warning">
-                      <Text variant="bodySm">You have unsaved changes</Text>
+                  {error && (
+                    <Banner tone="critical" onDismiss={() => setError(null)}>
+                      {error}
                     </Banner>
                   )}
-                </BlockStack>
-              </BlockStack>
-            </Card>
-          </BlockStack>
-        </InlineGrid>
-      </BlockStack>
-    </Page>
 
-    <SaveBar id="feed-save-bar" discardConfirmation>
-      <button
-        variant="primary"
-        onClick={handleSave}
-        disabled={isSubmitting}
-        {...(isSubmitting && { loading: "" })}
-      />
-      <button
-        onClick={handleDiscard}
-        disabled={isSubmitting}
-      />
-    </SaveBar>
+                  {uploadedVideos.length > 0 && (
+                    <BlockStack gap="300">
+                      <Text variant="headingSm" as="h3">
+                        Uploaded Videos ({uploadedVideos.length})
+                      </Text>
+                      <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
+                        {uploadedVideos.map((video, index) => (
+                          <VideoDisplay
+                            key={video.id || video.videoId || index}
+                            video={video}
+                            index={index}
+                            onRemove={() => handleRemoveVideo(index)}
+                            shopify={shopify}
+                            onTaggedProductsChange={handleTaggedProductsChange}
+                          />
+                        ))}
+                      </InlineGrid>
+                    </BlockStack>
+                  )}
+
+
+                </BlockStack>
+              </Card>
+            </BlockStack>
+
+            {/* Right Column: Settings */}
+            <BlockStack gap="400">
+              <Card padding="0">
+                <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
+              </Card>
+
+
+
+              <Accordion control={control} errors={errors} />
+
+
+            </BlockStack>
+          </InlineGrid>
+        </BlockStack>
+      </Page>
+
+      <SaveBar id="feed-save-bar" discardConfirmation>
+        <button
+          variant="primary"
+          onClick={handleSave}
+          disabled={isSubmitting}
+          {...(isSubmitting && { loading: "" })}
+        />
+        <button
+          onClick={handleDiscard}
+          disabled={isSubmitting}
+        />
+      </SaveBar>
     </>
   );
 }
-  

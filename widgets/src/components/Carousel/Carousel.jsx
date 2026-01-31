@@ -6,7 +6,8 @@ import './carousel.css';
 const CARD_WIDTH = 280;
 const CARD_GAP = 16;
 const SCROLL_AMOUNT = CARD_WIDTH + CARD_GAP;
-const PRODUCT_ITEM_WIDTH = 88;
+/* One product visible at a time, full width of card */
+const PRODUCT_ITEM_WIDTH = CARD_WIDTH; /* 280px = full width */
 const PRODUCT_ITEM_GAP = 8;
 const PRODUCT_SCROLL_AMOUNT = PRODUCT_ITEM_WIDTH + PRODUCT_ITEM_GAP;
 
@@ -26,8 +27,8 @@ function ExternalLinkIcon() {
 export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const [trackRef, setTrackRef] = createSignal(null);
 
-  const title = () => feed?.title || feed?.name || '';
-  const subtitle = () => feed?.description || settings?.subtitle || DEFAULT_SUBTITLE;
+  const title = () => settings?.translation?.carouselTitle || feed?.name || '';
+  const subtitle = () => settings?.translation?.carouselDescription || feed?.description || DEFAULT_SUBTITLE;
   /** Products per video: [[product, ...], []] — index i = products for videos[i] */
   const productsForVideo = (video) => video?.productsTagged ?? [];
 
@@ -145,7 +146,10 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                               {(product) => (
                                 <div className="video-carousel-card-product">
                                   <img src={product.image} alt={product.title} loading="lazy" />
-                                  <span>{product.title}</span>
+                                  <div className="video-carousel-card-product-info">
+                                    <span className="video-carousel-card-product-title">{product.title}</span>
+                                    <button className="video-carousel-card-product-button" onClick={() => window.location.href = `/products/${product.handle}`}> shop   </button>
+                                  </div>
                                 </div>
                               )}
                             </For>
@@ -171,7 +175,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                       aria-label="View product"
                       onClick={(e) => handleCardLinkClick(e, video)}
                     >
-                      <ExternalLinkIcon />
+                      {/* <ExternalLinkIcon /> */}
                     </a>
                   </article>
                 );
