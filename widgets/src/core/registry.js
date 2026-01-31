@@ -2,9 +2,6 @@
 const widgets = new Map();
 
 export function registerWidget(definition) {
-    if (widgets.has(definition.type)) {
-        console.warn(`Widget ${definition.type} already registered, overwriting`);
-    }
     widgets.set(definition.type, definition);
 }
 

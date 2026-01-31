@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 import devtools from 'solid-devtools/vite';
+import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 
 export default defineConfig({
-  plugins: [devtools(), solidPlugin()],
+  plugins: [devtools(), solidPlugin(), cssInjectedByJsPlugin()],
   build: {
     outDir: '../extensions/video-cart/assets',
     emptyOutDir: true,

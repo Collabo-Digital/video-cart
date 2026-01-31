@@ -1,49 +1,76 @@
 import { render } from 'solid-js/web';
-import { getWidget } from './core/registry';
+import { getWidget, registerWidget } from './core/registry';
+import { CONTAINER_SELECTOR } from './core/config';
+import { api } from './api';
+import { VideoCarousel } from './components/Carousel/Carousel';
+
+const DEFAULT_WIDGET_TYPE = 'carousel';
+
+function registerStorefrontWidgets() {
+  registerWidget({ type: 'carousel', component: VideoCarousel });
+}
 
 export async function initFeeds() {
-  
-  const carouselWidget = getWidget('carousel');
-  if (!carouselWidget) return;
-  
-  const Component = carouselWidget.component;
-  
-  for (const feedConfig of window.__video_cart_feeds__) {
-    const { feedId, containerId, shop } = feedConfig;
-    const container = document.getElementById(containerId);
-    
-    if (!container) continue;
-    
-    // Fetch feed data from API
-    fetch(`/apps/video-widget/feeds/${feedId}?shop=${encodeURIComponent(shop)}`)
-      .then(response => {
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-      })
-      .then(result => {
-        if (result.success && result.data) {
-          const feed = result.data;
+  registerStorefrontWidgets();
 
-          console.log("feed data", feed);
-          
-          // Render carousel widget with feed data
-          render(
-            () => Component({
-              feed: feed,
-              videos: feed.videos || [],
-              settings: feed.settings || {},
-            }),
-            container
-          );
-        } else {
-          console.error('Invalid feed response:', result);
+  const containers = document.querySelectorAll(CONTAINER_SELECTOR);
+  if (!containers.length) return;
+
+  if (typeof window !== 'undefined') {
+    window.__video_cart_config__ = window.__video_cart_config__ || {};
+    window.__video_cart_config__.widgets = window.__video_cart_config__.widgets || [];
+  }
+
+  const widgets = window.__video_cart_config__?.widgets || [];
+
+  for (const container of containers) {
+    if (container.dataset.videoCartInitialized === 'true') continue;
+    const feedId = container.dataset.feedId;
+    const containerId = container.dataset.containerId;
+    const shop = container.dataset.shop;
+
+    if (!feedId || !containerId) continue;
+
+    const mountEl = document.getElementById(containerId);
+    if (!mountEl) continue;
+
+    const cached = widgets.find((w) => w.containerId === containerId);
+
+    try {
+      let feed;
+      if (cached) {
+        feed = cached;
+      } else {
+        feed = await api.feeds.fetchFeed(feedId, shop);
+        const widgetEntry = { feedId, containerId, shop, ...feed };
+        const alreadyStored = widgets.some((w) => w.containerId === containerId);
+        if (!alreadyStored && window.__video_cart_config__?.widgets) {
+          window.__video_cart_config__.widgets.push(widgetEntry);
         }
-      })
-      .catch(error => {
-        console.error('Error fetching feed:', error);
-        container.innerHTML = '<p>Error loading video feed</p>';
-      });
+      }
+
+      const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;
+      const widgetDef = getWidget(widgetType);
+      if (!widgetDef?.component) {
+        throw new Error(`Unknown widget type: ${widgetType}`);
+      }
+
+      mountEl.innerHTML = '';
+      render(
+        () =>
+          widgetDef.component({
+            feed,
+            videos: feed.videos || [],
+            settings: feed.settings || {},
+          }),
+        mountEl
+      );
+      container.dataset.videoCartInitialized = 'true';
+    } catch (err) {
+      if (typeof console !== 'undefined' && console.error) {
+        console.error('Video feed error:', err);
+      }
+      mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';
+    }
   }
 }

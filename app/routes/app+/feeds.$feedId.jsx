@@ -284,9 +284,12 @@ export default function FeedEditorPage() {
 
           {/* Right Column: Settings */}
           <BlockStack gap="400">
+            <Card padding="0">
+              <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
+            </Card>
             <Card>
               <BlockStack gap="400">
-                <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
+                
 
                 <Controller
                   name="feedName"

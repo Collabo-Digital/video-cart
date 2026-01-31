@@ -1,19 +1,13 @@
-import { VideoCarousel } from './components/VideoCarousel';
-import { registerWidget } from './core/registry';
 import { initFeeds } from './runtime';
 
-registerWidget({
-  type: 'carousel',
-  component: VideoCarousel,
-});
-
 if (typeof window !== 'undefined') {
-  window.VideoCartWidgets = { initFeeds };
+  window.__video_cart_config__ = window.__video_cart_config__ || {};
+  window.__video_cart_config__.initFeeds = initFeeds;
+  window.__video_cart_config__.widgets = window.__video_cart_config__.widgets || [];
   window.dispatchEvent(new Event('video-cart-ready'));
 }
 
 function init() {
-  console.log("initFeeds");
   initFeeds();
 }
 
