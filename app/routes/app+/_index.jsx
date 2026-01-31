@@ -3,7 +3,7 @@ import { BlockStack, Card, Icon, InlineGrid, InlineStack, Page, Text } from '@sh
 import { ArchiveIcon } from '@shopify/polaris-icons';
 import { useState } from "react";
 import DateRangePicker from "../../components/DatePicker/DatePicker.jsx";
-import Chart from "../../components/Chart/Chart.jsx";
+// import Chart from "../../components/Chart/Chart.jsx";
 
 export default function Index() {
 
@@ -59,7 +59,7 @@ export default function Index() {
         ))}
 
       </InlineGrid>
-      <Chart />
+      {/* <Chart /> */}
       </BlockStack>
     </Page>
   );
