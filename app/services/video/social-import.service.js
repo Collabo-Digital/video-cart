@@ -53,8 +53,8 @@ export async function resolveSocialUrl({ source, url }) {
     if (!data?.status) {
       throw new Error(data?.message || 'Failed to fetch TikTok video');
     }
-    const v = data.video;
-    const directUrl = typeof v === 'string' ? v : Array.isArray(v) ? v[0] : null;
+    const videoField = data.video;
+    const directUrl = typeof videoField === 'string' ? videoField : Array.isArray(videoField) ? videoField[0] : null;
     if (!directUrl) {
       throw new Error('No downloadable video URL found for this TikTok link');
     }

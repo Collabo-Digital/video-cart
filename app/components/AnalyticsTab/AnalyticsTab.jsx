@@ -19,7 +19,7 @@ export default function AnalyticsTab() {
 
   return (
     <>
-    {/* <Card sectioned padding="0"> */}
+    {/* <Card > */}
         <BlockStack gap="300">
            <InlineStack align="end" inlineAlign="end">
              <DateRangePicker
@@ -35,13 +35,13 @@ export default function AnalyticsTab() {
                 columns={2}
                 gap="300"
             >
-                <Card sectioned>
+                <Card sectioned padding="500">
                     <BlockStack gap="200">
                         <Text as="h2" variant="bodyLg">Impression</Text>
                         <Text as="h3" variant="headingMd">100</Text>
                     </BlockStack>
                 </Card>
-                <Card sectioned>
+                <Card sectioned padding="500">
                     <BlockStack gap="200">
                         <Text as="h2" variant="bodyLg">Views</Text>
                         <Text as="h3" variant="headingMd">100</Text>
@@ -52,7 +52,7 @@ export default function AnalyticsTab() {
                 columns={2}
                 gap="300"
             >
-                <Card sectioned>
+                <Card sectioned padding="500">
                     <BlockStack gap="200">
                         <Text as="h2" variant="bodyLg">Click</Text>
                         <Text as="h3" variant="headingMd">100</Text>

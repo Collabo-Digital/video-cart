@@ -45,8 +45,6 @@ export const loader = async ({ params, request }) => {
     // Get feed with shop validation
     const feed = await getFeedById(feedId, shop);
 
-    console.log('feed------->', feed);
-
     if (!feed) {
       return new Response(
         JSON.stringify({ error: 'Feed not found' }),
@@ -113,7 +111,7 @@ export const loader = async ({ params, request }) => {
 
     // Filter out null results and videos that aren't ready
     const readyVideos = videosWithData
-      .filter(v => v !== null && v.status === 'READY' && v.playbackId);
+      .filter((video) => video !== null && video.status === 'READY' && video.playbackId);
 
     // Return feed data formatted for storefront
     const feedData = {

@@ -13,27 +13,27 @@
  */
 export function prepareVideosPayload(uploadedVideos) {
   if (!Array.isArray(uploadedVideos)) return [];
-  return uploadedVideos.map((v) => ({
-    id: v.id,
-    videoId: v.videoId ?? v.id,
-    playbackId: v.playbackId,
-    uploadId: v.uploadId,
-    assetId: v.assetId,
-    position: v.position ?? 0,
-    productsTagged: (v.taggedProducts || []).map((p) =>
-      typeof p === 'object' && p !== null
+  return uploadedVideos.map((video) => ({
+    id: video.id,
+    videoId: video.videoId ?? video.id,
+    playbackId: video.playbackId,
+    uploadId: video.uploadId,
+    assetId: video.assetId,
+    position: video.position ?? 0,
+    productsTagged: (video.taggedProducts || []).map((product) =>
+      typeof product === 'object' && product !== null
         ? {
-          id: p.id != null ? String(p.id) : '',
-          title: p.title ?? '',
-          handle: p.handle ?? '',
-          image: p.image ?? null,
-          images: p.images ?? [],
-          productType: p.productType,
-          status: p.status,
-          vendor: p.vendor,
-          variants: Array.isArray(p.variants) ? p.variants : [],
+          id: product.id != null ? String(product.id) : '',
+          title: product.title ?? '',
+          handle: product.handle ?? '',
+          image: product.image ?? null,
+          images: product.images ?? [],
+          productType: product.productType,
+          status: product.status,
+          vendor: product.vendor,
+          variants: Array.isArray(product.variants) ? product.variants : [],
         }
-        : { id: String(p), title: '', handle: '', image: null, images: [], variants: [] }
+        : { id: String(product), title: '', handle: '', image: null, images: [], variants: [] }
     ),
   }));
 }

@@ -90,10 +90,10 @@ export async function updateById(id, data) {
  */
 export async function updateVideosProductsTagged(feedId, videos) {
   if (!videos || !Array.isArray(videos)) return;
-  for (const v of videos) {
+  for (const entry of videos) {
     await prisma.feedVideo.updateMany({
-      where: { feedId, videoId: v.videoId },
-      data: { productsTagged: v.productsTagged ?? [] },
+      where: { feedId, videoId: entry.videoId },
+      data: { productsTagged: entry.productsTagged ?? [] },
     });
   }
 }
@@ -130,7 +130,7 @@ export async function syncFeedVideos(feedId, resolvedVideos) {
     });
   }
 
-  const keepVideoIds = resolvedVideos.map((v) => v.videoId).filter(Boolean);
+  const keepVideoIds = resolvedVideos.map((entry) => entry.videoId).filter(Boolean);
   if (keepVideoIds.length > 0) {
     await prisma.feedVideo.deleteMany({
       where: {

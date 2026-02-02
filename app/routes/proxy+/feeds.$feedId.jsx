@@ -28,8 +28,6 @@ export const loader = async ({ request, params }) => {
       }, { status: 404 });
     }
 
-    console.log('feed of feeds $feedId', feed);
-
     // Verify feed belongs to this shop
     if (feed.shopDomain !== session.shop) {
       return Response.json({ 
@@ -80,7 +78,7 @@ export const loader = async ({ request, params }) => {
 
     // Filter out null results and videos that aren't ready
     const readyVideos = videosWithData
-      .filter(v => v !== null && v.status === 'READY' && v.playbackId)
+      .filter((video) => video !== null && video.status === 'READY' && video.playbackId)
       .sort((a, b) => a.position - b.position);
 
     // Return feed data formatted for storefront
@@ -89,9 +87,9 @@ export const loader = async ({ request, params }) => {
       data: {
         id: feed.id,
         feedName: feed.feedName,
-        widgetType: feed.widgetType || 'carousel', // Default to carousel if not set
+        widgetType: feed.widgetType || 'carousel',
         isEnabled: feed.isEnabled,
-        videos: feed.videos || [],
+        videos: readyVideos,
         settings: {
           autoplay: feed.autoplay,
           showControls: feed.showControls,

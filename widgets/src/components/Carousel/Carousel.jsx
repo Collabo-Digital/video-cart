@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
 import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
 import Hls from 'hls.js';
-import { getPlaybackUrl, getTumbnailPreviewUrl } from '../../shared/mux';
+import { getPlaybackUrl, getThumbnailPreviewUrl } from '../../shared/mux';
 import './carousel.css';
 
 const MOBILE_BREAKPOINT = 768;
@@ -40,11 +40,11 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
 
   /** Display price from first variant (Shopify price string e.g. "50.00") */
   const productPrice = (product) => {
-    const p = product?.variants?.[0]?.price;
-    if (p == null || p === '') return null;
-    const num = typeof p === 'string' ? parseFloat(p, 10) : Number(p);
+    const priceVal = product?.variants?.[0]?.price;
+    if (priceVal == null || priceVal === '') return null;
+    const num = typeof priceVal === 'string' ? parseFloat(priceVal, 10) : Number(priceVal);
     if (Number.isNaN(num)) return null;
-    return { raw: p, formatted: `$ ${num.toFixed(num % 1 === 0 ? 0 : 2)}` };
+    return { raw: priceVal, formatted: `$ ${num.toFixed(num % 1 === 0 ? 0 : 2)}` };
   };
 
   const currentVideo = () => {
@@ -253,7 +253,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                       <Show when={index() !== expandedIndex()}>
                         <span
                           className="video-carousel-reels-slide-placeholder"
-                          style={{ 'background-image': `url(${getTumbnailPreviewUrl(video.playbackId, 560, 748) || ''})` }}
+                          style={{ 'background-image': `url(${getThumbnailPreviewUrl(video.playbackId, 560, 748) || ''})` }}
                           aria-hidden
                         />
                       </Show>
@@ -363,7 +363,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
           <div className="video-carousel-track" ref={setTrackRef} role="list">
             <For each={videos}>
               {(video, index) => {
-                const thumbUrl = () => getTumbnailPreviewUrl(video.playbackId, 560, 748);
+                const thumbUrl = () => getThumbnailPreviewUrl(video.playbackId, 560, 748);
                 const meta = () => {
                   const count = video?.productsTagged?.length ?? 0;
                   return count > 0 ? `${count} product${count !== 1 ? 's' : ''}` : 'Watch';
@@ -405,7 +405,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                   <img src={product.image} alt={product.title} loading="lazy" />
                                   <div className="video-carousel-card-product-info">
                                     <span className="video-carousel-card-product-title">{product.title}</span>
-                                    <button className="video-carousel-card-product-button" onClick={() => window.location.href = `/products/${product.handle}`}> shop   </button>
+                                    <button className="video-carousel-card-product-button" onClick={() => window.location.href = `/products/${product.handle}`}>Shop</button>
                                   </div>
                                 </div>
                               )}

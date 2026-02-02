@@ -34,7 +34,7 @@ export async function initFeeds() {
     const mountEl = document.getElementById(containerId);
     if (!mountEl) continue;
 
-    const cached = widgets.find((w) => w.containerId === containerId);
+    const cached = widgets.find((entry) => entry.containerId === containerId);
 
     try {
       let feed;
@@ -43,7 +43,7 @@ export async function initFeeds() {
       } else {
         feed = await api.feeds.fetchFeed(feedId, shop);
         const widgetEntry = { feedId, containerId, shop, ...feed };
-        const alreadyStored = widgets.some((w) => w.containerId === containerId);
+        const alreadyStored = widgets.some((entry) => entry.containerId === containerId);
         if (!alreadyStored && window.__video_cart_config__?.widgets) {
           window.__video_cart_config__.widgets.push(widgetEntry);
         }

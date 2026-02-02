@@ -9,7 +9,7 @@ export default function Index() {
 
   const [date, setDate] = useState({ start: null, end: null });
 
-  const conversion = [{
+  const conversionStats = [{
     title: "Video viewers",
     count: 10,
     icon: ArchiveIcon
@@ -32,26 +32,22 @@ export default function Index() {
   
     <Page>
       <BlockStack gap={400}>
-      <DateRangePicker
+          <DateRangePicker
             value={date}
-            onDateRangeSelect={({ start, end }) => {
-              console.log('Selected Start Date:', start);
-              console.log('Selected End Date:', end);
-              setDate({ start, end });
-            }}
+            onDateRangeSelect={({ start, end }) => setDate({ start, end })}
           />
       <InlineGrid columns={4} gap={400}>
 
-        {conversion.map((element, index) => (
+        {conversionStats.map((stat, index) => (
           <Card key={index} >
             <InlineStack>
-              {element.icon && <Icon source={element.icon} />}
+              {stat.icon && <Icon source={stat.icon} />}
               <BlockStack>
                 <Text as="h2" variant="bodyMd">
-                  {element.title}
+                  {stat.title}
                 </Text>
                 <Text as="h3" variant="bodySm">
-                  {element.count}
+                  {stat.count}
                 </Text>
               </BlockStack>
             </InlineStack>

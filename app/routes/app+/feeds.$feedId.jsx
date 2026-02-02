@@ -83,7 +83,6 @@ export const action = async ({ params, request }) => {
 
 export default function FeedEditorPage() {
   const { mode, feed } = useLoaderData();
-  console.log('feed ---->', feed);
   const submit = useSubmit();
   const navigation = useNavigation();
   const shopify = useAppBridge();
@@ -223,15 +222,19 @@ export default function FeedEditorPage() {
   }, []);
 
   const handleDiscard = useCallback(() => {
-    // Reset form to original values
+    // Reset form to original values (same shape as defaultValues)
     reset({
       feedName: feed?.feedName ?? "",
       widgetType: feed?.widgetType ?? "carousel",
       isEnabled: feed?.isEnabled ?? true,
       settings: {
-        carouselTitle: feed?.settings?.carouselTitle ?? "",
-        carouselDescription: feed?.settings?.carouselDescription ?? "",
-        addToCartText: feed?.settings?.addToCartText ?? "",
+        general: feed?.settings?.general ?? {},
+        design: feed?.settings?.design ?? {},
+        translation: {
+          carouselTitle: feed?.settings?.translation?.carouselTitle ?? feed?.settings?.carouselTitle ?? "",
+          carouselDescription: feed?.settings?.translation?.carouselDescription ?? feed?.settings?.carouselDescription ?? "",
+          addToCartText: feed?.settings?.translation?.addToCartText ?? feed?.settings?.addToCartText ?? "",
+        },
       },
     });
 

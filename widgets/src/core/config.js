@@ -11,5 +11,5 @@ export const API_BASE_URL = typeof import.meta !== 'undefined' && import.meta.en
 export const CONTAINER_SELECTOR = '.video-cart-container';
 export const FEED_API_PATH = 'apps/video-widget/feeds';
 
-/** Demo/placeholder playback ID (e.g. for InputBox); do not hardcode full URLs in components. */
+/** Demo/placeholder playback ID (e.g. for demo or input); do not hardcode full URLs in components. */
 export const DEMO_PLAYBACK_ID = '7O7RsL2n51IHLTkYLPQ2GqrmEYez00DyevmpNUSgG024A';

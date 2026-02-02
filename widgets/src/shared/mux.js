@@ -15,7 +15,7 @@ export function getThumbnailUrl(playbackId, width = 240, height = 135) {
   return `${MUX_IMAGE_BASE}/${playbackId}/thumbnail.jpg?width=${width}&height=${height}`;
 }
 
-export function getTumbnailPreviewUrl(playbackId, width = 240, height = 135) {
+export function getThumbnailPreviewUrl(playbackId, width = 240, height = 135) {
   if (!playbackId) return null;
   return `${MUX_IMAGE_BASE}/${playbackId}/animated.webp?width=${width}`;
 }
