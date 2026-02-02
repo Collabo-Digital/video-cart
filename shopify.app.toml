@@ -1,29 +1,32 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "d8acbc84f5d56fbcb7b3881fb59d5706"
-name = "VIDEO CART"
-application_url = "https://video-cart-dev.vercel.app/"
+client_id = "46a6333228dbe822d3cad6e6ecaaa25c"
+name = "video-cart"
+application_url = "https://example.com"
 embedded = true
 
 [webhooks]
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
-
-  [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "write_app_proxy,write_products"
 
 [auth]
-redirect_urls = [ "https://video-cart-dev.vercel.app/api/auth" ]
+redirect_urls = [ "https://example.com/api/auth" ]
 
 [app_proxy]
-url = "https://video-cart-dev.vercel.app/proxy"
+url = "https://bangkok-media-cabinet-indoor.trycloudflare.com/proxy"
 subpath = "video-widget"
 prefix = "apps"
+
+[build]
+automatically_update_urls_on_dev = true

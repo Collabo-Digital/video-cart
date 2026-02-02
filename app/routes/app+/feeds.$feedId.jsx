@@ -25,6 +25,7 @@ import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
 import { redirect, useLoaderData, useNavigation, useSubmit } from "react-router";
 import { Accordion } from "../../components/Accordion/Accordion";
+import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 
 export const loader = async ({ params, request }) => {
   try {
@@ -302,7 +303,8 @@ export default function FeedEditorPage() {
 
 
 
-              <Accordion control={control} errors={errors} />
+              {selected === 0 && <Accordion control={control} errors={errors} />}
+              {selected === 1 && <AnalyticsTab />}
 
 
             </BlockStack>
