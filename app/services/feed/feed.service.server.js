@@ -5,7 +5,40 @@
  */
 
 import * as FeedModel from '../../models/feed.server';
-import { updateVideosProductsTagged as updateFeedVideosProductsTagged } from '../../models/feed.server';
+import { syncFeedVideos } from '../../models/feed.server';
+import * as VideoModel from '../../models/video.server';
+
+/** MongoDB ObjectId is 24 hex characters */
+function isMongoId(str) {
+  return typeof str === 'string' && /^[a-fA-F0-9]{24}$/.test(str);
+}
+
+/**
+ * Resolve payload video to our Video record id (by videoId, playbackId, assetId, or upload id).
+ * @param {{ videoId?: string, id?: string, playbackId?: string, assetId?: string, uploadId?: string }} v
+ * @returns {Promise<string|null>} Video.id or null
+ */
+async function resolveVideoId(v) {
+  const candidateId = v.videoId ?? v.id;
+  if (candidateId && isMongoId(candidateId)) {
+    const found = await VideoModel.findById(candidateId);
+    if (found) return found.id;
+  }
+  if (v.playbackId) {
+    const byPlayback = await VideoModel.findByPlaybackId(v.playbackId);
+    if (byPlayback) return byPlayback.id;
+  }
+  if (v.assetId) {
+    const byAsset = await VideoModel.findByAssetId(v.assetId);
+    if (byAsset) return byAsset.id;
+  }
+  const uploadId = v.uploadId ?? candidateId;
+  if (uploadId) {
+    const byUpload = await VideoModel.findByUploadId(uploadId);
+    if (byUpload) return byUpload.id;
+  }
+  return null;
+}
 
 /**
  * Get all feeds for a shop
@@ -123,7 +156,20 @@ export async function updateFeed(feedId, data) {
   const result = await FeedModel.updateById(feedId, updateData);
 
   if (videos && Array.isArray(videos) && videos.length > 0) {
-    await updateFeedVideosProductsTagged(feedId, videos);
+    const resolvedVideos = [];
+    for (let i = 0; i < videos.length; i++) {
+      const v = videos[i];
+      const videoId = await resolveVideoId(v);
+      if (videoId && v.playbackId) {
+        resolvedVideos.push({
+          videoId,
+          playbackId: v.playbackId,
+          position: v.position ?? i,
+          productsTagged: v.productsTagged ?? [],
+        });
+      }
+    }
+    await syncFeedVideos(feedId, resolvedVideos);
   }
 
   return result;

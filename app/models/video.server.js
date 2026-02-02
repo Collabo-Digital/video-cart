@@ -43,6 +43,29 @@ export async function findByUploadId(uploadId) {
 }
 
 /**
+ * Find video by Mux asset ID
+ * @param {string} assetId - Mux asset ID
+ * @returns {Promise<Object|null>} Video object or null
+ */
+export async function findByAssetId(assetId) {
+  return prisma.video.findUnique({
+    where: { videoAssetId: assetId }
+  });
+}
+
+/**
+ * Find video by Mux playback ID
+ * @param {string} playbackId - Mux playback ID
+ * @returns {Promise<Object|null>} Video object or null
+ */
+export async function findByPlaybackId(playbackId) {
+  if (!playbackId) return null;
+  return prisma.video.findFirst({
+    where: { videoPlaybackId: playbackId }
+  });
+}
+
+/**
  * Create new video
  * @param {Object} data - Video data
  * @returns {Promise<Object>} Created video object

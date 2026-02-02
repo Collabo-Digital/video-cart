@@ -11,7 +11,6 @@ import {
   Banner,
   BlockStack,
   InlineGrid,
-  InlineStack,
   Tabs,
 } from "@shopify/polaris";
 import { useEffect, useState, useCallback } from "react";
@@ -84,6 +83,7 @@ export const action = async ({ params, request }) => {
 
 export default function FeedEditorPage() {
   const { mode, feed } = useLoaderData();
+  console.log('feed ---->', feed);
   const submit = useSubmit();
   const navigation = useNavigation();
   const shopify = useAppBridge();

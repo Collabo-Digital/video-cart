@@ -32,11 +32,14 @@ export const action = async ({ request }) => {
       }
     );
   } catch (error) {
-    console.error('Mux webhook error:', error);
+    console.error('Mux webhook error:', error?.message, error?.stack);
     return new Response(
-      JSON.stringify({ error: error.message || 'Webhook processing failed' }),
+      JSON.stringify({
+        error: error.message || 'Webhook processing failed',
+        received: true,
+      }),
       {
-        status: 400,
+        status: error.message?.includes('signature') || error.message?.includes('secret') ? 401 : 400,
         headers: {
           'Content-Type': 'application/json',
         },

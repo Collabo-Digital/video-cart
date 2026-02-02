@@ -12,7 +12,9 @@ import mux from '../../config/mux.server';
 import * as VideoModel from '../../models/video.server';
 
 /**
- * Create upload URL for client
+ * Create upload URL for client and create a Video record immediately so the feed can
+ * link to it when the user saves (before the Mux webhook fires). Webhook will update
+ * the same record with playbackId, duration, status READY.
  * @param {Object} options - Upload options
  * @returns {Promise<Object>} Upload URL and ID
  */
@@ -24,6 +26,17 @@ export async function createUploadUrl(options = {}) {
     },
     cors_origin: options.corsOrigin || '*',
     test: process.env.NODE_ENV !== 'production',
+  });
+
+  // Create Video record immediately so resolveVideoId finds it when user saves the feed.
+  // Mux does not return asset_id until upload completes; webhook will update with real assetId and playbackId.
+  const videoAssetIdPlaceholder = `pending-${upload.id}`;
+  await VideoModel.create({
+    title: 'Untitled Video',
+    serviceProvider: 'mux',
+    videoUploadId: upload.id,
+    videoAssetId: videoAssetIdPlaceholder,
+    status: 'PROCESSING',
   });
 
   return {
@@ -69,23 +82,31 @@ export async function createAssetFromUrl(videoUrl) {
 }
 
 /**
- * Create a Video record for a server-side imported asset.
+ * Create or update a Video record for a server-side imported asset.
+ * If the video is already present (by assetId), update it; otherwise create a new entry.
  * @param {Object} params
  * @param {string} params.assetId
  * @param {string|null} params.playbackId
  * @param {string} params.title
- * @returns {Promise<Object>} Created video record
+ * @returns {Promise<Object>} Created or updated video record
  */
 export async function createVideoForImportedAsset({ assetId, playbackId, title }) {
-  // videoUploadId is required and unique; for imports we derive a stable id from the asset id
-  const videoUploadId = `import-${assetId}`;
-
-  return VideoModel.create({
+  const existing = await VideoModel.findByAssetId(assetId);
+  const payload = {
     title: title || 'Imported Video',
     serviceProvider: 'mux',
-    videoUploadId,
-    videoAssetId: assetId,
     videoPlaybackId: playbackId,
     status: 'PROCESSING',
+  };
+
+  if (existing) {
+    return VideoModel.updateById(existing.id, payload);
+  }
+
+  const videoUploadId = `import-${assetId}`;
+  return VideoModel.create({
+    videoUploadId,
+    videoAssetId: assetId,
+    ...payload,
   });
 }

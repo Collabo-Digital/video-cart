@@ -99,6 +99,51 @@ export async function updateVideosProductsTagged(feedId, videos) {
 }
 
 /**
+ * Sync feed videos: create or update FeedVideo for each resolved video, remove others.
+ * Used when saving feed so new uploads (resolved by playbackId/assetId) appear in the feed.
+ * @param {string} feedId - Feed ID
+ * @param {Array<{ videoId: string, playbackId: string, position: number, productsTagged: Array }>} resolvedVideos - Resolved videos (videoId = our Video.id)
+ */
+export async function syncFeedVideos(feedId, resolvedVideos) {
+  if (!feedId || !Array.isArray(resolvedVideos)) return;
+
+  for (let i = 0; i < resolvedVideos.length; i++) {
+    const { videoId, playbackId, position, productsTagged } = resolvedVideos[i];
+    if (!videoId || !playbackId) continue;
+
+    await prisma.feedVideo.upsert({
+      where: {
+        feedId_videoId: { feedId, videoId },
+      },
+      create: {
+        feedId,
+        videoId,
+        playbackId,
+        position: position ?? i,
+        productsTagged: productsTagged ?? [],
+      },
+      update: {
+        playbackId,
+        position: position ?? i,
+        productsTagged: productsTagged ?? [],
+      },
+    });
+  }
+
+  const keepVideoIds = resolvedVideos.map((v) => v.videoId).filter(Boolean);
+  if (keepVideoIds.length > 0) {
+    await prisma.feedVideo.deleteMany({
+      where: {
+        feedId,
+        videoId: { notIn: keepVideoIds },
+      },
+    });
+  } else {
+    await prisma.feedVideo.deleteMany({ where: { feedId } });
+  }
+}
+
+/**
  * Delete feed by ID
  * @param {string} id - Feed ID
  * @returns {Promise<Object>} Deleted feed object

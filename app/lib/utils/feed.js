@@ -7,8 +7,9 @@
 /**
  * Prepare uploaded videos + tagged products for feed create/update payload.
  * Normalizes tagged products to productsTagged shape (id, title, handle, image, images, variants).
+ * Includes id, videoId, playbackId, uploadId, assetId so the server can resolve Video record.
  * @param {Array<Object>} uploadedVideos - Videos with taggedProducts
- * @returns {Array<{ id, videoId, playbackId, position, productsTagged }>} Payload for API
+ * @returns {Array<{ id, videoId, playbackId, uploadId, assetId, position, productsTagged }>} Payload for API
  */
 export function prepareVideosPayload(uploadedVideos) {
   if (!Array.isArray(uploadedVideos)) return [];
@@ -16,6 +17,8 @@ export function prepareVideosPayload(uploadedVideos) {
     id: v.id,
     videoId: v.videoId ?? v.id,
     playbackId: v.playbackId,
+    uploadId: v.uploadId,
+    assetId: v.assetId,
     position: v.position ?? 0,
     productsTagged: (v.taggedProducts || []).map((p) =>
       typeof p === 'object' && p !== null
