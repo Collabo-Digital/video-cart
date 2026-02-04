@@ -307,7 +307,7 @@ export default function FeedEditorPage() {
 
 
               {selected === 0 && <Accordion control={control} errors={errors} />}
-              {selected === 1 && <AnalyticsTab />}
+              {selected === 1 && <AnalyticsTab feedId={feed?.id} />}
 
 
             </BlockStack>

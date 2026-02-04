@@ -77,6 +77,7 @@ model Video {
   
   // Relations
   feedVideos      FeedVideo[]
+  videoAnalytics VideoAnalytics[]
 }
 
 model Feed {
@@ -103,9 +104,11 @@ model Feed {
   updatedAt      DateTime    @updatedAt
   
   // Relations
-  shop           Shop        @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
-  videos         FeedVideo[]
-  
+  shop            Shop             @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
+  videos          FeedVideo[]
+  feedAnalytics   FeedAnalytics[]
+  videoAnalytics  VideoAnalytics[]
+
   @@index([shopDomain])
   @@index([isDeleted])
 }
@@ -133,4 +136,48 @@ model FeedVideo {
   @@unique([feedId, videoId])
   @@index([feedId])
   @@index([videoId])
+}
+
+// Feed-level analytics: one row per feed per day (UTC date)
+model FeedAnalytics {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  feedId      String   @db.ObjectId
+  date        DateTime // UTC start-of-day
+
+  impressions Int      @default(0)
+  views       Int      @default(0)
+  clicks      Int      @default(0)
+  purchases   Int      @default(0)
+  sales       Float    @default(0)
+
+  extras      Json?
+
+  feed        Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+
+  @@unique([feedId, date])
+  @@index([date])
+}
+
+// Video-in-feed analytics: one row per (video, feed) per day
+model VideoAnalytics {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId        String   @db.ObjectId
+  feedId         String   @db.ObjectId
+  date           DateTime // UTC start-of-day
+
+  impressions    Int      @default(0)
+  views         Int      @default(0)
+  clicks        Int      @default(0)
+  purchases     Int      @default(0)
+  sales         Float    @default(0)
+  totalWatchTime Float    @default(0) // seconds
+  avgWatchTime   Float?
+
+  extras         Json?
+
+  video         Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  feed          Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, feedId, date])
+  @@index([date])
 }

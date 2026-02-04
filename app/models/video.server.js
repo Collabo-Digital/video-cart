@@ -32,6 +32,19 @@ export async function findById(id) {
 }
 
 /**
+ * Find videos by multiple IDs (e.g. for analytics aggregation)
+ * @param {string[]} ids - Video IDs
+ * @returns {Promise<Array>} Array of video objects
+ */
+export async function findManyByIds(ids) {
+  if (!ids?.length) return [];
+  return prisma.video.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, title: true },
+  });
+}
+
+/**
  * Find video by upload ID
  * @param {string} uploadId - Mux upload ID
  * @returns {Promise<Object|null>} Video object or null
