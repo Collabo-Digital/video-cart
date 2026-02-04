@@ -23,7 +23,7 @@ export const action = async ({ request }) => {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { feedId, videoId, eventType, watchTimeSeconds, salesAmount, shop } = body;
+    const { feedId, videoId, eventType, watchTimeSeconds, salesAmount, revenueAmount, orderCount, shop } = body;
 
     if (!feedId || !eventType) {
       return new Response(
@@ -55,6 +55,8 @@ export const action = async ({ request }) => {
       eventType,
       watchTimeSeconds: watchTimeSeconds ?? 0,
       salesAmount: salesAmount ?? 0,
+      revenueAmount: revenueAmount ?? 0,
+      orderCount: orderCount ?? 1,
     });
 
     return new Response(

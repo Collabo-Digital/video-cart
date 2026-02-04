@@ -7,7 +7,6 @@ import {
   InlineStack,
   InlineGrid,
   Button,
-  DataTable,
   SkeletonBodyText,
   Banner,
 } from "@shopify/polaris";
@@ -20,12 +19,6 @@ function formatSales(n) {
   return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
 }
 
-function formatDuration(seconds) {
-  if (seconds == null || Number.isNaN(seconds)) return "—";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
 
 const defaultRange = () => {
   const end = new Date();
@@ -77,8 +70,8 @@ function AnalyticsTab({ feedId }) {
 
   const loading = fetcher.state === "loading" && !fetcher.data;
   const data = fetcher.data?.success ? fetcher.data.data : null;
-  const feedStats = data?.feed ?? null;
-  const videos = data?.videos ?? [];
+  const widgetStats = data?.widget ?? null;
+  // const videos = data?.videos ?? []; // reserved for future per-video table
 
   return (
     <>
@@ -91,7 +84,7 @@ function AnalyticsTab({ feedId }) {
         </InlineStack>
 
         <Text as="h2" variant="headingMd">
-          Feed overview
+          Widget overview
         </Text>
         <InlineGrid columns={2} gap="300">
           <Card sectioned padding="500">
@@ -103,7 +96,7 @@ function AnalyticsTab({ feedId }) {
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {feedStats ? feedStats.impressions : "—"}
+                  {widgetStats ? widgetStats.impressions : "—"}
                 </Text>
               )}
             </BlockStack>
@@ -117,7 +110,7 @@ function AnalyticsTab({ feedId }) {
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {feedStats ? feedStats.views : "—"}
+                  {widgetStats ? widgetStats.views : "—"}
                 </Text>
               )}
             </BlockStack>
@@ -125,13 +118,13 @@ function AnalyticsTab({ feedId }) {
           <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
-                Clicks
+                Widget clicks
               </Text>
               {loading ? (
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {feedStats ? feedStats.clicks : "—"}
+                  {widgetStats ? widgetStats.clicks : "—"}
                 </Text>
               )}
             </BlockStack>
@@ -139,13 +132,13 @@ function AnalyticsTab({ feedId }) {
           <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
-                Purchases
+                Orders
               </Text>
               {loading ? (
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {feedStats ? feedStats.purchases : "—"}
+                  {widgetStats ? widgetStats.orders : "—"}
                 </Text>
               )}
             </BlockStack>
@@ -153,13 +146,27 @@ function AnalyticsTab({ feedId }) {
           <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
-                Sales
+                Revenue
               </Text>
               {loading ? (
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {feedStats ? formatSales(feedStats.sales) : "—"}
+                  {widgetStats ? formatSales(widgetStats.revenue) : "—"}
+                </Text>
+              )}
+            </BlockStack>
+          </Card>
+          <Card sectioned padding="500">
+            <BlockStack gap="200">
+              <Text as="h2" variant="bodyLg">
+                Add to cart
+              </Text>
+              {loading ? (
+                <SkeletonBodyText lines={1} />
+              ) : (
+                <Text as="h3" variant="headingMd">
+                  {widgetStats ? widgetStats.addToCart : "—"}
                 </Text>
               )}
             </BlockStack>

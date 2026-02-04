@@ -41,20 +41,15 @@ export const loader = async ({ request, params }) => {
       );
     }
 
-    const { feed, videos } = await getFeedAnalytics(feedId, start, end);
+    const { widget, videos, atcRate } = await getFeedAnalytics(feedId, start, end);
 
     return new Response(
       JSON.stringify({
         success: true,
         data: {
-          feed: {
-            ...feed,
-            sales: Number(feed.sales),
-          },
-          videos: videos.map((v) => ({
-            ...v,
-            sales: Number(v.sales),
-          })),
+          widget,
+          atcRate,
+          videos,
         },
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }

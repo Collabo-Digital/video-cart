@@ -26,6 +26,8 @@ export const loader = async ({ request }) => {
     const eventType = url.searchParams.get("eventType");
     const watchTimeSeconds = url.searchParams.get("watchTimeSeconds");
     const salesAmount = url.searchParams.get("salesAmount");
+    const revenueAmount = url.searchParams.get("revenueAmount");
+    const orderCount = url.searchParams.get("orderCount");
 
     if (!feedId || !eventType) {
       return Response.json(
@@ -48,6 +50,8 @@ export const loader = async ({ request }) => {
       eventType,
       watchTimeSeconds: watchTimeSeconds != null ? Number(watchTimeSeconds) : 0,
       salesAmount: salesAmount != null ? Number(salesAmount) : 0,
+      revenueAmount: revenueAmount != null ? Number(revenueAmount) : 0,
+      orderCount: orderCount != null ? Number(orderCount) : 1,
     });
 
     return Response.json({ success: true }, { status: 200, headers: JSON_HEADERS });

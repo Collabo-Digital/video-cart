@@ -38,7 +38,9 @@ export async function findByFeedAndDateRange(feedId, { startDate, endDate }) {
  * Upsert and increment feed analytics for a given day
  * @param {string} feedId
  * @param {Date} date
- * @param {Object} increments - { impressions?, views?, clicks?, purchases?, sales? }
+ * @param {Object} increments
+ *  - widgetImpressions?, widgetClicks?, widgetVideoPlays?, widgetViews?, widgetProductClicks?,
+ *    widgetAddToCart?, widgetOrders?, widgetRevenue?
  * @returns {Promise<Object>}
  */
 export async function upsertIncrement(feedId, date, increments) {
@@ -49,12 +51,18 @@ export async function upsertIncrement(feedId, date, increments) {
     },
   });
 
+  const add = (a, b) => (a ?? 0) + (b ?? 0);
+
   const data = {
-    impressions: (existing?.impressions ?? 0) + (increments.impressions ?? 0),
-    views: (existing?.views ?? 0) + (increments.views ?? 0),
-    clicks: (existing?.clicks ?? 0) + (increments.clicks ?? 0),
-    purchases: (existing?.purchases ?? 0) + (increments.purchases ?? 0),
-    sales: (existing?.sales != null ? Number(existing.sales) : 0) + (increments.sales ?? 0),
+    // New widget-level fields
+    widgetImpressions: add(existing?.widgetImpressions, increments.widgetImpressions),
+    widgetClicks: add(existing?.widgetClicks, increments.widgetClicks),
+    widgetVideoPlays: add(existing?.widgetVideoPlays, increments.widgetVideoPlays),
+    widgetViews: add(existing?.widgetViews, increments.widgetViews),
+    widgetProductClicks: add(existing?.widgetProductClicks, increments.widgetProductClicks),
+    widgetAddToCart: add(existing?.widgetAddToCart, increments.widgetAddToCart),
+    widgetOrders: add(existing?.widgetOrders, increments.widgetOrders),
+    widgetRevenue: (existing?.widgetRevenue != null ? Number(existing.widgetRevenue) : 0) + (increments.widgetRevenue ?? 0),
   };
 
   return prisma.feedAnalytics.upsert({

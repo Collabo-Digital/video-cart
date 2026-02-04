@@ -183,18 +183,27 @@ export default function AnalyticsByIdPage() {
     type === "video" ? entityId : videos[0]?.videoId ?? undefined
   );
 
-  const stats = type === "feed"
-    ? analytics?.feed
-    : analytics?.video;
-  const summary = stats
-    ? [
-        { label: "Impressions", value: stats.impressions ?? 0 },
-        { label: "Views", value: stats.views ?? 0 },
-        { label: "Clicks", value: stats.clicks ?? 0 },
-        { label: "Purchases", value: stats.purchases ?? 0 },
-        { label: "Sales", value: stats.sales != null ? Number(stats.sales).toFixed(2) : "0" },
-      ]
-    : [];
+  const summary =
+    type === "feed"
+      ? [
+          { label: "Widget impressions", value: analytics?.widget?.impressions ?? 0 },
+          { label: "Widget views", value: analytics?.widget?.views ?? 0 },
+          { label: "Widget clicks", value: analytics?.widget?.clicks ?? 0 },
+          { label: "Video plays", value: analytics?.widget?.videoPlays ?? 0 },
+          { label: "Product clicks", value: analytics?.widget?.productClicks ?? 0 },
+          { label: "Add to cart", value: analytics?.widget?.addToCart ?? 0 },
+          { label: "Orders", value: analytics?.widget?.orders ?? 0 },
+          { label: "Revenue", value: Number(analytics?.widget?.revenue ?? 0).toFixed(2) },
+        ]
+      : [
+          { label: "Video impressions", value: analytics?.video?.videoImpressions ?? 0 },
+          { label: "Video views", value: analytics?.video?.videoViews ?? 0 },
+          { label: "Product clicks", value: analytics?.video?.productClicks ?? 0 },
+          { label: "ATC clicks", value: analytics?.video?.atcClicks ?? 0 },
+          { label: "Add to cart", value: analytics?.video?.addToCart ?? 0 },
+          { label: "Orders", value: analytics?.video?.orders ?? 0 },
+          { label: "Revenue", value: Number(analytics?.video?.revenue ?? 0).toFixed(2) },
+        ];
   const muxAggregate = muxMetrics?.aggregate;
 
   const currentIndex = videos.findIndex((v) => v.videoId === selectedVideoId);

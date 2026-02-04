@@ -9,10 +9,21 @@ import * as VideoAnalyticsModel from '../../models/videoAnalytics.server';
 import * as VideoModel from '../../models/video.server';
 
 export const EVENT_TYPES = {
-  IMPRESSION: 'impression',
-  VIEW: 'view',
-  CLICK: 'click',
-  PURCHASE: 'purchase',
+  // Widget-level
+  WIDGET_IMPRESSION: 'widget_impression',
+  WIDGET_CLICK: 'widget_click',
+  WIDGET_VIDEO_PLAY: 'widget_video_play',
+  WIDGET_PRODUCT_CLICK: 'widget_product_click',
+  WIDGET_ATC: 'widget_add_to_cart',
+  WIDGET_ORDER: 'widget_order',
+
+  // Video-level (requires videoId)
+  VIDEO_IMPRESSION: 'video_impression',
+  VIDEO_VIEW: 'video_view',
+  VIDEO_PRODUCT_CLICK: 'video_product_click',
+  VIDEO_ATC_CLICK: 'video_atc_click',
+  VIDEO_ATC: 'video_add_to_cart',
+  VIDEO_ORDER: 'video_order',
 };
 
 /**
@@ -24,7 +35,17 @@ export const EVENT_TYPES = {
  * @param {number} [params.watchTimeSeconds] - for view events
  * @param {number} [params.salesAmount] - for purchase events
  */
-export async function recordEvent({ feedId, videoId, eventType, watchTimeSeconds = 0, salesAmount = 0 }) {
+export async function recordEvent({
+  feedId,
+  videoId,
+  eventType,
+  // legacy
+  watchTimeSeconds = 0,
+  salesAmount = 0,
+  // new conversion fields
+  revenueAmount = 0,
+  orderCount = 1,
+} = {}) {
   if (!feedId) throw new Error('feedId is required');
   const now = new Date();
 
@@ -32,29 +53,90 @@ export async function recordEvent({ feedId, videoId, eventType, watchTimeSeconds
   const videoUpdates = {};
 
   switch (eventType) {
-    case EVENT_TYPES.IMPRESSION:
-      feedIncrements.impressions = 1;
-      if (videoId) videoUpdates.impressions = 1;
+    // Widget-level
+    case EVENT_TYPES.WIDGET_IMPRESSION:
+      feedIncrements.widgetImpressions = 1;
       break;
-    case EVENT_TYPES.VIEW:
-      feedIncrements.views = 1;
+    case EVENT_TYPES.WIDGET_CLICK:
+      feedIncrements.widgetClicks = 1;
+      feedIncrements.widgetViews = 1;
+      break;
+    case EVENT_TYPES.WIDGET_VIDEO_PLAY:
+      feedIncrements.widgetVideoPlays = 1;
+      feedIncrements.widgetViews = 1;
+      break;
+    case EVENT_TYPES.WIDGET_PRODUCT_CLICK:
+      feedIncrements.widgetProductClicks = 1;
+      break;
+    case EVENT_TYPES.WIDGET_ATC:
+      feedIncrements.widgetAddToCart = 1;
+      break;
+    case EVENT_TYPES.WIDGET_ORDER: {
+      const orders = Number(orderCount) || 1;
+      const revenue = Number(revenueAmount ?? salesAmount) || 0;
+      feedIncrements.widgetOrders = orders;
+      feedIncrements.widgetRevenue = revenue;
+      break;
+    }
+
+    // Video-level (requires videoId)
+    case EVENT_TYPES.VIDEO_IMPRESSION:
+      if (!videoId) throw new Error('videoId is required for video_impression');
+      videoUpdates.videoImpressions = 1;
+      break;
+    case EVENT_TYPES.VIDEO_VIEW:
+      if (!videoId) throw new Error('videoId is required for video_view');
+      videoUpdates.videoViews = 1;
+      break;
+    case EVENT_TYPES.VIDEO_PRODUCT_CLICK:
+      if (!videoId) throw new Error('videoId is required for video_product_click');
+      videoUpdates.videoProductClicks = 1;
+      break;
+    case EVENT_TYPES.VIDEO_ATC_CLICK:
+      if (!videoId) throw new Error('videoId is required for video_atc_click');
+      videoUpdates.videoAtcClicks = 1;
+      break;
+    case EVENT_TYPES.VIDEO_ATC:
+      if (!videoId) throw new Error('videoId is required for video_add_to_cart');
+      videoUpdates.videoAddToCart = 1;
+      break;
+    case EVENT_TYPES.VIDEO_ORDER: {
+      if (!videoId) throw new Error('videoId is required for video_order');
+      const orders = Number(orderCount) || 1;
+      const revenue = Number(revenueAmount ?? salesAmount) || 0;
+      videoUpdates.videoOrders = orders;
+      videoUpdates.videoRevenue = revenue;
+      break;
+    }
+
+    // Legacy eventType compatibility (old widget sends these)
+    case 'impression':
+      feedIncrements.widgetImpressions = 1;
       if (videoId) {
-        videoUpdates.views = 1;
-        videoUpdates.totalWatchTime = Number(watchTimeSeconds) || 0;
+        videoUpdates.videoImpressions = 1;
       }
       break;
-    case EVENT_TYPES.CLICK:
-      feedIncrements.clicks = 1;
-      if (videoId) videoUpdates.clicks = 1;
+    case 'click':
+      feedIncrements.widgetClicks = 1;
+      feedIncrements.widgetViews = 1;
       break;
-    case EVENT_TYPES.PURCHASE:
-      feedIncrements.purchases = 1;
-      feedIncrements.sales = Number(salesAmount) || 0;
+    case 'view':
+      feedIncrements.widgetVideoPlays = 1;
+      feedIncrements.widgetViews = 1;
       if (videoId) {
-        videoUpdates.purchases = 1;
-        videoUpdates.sales = Number(salesAmount) || 0;
+        videoUpdates.videoViews = 1;
       }
       break;
+    case 'purchase': {
+      const revenue = Number(revenueAmount ?? salesAmount) || 0;
+      feedIncrements.widgetOrders = 1;
+      feedIncrements.widgetRevenue = revenue;
+      if (videoId) {
+        videoUpdates.videoOrders = 1;
+        videoUpdates.videoRevenue = revenue;
+      }
+      break;
+    }
     default:
       throw new Error(`Unknown eventType: ${eventType}`);
   }
@@ -78,19 +160,28 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
     VideoAnalyticsModel.findByFeedAndDateRange(feedId, { startDate, endDate }),
   ]);
 
-  const feed = {
-    impressions: 0,
-    views: 0,
-    clicks: 0,
-    purchases: 0,
-    sales: 0,
+  // Widget-level totals (per requirements)
+  const widget = {
+    impressions: 0,      // widgetImpressions
+    clicks: 0,           // widgetClicks
+    videoPlays: 0,       // widgetVideoPlays
+    views: 0,            // widgetViews (or derived clicks+videoPlays)
+    productClicks: 0,    // widgetProductClicks
+    addToCart: 0,        // widgetAddToCart
+    orders: 0,           // widgetOrders
+    revenue: 0,          // widgetRevenue
   };
+
   for (const row of feedRows) {
-    feed.impressions += row.impressions ?? 0;
-    feed.views += row.views ?? 0;
-    feed.clicks += row.clicks ?? 0;
-    feed.purchases += row.purchases ?? 0;
-    feed.sales += Number(row.sales ?? 0);
+    widget.impressions += row.widgetImpressions ?? 0;
+    widget.clicks += row.widgetClicks ?? 0;
+    widget.videoPlays += row.widgetVideoPlays ?? 0;
+    widget.views += row.widgetViews ?? 0;
+    widget.productClicks += row.widgetProductClicks ?? 0;
+    widget.addToCart += row.widgetAddToCart ?? 0;
+    widget.orders += row.widgetOrders ?? 0;
+    widget.revenue += Number(row.widgetRevenue ?? 0);
+
   }
 
   const uniqueVideoIds = [...new Set(videoRows.map((r) => r.videoId).filter(Boolean))];
@@ -109,32 +200,33 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
       byVideo.set(vid, {
         videoId: vid,
         title: videoTitles.get(vid) ?? null,
-        impressions: 0,
-        views: 0,
-        clicks: 0,
-        purchases: 0,
-        sales: 0,
-        totalWatchTime: 0,
-        avgWatchTime: null,
+        // Video-level metrics (per requirements)
+        videoImpressions: 0,
+        videoViews: 0,
+        productClicks: 0,
+        atcClicks: 0,
+        addToCart: 0,
+        orders: 0,
+        revenue: 0,
+
       });
     }
     const v = byVideo.get(vid);
-    v.impressions += row.impressions ?? 0;
-    v.views += row.views ?? 0;
-    v.clicks += row.clicks ?? 0;
-    v.purchases += row.purchases ?? 0;
-    v.sales += Number(row.sales ?? 0);
-    v.totalWatchTime += row.totalWatchTime ?? 0;
-    if (row.avgWatchTime != null) {
-      v.avgWatchTime = v.views > 0 ? v.totalWatchTime / v.views : null;
-    }
-  }
-  const videos = Array.from(byVideo.values()).map((v) => ({
-    ...v,
-    avgWatchTime: v.views > 0 ? v.totalWatchTime / v.views : null,
-  }));
+    v.videoImpressions += row.videoImpressions ?? 0;
+    v.videoViews += row.videoViews ?? 0;
+    v.productClicks += row.videoProductClicks ?? 0;
+    v.atcClicks += row.videoAtcClicks ?? 0;
+    v.addToCart += row.videoAddToCart ?? 0;
+    v.orders += row.videoOrders ?? 0;
+    v.revenue += Number(row.videoRevenue ?? 0);
 
-  return { feed, videos };
+  }
+  const videos = Array.from(byVideo.values());
+
+  // Derived metrics
+  const atcRate = widget.views > 0 ? widget.addToCart / widget.views : 0;
+
+  return { widget, atcRate, videos };
 }
 
 /**
@@ -148,24 +240,25 @@ export async function getVideoAnalytics(videoId, startDate, endDate) {
   const rows = await VideoAnalyticsModel.findByVideoAndDateRange(videoId, { startDate, endDate });
 
   const video = {
-    impressions: 0,
-    views: 0,
-    clicks: 0,
-    purchases: 0,
-    sales: 0,
-    totalWatchTime: 0,
-    avgWatchTime: null,
+    // Video-level (per requirements)
+    videoImpressions: 0,
+    videoViews: 0,
+    productClicks: 0,
+    atcClicks: 0,
+    addToCart: 0,
+    orders: 0,
+    revenue: 0,
+
   };
   for (const row of rows) {
-    video.impressions += row.impressions ?? 0;
-    video.views += row.views ?? 0;
-    video.clicks += row.clicks ?? 0;
-    video.purchases += row.purchases ?? 0;
-    video.sales += Number(row.sales ?? 0);
-    video.totalWatchTime += row.totalWatchTime ?? 0;
-  }
-  if (video.views > 0) {
-    video.avgWatchTime = video.totalWatchTime / video.views;
+    video.videoImpressions += row.videoImpressions ?? 0;
+    video.videoViews += row.videoViews ?? 0;
+    video.productClicks += row.videoProductClicks ?? 0;
+    video.atcClicks += row.videoAtcClicks ?? 0;
+    video.addToCart += row.videoAddToCart ?? 0;
+    video.orders += row.videoOrders ?? 0;
+    video.revenue += Number(row.videoRevenue ?? 0);
+
   }
 
   return { video };

@@ -290,7 +290,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio > 0) {
             sent = true;
-            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.IMPRESSION });
+            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_IMPRESSION });
             break;
           }
         }
@@ -388,12 +388,13 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
         if (viewSent || !feed?.id || !video?.id) return;
         viewSent = true;
         const sec = el.currentTime != null ? Math.floor(el.currentTime) : 0;
-        await trackDbEvent({ 
-          feedId: feed.id, 
-          videoId: video.id, 
-          eventType: EVENT_TYPES.VIEW, 
-          watchTimeSeconds: sec 
+        await trackDbEvent({
+          feedId: feed.id,
+          videoId: video.id,
+          eventType: EVENT_TYPES.VIDEO_VIEW,
+          watchTimeSeconds: sec,
         });
+        await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_VIDEO_PLAY });
         console.log('View event tracked for video:', video?.id);
       };
       el.addEventListener('play', onPlay);
@@ -447,12 +448,13 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
         if (viewSent || !feed?.id || !video?.id) return;
         viewSent = true;
         const sec = el.currentTime != null ? Math.floor(el.currentTime) : 0;
-        await trackDbEvent({ 
-          feedId: feed.id, 
-          videoId: video.id, 
-          eventType: EVENT_TYPES.VIEW, 
-          watchTimeSeconds: sec 
+        await trackDbEvent({
+          feedId: feed.id,
+          videoId: video.id,
+          eventType: EVENT_TYPES.VIDEO_VIEW,
+          watchTimeSeconds: sec,
         });
+        // await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_VIDEO_PLAY });
       };
       el.addEventListener('play', onPlay);
 
@@ -491,7 +493,8 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const handleCardClick = async (video, index) => {
     onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });
     if (feed?.id && video?.id) {
-      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.IMPRESSION });
+      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+      // await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_CLICK });
     }
     setExpandedIndex(index);
   };
@@ -544,7 +547,8 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     e.preventDefault();
     e.stopPropagation();
     if (feed?.id && video?.id) {
-      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.CLICK });
+      await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
     }
     const first = video?.productsTagged?.[0];
     if (first) {
@@ -668,7 +672,11 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                   <a
                                     href={`/products/${product.handle}`}
                                     className="video-carousel-overlay-product-add video-carousel-overlay-product-shop"
-                                    onClick={() => {
+                                    onClick={async () => {
+                                      if (feed?.id && video?.id) {
+                                        await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+                                        await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+                                      }
                                       onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
                                     }}
                                   >
@@ -704,7 +712,12 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                         <a
                           href={`/products/${product.handle}`}
                           className="video-carousel-overlay-product-add"
-                          onClick={() => {
+                          onClick={async () => {
+                            const cv = currentVideo();
+                            if (feed?.id && cv?.id) {
+                              await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+                              await trackDbEvent({ feedId: feed.id, videoId: cv.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+                            }
                             onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
                           }}
                         >
@@ -799,7 +812,20 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                   <img src={product.image} alt={product.title} loading="lazy" />
                                   <div className="video-carousel-card-product-info">
                                     <span className="video-carousel-card-product-title">{product.title}</span>
-                                    <button className="video-carousel-card-product-button" onClick={() => window.location.href = `/products/${product.handle}`}>Shop</button>
+                                    <button
+                                    type="button"
+                                    className="video-carousel-card-product-button"
+                                    onClick={async () => {
+                                      if (feed?.id && video?.id) {
+                                        await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+                                        await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+                                      }
+                                      onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
+                                      window.location.href = `/products/${product.handle}`;
+                                    }}
+                                  >
+                                    Shop
+                                  </button>
                                   </div>
                                 </div>
                               )}

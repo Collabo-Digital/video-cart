@@ -144,11 +144,15 @@ model FeedAnalytics {
   feedId      String   @db.ObjectId
   date        DateTime // UTC start-of-day
 
-  impressions Int      @default(0)
-  views       Int      @default(0)
-  clicks      Int      @default(0)
-  purchases   Int      @default(0)
-  sales       Float    @default(0)
+  // Widget-level analytics (per requirements)
+  widgetImpressions  Int   @default(0) // widget loaded + visible
+  widgetClicks       Int   @default(0) // widget clicks / interactions
+  widgetVideoPlays   Int   @default(0) // video plays initiated from widget
+  widgetViews        Int   @default(0) // (optional stored) clicks + video plays
+  widgetProductClicks Int  @default(0) // product clicks from widget
+  widgetAddToCart    Int   @default(0) // add-to-cart events attributed to widget
+  widgetOrders       Int   @default(0) // completed checkouts attributed to widget
+  widgetRevenue      Float @default(0) // revenue from widget-driven purchases
 
   extras      Json?
 
@@ -165,13 +169,14 @@ model VideoAnalytics {
   feedId         String   @db.ObjectId
   date           DateTime // UTC start-of-day
 
-  impressions    Int      @default(0)
-  views         Int      @default(0)
-  clicks        Int      @default(0)
-  purchases     Int      @default(0)
-  sales         Float    @default(0)
-  totalWatchTime Float    @default(0) // seconds
-  avgWatchTime   Float?
+  // Video-level analytics (per requirements)
+  videoImpressions  Int   @default(0) // video visible in widget
+  videoViews        Int   @default(0) // video views (play events)
+  videoProductClicks Int  @default(0) // product click count per video
+  videoAtcClicks    Int   @default(0) // ATC button clicks for tagged products
+  videoAddToCart    Int   @default(0) // add-to-cart events attributed to video
+  videoOrders       Int   @default(0) // completed checkouts attributed to video
+  videoRevenue      Float @default(0) // revenue attributed to video
 
   extras         Json?
 

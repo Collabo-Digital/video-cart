@@ -57,7 +57,8 @@ export async function findByVideoAndDateRange(videoId, { startDate, endDate }) {
  * @param {string} videoId
  * @param {string} feedId
  * @param {Date} date
- * @param {Object} updates - { impressions?, views?, clicks?, purchases?, sales?, totalWatchTime? }
+ * @param {Object} updates
+ *  - videoImpressions?, videoViews?, videoProductClicks?, videoAtcClicks?, videoAddToCart?, videoOrders?, videoRevenue?
  * @returns {Promise<Object>}
  */
 export async function upsertIncrement(videoId, feedId, date, updates) {
@@ -69,19 +70,16 @@ export async function upsertIncrement(videoId, feedId, date, updates) {
   });
 
   const add = (a, b) => (a ?? 0) + (b ?? 0);
-  const impressions = add(existing?.impressions, updates.impressions);
-  const views = add(existing?.views, updates.views);
-  const totalWatchTime = add(existing?.totalWatchTime, updates.totalWatchTime);
-  const avgWatchTime = views > 0 ? totalWatchTime / views : null;
 
   const data = {
-    impressions,
-    views,
-    clicks: add(existing?.clicks, updates.clicks),
-    purchases: add(existing?.purchases, updates.purchases),
-    sales: (existing?.sales != null ? Number(existing.sales) : 0) + (updates.sales ?? 0),
-    totalWatchTime,
-    avgWatchTime,
+    // New fields (per requirements)
+    videoImpressions: add(existing?.videoImpressions, updates.videoImpressions),
+    videoViews: add(existing?.videoViews, updates.videoViews),
+    videoProductClicks: add(existing?.videoProductClicks, updates.videoProductClicks),
+    videoAtcClicks: add(existing?.videoAtcClicks, updates.videoAtcClicks),
+    videoAddToCart: add(existing?.videoAddToCart, updates.videoAddToCart),
+    videoOrders: add(existing?.videoOrders, updates.videoOrders),
+    videoRevenue: (existing?.videoRevenue != null ? Number(existing.videoRevenue) : 0) + (updates.videoRevenue ?? 0),
   };
 
   return prisma.videoAnalytics.upsert({
