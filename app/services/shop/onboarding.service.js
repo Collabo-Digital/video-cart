@@ -5,6 +5,7 @@
  */
 
 import * as ShopModel from '../../models/shop.server';
+import { ensureWebPixelInstalled } from "../../lib/utils/webPixel";
 
 /**
  * Handle post-authentication tasks
@@ -95,6 +96,20 @@ export async function doTaskAfterAuth({ session, admin }) {
         shopDomain: savedShop.shopDomain,
         name: savedShop.name
       });
+
+      // Ensure app pixel is activated (creates web pixel record once per shop)
+      // apiBaseUrl lets the pixel POST to the app (pixel cannot call same-origin store).
+      const appUrl = (process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "");
+      const pixelResult = await ensureWebPixelInstalled(admin, {
+        accountID: session.shop,
+        ...(appUrl ? { apiBaseUrl: appUrl } : {}),
+      });
+
+      if (pixelResult?.status === "error") {
+        console.error("Failed to create web pixel", pixelResult.userErrors);
+      } else {
+        console.log("Web pixel status:", pixelResult.status);
+      }
 
       return savedShop;
 

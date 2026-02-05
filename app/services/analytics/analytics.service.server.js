@@ -7,6 +7,7 @@
 import * as FeedAnalyticsModel from '../../models/feedAnalytics.server';
 import * as VideoAnalyticsModel from '../../models/videoAnalytics.server';
 import * as VideoModel from '../../models/video.server';
+import { getFeedById } from '../feed/feed.service.server';
 
 export const EVENT_TYPES = {
   // Widget-level
@@ -262,4 +263,52 @@ export async function getVideoAnalytics(videoId, startDate, endDate) {
   }
 
   return { video };
+}
+
+/**
+ * Record conversion events from pixel (checkout_completed). Used by both
+ * app proxy and public API. Validates each feed belongs to shop.
+ * @param {string} shop - shop domain
+ * @param {Array<{ video_id: string, widget_id: string, quantity?: number, line_total?: number }>} items
+ */
+export async function recordConversionFromPixel(shop, items) {
+  if (!items?.length) return;
+
+  const byFeed = new Map();
+  const byFeedVideo = new Map();
+
+  for (const item of items) {
+    const feedId = item.widget_id;
+    const videoId = item.video_id;
+    if (!feedId || !videoId) continue;
+
+    const revenue = Number(item.line_total) ?? 0;
+
+    if (!byFeed.has(feedId)) byFeed.set(feedId, { revenue: 0 });
+    byFeed.get(feedId).revenue += revenue;
+
+    const fvKey = `${feedId}\t${videoId}`;
+    if (!byFeedVideo.has(fvKey)) byFeedVideo.set(fvKey, { feedId, videoId, revenue: 0 });
+    byFeedVideo.get(fvKey).revenue += revenue;
+  }
+
+  for (const [feedId, { revenue }] of byFeed) {
+    await getFeedById(feedId, shop);
+    await recordEvent({
+      feedId,
+      eventType: EVENT_TYPES.WIDGET_ORDER,
+      orderCount: 1,
+      revenueAmount: revenue,
+    });
+  }
+
+  for (const [, { feedId, videoId, revenue }] of byFeedVideo) {
+    await recordEvent({
+      feedId,
+      videoId,
+      eventType: EVENT_TYPES.VIDEO_ORDER,
+      orderCount: 1,
+      revenueAmount: revenue,
+    });
+  }
 }

@@ -41,6 +41,10 @@ import {
   BlockStack,
   InlineStack,
   Button,
+  Text,
+  Badge,
+  Divider,
+  Box,
 } from "@shopify/polaris";
 import { useState } from "react";
 import { useLoaderData } from "react-router";
@@ -177,6 +181,18 @@ function formatWatchTime(seconds) {
   return parts.join(" ");
 }
 
+function formatRevenue(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return "$0.00";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+}
+
+function formatNumber(value) {
+  const n = Number(value);
+  if (Number.isNaN(n)) return "0";
+  return new Intl.NumberFormat("en-US").format(n);
+}
+
 export default function AnalyticsByIdPage() {
   const { type, title, videos, analytics, muxMetrics, entityId } = useLoaderData();
   const [selectedVideoId, setSelectedVideoId] = useState(() =>
@@ -186,23 +202,23 @@ export default function AnalyticsByIdPage() {
   const summary =
     type === "feed"
       ? [
-          { label: "Widget impressions", value: analytics?.widget?.impressions ?? 0 },
-          { label: "Widget views", value: analytics?.widget?.views ?? 0 },
-          { label: "Widget clicks", value: analytics?.widget?.clicks ?? 0 },
-          { label: "Video plays", value: analytics?.widget?.videoPlays ?? 0 },
-          { label: "Product clicks", value: analytics?.widget?.productClicks ?? 0 },
-          { label: "Add to cart", value: analytics?.widget?.addToCart ?? 0 },
-          { label: "Orders", value: analytics?.widget?.orders ?? 0 },
-          { label: "Revenue", value: Number(analytics?.widget?.revenue ?? 0).toFixed(2) },
+          { label: "Widget impressions", value: analytics?.widget?.impressions ?? 0, isRevenue: false },
+          { label: "Widget views", value: analytics?.widget?.views ?? 0, isRevenue: false },
+          { label: "Widget clicks", value: analytics?.widget?.clicks ?? 0, isRevenue: false },
+          { label: "Video plays", value: analytics?.widget?.videoPlays ?? 0, isRevenue: false },
+          { label: "Product clicks", value: analytics?.widget?.productClicks ?? 0, isRevenue: false },
+          { label: "Add to cart", value: analytics?.widget?.addToCart ?? 0, isRevenue: false },
+          { label: "Orders", value: analytics?.widget?.orders ?? 0, isRevenue: false },
+          { label: "Revenue", value: Number(analytics?.widget?.revenue ?? 0), isRevenue: true },
         ]
       : [
-          { label: "Video impressions", value: analytics?.video?.videoImpressions ?? 0 },
-          { label: "Video views", value: analytics?.video?.videoViews ?? 0 },
-          { label: "Product clicks", value: analytics?.video?.productClicks ?? 0 },
-          { label: "ATC clicks", value: analytics?.video?.atcClicks ?? 0 },
-          { label: "Add to cart", value: analytics?.video?.addToCart ?? 0 },
-          { label: "Orders", value: analytics?.video?.orders ?? 0 },
-          { label: "Revenue", value: Number(analytics?.video?.revenue ?? 0).toFixed(2) },
+          { label: "Video impressions", value: analytics?.video?.videoImpressions ?? 0, isRevenue: false },
+          { label: "Video views", value: analytics?.video?.videoViews ?? 0, isRevenue: false },
+          { label: "Product clicks", value: analytics?.video?.productClicks ?? 0, isRevenue: false },
+          { label: "ATC clicks", value: analytics?.video?.atcClicks ?? 0, isRevenue: false },
+          { label: "Add to cart", value: analytics?.video?.addToCart ?? 0, isRevenue: false },
+          { label: "Orders", value: analytics?.video?.orders ?? 0, isRevenue: false },
+          { label: "Revenue", value: Number(analytics?.video?.revenue ?? 0), isRevenue: true },
         ];
   const muxAggregate = muxMetrics?.aggregate;
 
@@ -218,146 +234,158 @@ export default function AnalyticsByIdPage() {
     if (hasNext) setSelectedVideoId(videos[currentIndex + 1].videoId);
   };
 
+  const muxPerVideo = selectedVideoId && muxMetrics?.byVideoId?.[selectedVideoId];
+
   return (
     <Frame>
       <Page
-        title={type === "feed" ? `Analytics: ${title}` : `Video: ${title}`}
+        title={title}
         backAction={{ content: "Back", url: "/app/feeds" }}
+        titleMetadata={type ? <Badge tone={type === "feed" ? "info" : "attention"}>{type === "feed" ? "Feed" : "Video"}</Badge> : null}
       >
-        <InlineGrid columns={2} gap="400">
-          <BlockStack gap="400">
-            {videos.length > 1 && (
-              <InlineStack align="end" blockAlign="end" gap="200">
-                <Button
-                  icon={CircleLeftIcon}
-                  onClick={goPrev}
-                  disabled={!hasPrev}
-                  accessibilityLabel="Previous video"
-                />
-                <Button
-                  icon={CircleRightIcon}
-                  onClick={goNext}
-                  disabled={!hasNext}
-                  accessibilityLabel="Next video"
-                />
+        <BlockStack gap="600">
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                <Text as="h2" variant="headingMd">
+                  Overview
+                </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  Last 30 days
+                </Text>
               </InlineStack>
-            )}
-            <Card>
-              {videos.length > 1
-                ? `Video ${currentIndex + 1} of ${videos.length}`
-                : `${videos.length} video(s) in this ${type === "feed" ? "feed" : "video"}`}
-              {selectedVideo ? (
-                <Card>
-                  <VideoDisplay video={selectedVideo} index={currentIndex} />
-                </Card>
+              {summary.length > 0 ? (
+                <InlineGrid columns={{ xs: 2, sm: 4 }} gap="400">
+                  {summary.map(({ label, value, isRevenue }) => (
+                    <Box key={label} padding="300" background="bg-surface-secondary" borderRadius="200">
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {label}
+                        </Text>
+                        <Text as="p" variant="headingMd" fontWeight="semibold">
+                          {isRevenue ? formatRevenue(value) : formatNumber(value)}
+                        </Text>
+                      </BlockStack>
+                    </Box>
+                  ))}
+                </InlineGrid>
               ) : (
-                <p>No video selected.</p>
+                <Box padding="400">
+                  <Text as="p" tone="subdued">
+                    No analytics data for this period.
+                  </Text>
+                </Box>
               )}
-            </Card>
-          </BlockStack>
-          <BlockStack gap="400">
+            </BlockStack>
+          </Card>
+
+          <InlineGrid columns={{ xs: 1, md: 2 }} gap="600">
             <Card>
-              <BlockStack gap="200">
-                <strong>Analytics</strong>
-                <p>Last 30 days</p>
-                {summary.length > 0 ? (
-                  <BlockStack gap="100">
-                    {summary.map(({ label, value }) => (
-                      <InlineStack key={label} gap="200" blockAlign="center">
-                        <span>{label}:</span>
-                        <span>{value}</span>
-                      </InlineStack>
-                    ))}
-                  </BlockStack>
+              <BlockStack gap="400">
+                <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                  <Text as="h2" variant="headingMd">
+                    Video
+                  </Text>
+                  {videos.length > 1 && (
+                    <InlineStack gap="200">
+                      <Button
+                        icon={CircleLeftIcon}
+                        onClick={goPrev}
+                        disabled={!hasPrev}
+                        accessibilityLabel="Previous video"
+                      />
+                      <Button
+                        icon={CircleRightIcon}
+                        onClick={goNext}
+                        disabled={!hasNext}
+                        accessibilityLabel="Next video"
+                      />
+                    </InlineStack>
+                  )}
+                </InlineStack>
+                {videos.length > 1 && (
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    Video {currentIndex + 1} of {videos.length}
+                    {selectedVideo?.title ? ` · ${selectedVideo.title}` : ""}
+                  </Text>
+                )}
+                {selectedVideo ? (
+                  <Box paddingBlockStart="200">
+                    <VideoDisplay video={selectedVideo} index={currentIndex} />
+                  </Box>
                 ) : (
-                  <p>No analytics data for this period.</p>
-                )}
-                {muxMetrics && (
-                  <BlockStack gap="100">
-                    <strong>Mux Metrics for {selectedVideoId}</strong>
-                    <InlineStack gap="200" blockAlign="center">
-                      <span>Views:</span>
-                      <span>{muxMetrics.byVideoId[selectedVideoId]?.views ?? 0}</span>
-                      <span>Total watch time:</span>
-                      <span>{formatWatchTime(muxMetrics.byVideoId[selectedVideoId]?.totalWatchTimeSeconds ?? 0)}</span>
-                      <span>Avg watch time:</span>
-                      <span>{formatWatchTime(muxMetrics.byVideoId[selectedVideoId]?.avgWatchTimeSeconds ?? 0)}</span>
-                      <span>Viewer experience score:</span>
-                      <span>{Number(muxMetrics.byVideoId[selectedVideoId]?.viewerExperienceScore ?? 0).toFixed(1)}</span>
-                      <span>Playback failure %:</span>
-                      <span>{Number(muxMetrics.byVideoId[selectedVideoId]?.playbackFailurePercentage ?? 0).toFixed(2)}%</span>
-                      <span>Rebuffer %:</span>
-                      <span>{Number(muxMetrics.byVideoId[selectedVideoId]?.rebufferPercentage ?? 0).toFixed(2)}%</span>
-                    </InlineStack>
-                  </BlockStack>
-                )}
-                {muxAggregate && (
-                  <BlockStack gap="100">
-                    <strong>Mux (overall data metrics)</strong>
-                    <InlineStack gap="200" blockAlign="center">
-                      <span>Views:</span>
-                      <span>{muxAggregate.views ?? 0}</span>
-                    </InlineStack>
-                    <InlineStack gap="200" blockAlign="center">
-                      <span>Total watch time:</span>
-                      <span>{formatWatchTime(muxAggregate.totalWatchTimeSeconds)}</span>
-                    </InlineStack>
-                    {muxAggregate.avgWatchTimeSeconds != null && (
-                      <InlineStack gap="200" blockAlign="center">
-                        <span>Avg watch time:</span>
-                        <span>{formatWatchTime(muxAggregate.avgWatchTimeSeconds)}</span>
-                      </InlineStack>
-                    )}
-                    {muxAggregate.viewerExperienceScore != null && (
-                      <InlineStack gap="200" blockAlign="center">
-                        <span>Viewer experience score:</span>
-                        <span>{Number(muxAggregate.viewerExperienceScore).toFixed(1)}</span>
-                      </InlineStack>
-                    )}
-                    {muxAggregate.playbackFailurePercentage != null && (
-                      <InlineStack gap="200" blockAlign="center">
-                        <span>Playback failure %:</span>
-                        <span>{Number(muxAggregate.playbackFailurePercentage).toFixed(2)}%</span>
-                      </InlineStack>
-                    )}
-                    {muxAggregate.rebufferPercentage != null && (
-                      <InlineStack gap="200" blockAlign="center">
-                        <span>Rebuffer %:</span>
-                        <span>{Number(muxAggregate.rebufferPercentage).toFixed(2)}%</span>
-                      </InlineStack>
-                    )}
-                  </BlockStack>
+                  <Box padding="400">
+                    <Text as="p" tone="subdued">
+                      No video selected.
+                    </Text>
+                  </Box>
                 )}
               </BlockStack>
             </Card>
-          </BlockStack>
-        </InlineGrid>
-        {/* <BlockStack gap="400">
-          <Text as="p" variant="bodyMd" tone="subdued">
-            {type === "feed"
-              ? `${videos.length} video(s) in this feed`
-              : "Single video"}
-          </Text>
-          <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap="400">
-            {videos.map((video, index) => (
-              <Card key={video.videoId ?? index}>
-                <VideoDisplay
-                  video={video}
-                  index={index}
-                  onRemove={undefined}
-                  onTaggedProductsChange={undefined}
-                />
-              </Card>
-            ))}
+
+            <BlockStack gap="400">
+              {muxPerVideo && (
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Playback metrics (this video)
+                    </Text>
+                    <Divider />
+                    <BlockStack gap="200">
+                      {[
+                        { label: "Views", value: formatNumber(muxPerVideo.views ?? 0) },
+                        { label: "Total watch time", value: formatWatchTime(muxPerVideo.totalWatchTimeSeconds ?? 0) },
+                        { label: "Avg watch time", value: formatWatchTime(muxPerVideo.avgWatchTimeSeconds ?? 0) },
+                        { label: "Viewer experience score", value: Number(muxPerVideo.viewerExperienceScore ?? 0).toFixed(1) },
+                        { label: "Playback failure", value: `${Number(muxPerVideo.playbackFailurePercentage ?? 0).toFixed(2)}%` },
+                        { label: "Rebuffer", value: `${Number(muxPerVideo.rebufferPercentage ?? 0).toFixed(2)}%` },
+                      ].map(({ label, value }) => (
+                        <InlineStack key={label} align="space-between" blockAlign="center" wrap={false}>
+                          <Text as="span" variant="bodySm" tone="subdued">
+                            {label}
+                          </Text>
+                          <Text as="span" variant="bodyMd" fontWeight="medium">
+                            {value}
+                          </Text>
+                        </InlineStack>
+                      ))}
+                    </BlockStack>
+                  </BlockStack>
+                </Card>
+              )}
+
+              {muxAggregate && (
+                <Card>
+                  <BlockStack gap="300">
+                    <Text as="h2" variant="headingMd">
+                      Playback metrics (overall)
+                    </Text>
+                    <Divider />
+                    <BlockStack gap="200">
+                      {[
+                        { label: "Views", value: formatNumber(muxAggregate.views ?? 0) },
+                        { label: "Total watch time", value: formatWatchTime(muxAggregate.totalWatchTimeSeconds) },
+                        muxAggregate.avgWatchTimeSeconds != null && { label: "Avg watch time", value: formatWatchTime(muxAggregate.avgWatchTimeSeconds) },
+                        muxAggregate.viewerExperienceScore != null && { label: "Viewer experience score", value: Number(muxAggregate.viewerExperienceScore).toFixed(1) },
+                        muxAggregate.playbackFailurePercentage != null && { label: "Playback failure", value: `${Number(muxAggregate.playbackFailurePercentage).toFixed(2)}%` },
+                        muxAggregate.rebufferPercentage != null && { label: "Rebuffer", value: `${Number(muxAggregate.rebufferPercentage).toFixed(2)}%` },
+                      ].filter(Boolean).map(({ label, value }) => (
+                        <InlineStack key={label} align="space-between" blockAlign="center" wrap={false}>
+                          <Text as="span" variant="bodySm" tone="subdued">
+                            {label}
+                          </Text>
+                          <Text as="span" variant="bodyMd" fontWeight="medium">
+                            {value}
+                          </Text>
+                        </InlineStack>
+                      ))}
+                    </BlockStack>
+                  </BlockStack>
+                </Card>
+              )}
+            </BlockStack>
           </InlineGrid>
-          {videos.length === 0 && (
-            <Card>
-              <Text as="p" tone="subdued">
-                No videos to show.
-              </Text>
-            </Card>
-          )}
-        </BlockStack> */}
+        </BlockStack>
       </Page>
     </Frame>
   );

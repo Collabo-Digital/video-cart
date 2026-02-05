@@ -1,248 +1,4 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
-// import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
-// import Hls from 'hls.js';
-// import mux from 'mux-embed';
-// import { getPlaybackUrl, getThumbnailPreviewUrl } from '../../shared/mux';
-// import { MUX_DATA_ENV_KEY } from '../../core/config';
-// import { api } from '../../api';
-// import { EVENT_TYPES } from '../../api/services/analyticsService';
-// import './carousel.css';
-
-// /** Fire analytics event to DB (app proxy). Fire-and-forget. */
-// async function trackDbEvent(payload) {
-//   if (!payload?.feedId || !payload?.eventType) return;
-//   await api.analytics.recordEvent(payload).then(() => { console.log('Analytics event tracked successfully'); }).catch((error) => { console.error('Error tracking analytics event:', error); });
-// }
-
-// const muxPlayerInitTime = typeof window !== 'undefined' && window.performance?.now ? performance.now() : 0;
-
-// const MOBILE_BREAKPOINT = 768;
-
-// const CARD_WIDTH = 280;
-// const CARD_GAP = 16;
-// const SCROLL_AMOUNT = CARD_WIDTH + CARD_GAP;
-// /* One product visible at a time, full width of card */
-// const PRODUCT_ITEM_WIDTH = CARD_WIDTH; /* 280px = full width */
-// const PRODUCT_ITEM_GAP = 8;
-// const PRODUCT_SCROLL_AMOUNT = PRODUCT_ITEM_WIDTH + PRODUCT_ITEM_GAP;
-
-// const DEFAULT_SUBTITLE =
-//   '';
-
-// export function VideoCarousel({ feed, videos, settings, onEvent }) {
-//   const [trackRef, setTrackRef] = createSignal(null);
-//   const [containerRef, setContainerRef] = createSignal(null);
-//   /** When set, show full-screen story-like overlay for that video index; null = carousel only */
-//   const [expandedIndex, setExpandedIndex] = createSignal(null);
-//   const [videoEl, setVideoEl] = createSignal(null);
-//   const [reelsTrackRef, setReelsTrackRef] = createSignal(null);
-//   const [isMobile, setIsMobile] = createSignal(typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches);
-
-//   /** Feed impression: once when carousel container enters viewport (stored in DB) */
-//   createEffect(() => {
-//     const container = containerRef();
-//     if (!container || !feed?.id) return;
-//     let sent = false;
-//     const observer = new IntersectionObserver(
-//       async (entries) => {
-//         if (sent) return;
-//         for (const entry of entries) {
-//           if (entry.isIntersecting && entry.intersectionRatio > 0) {
-//             sent = true;
-//             await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.IMPRESSION });
-//             break;
-//           }
-//         }
-//       },
-//       { threshold: 0.1 }
-//     );
-//     observer.observe(container);
-//     onCleanup(() => observer.disconnect());
-//   });
-
-//   createEffect(() => {
-//     if (typeof window === 'undefined') return;
-//     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`);
-//     const handler = () => setIsMobile(mql.matches);
-//     mql.addEventListener('change', handler);
-//     onCleanup(() => mql.removeEventListener('change', handler));
-//   });
-
-//   const title = () => settings?.translation?.carouselTitle || feed?.name || '';
-//   const subtitle = () => settings?.translation?.carouselDescription || feed?.description || DEFAULT_SUBTITLE;
-//   /** Products per video: [[product, ...], []] — index i = products for videos[i] */
-//   const productsForVideo = (video) => video?.productsTagged ?? [];
-
-//   /** Display price from first variant (Shopify price string e.g. "50.00") */
-//   const productPrice = (product) => {
-//     const priceVal = product?.variants?.[0]?.price;
-//     if (priceVal == null || priceVal === '') return null;
-//     const num = typeof priceVal === 'string' ? parseFloat(priceVal, 10) : Number(priceVal);
-//     if (Number.isNaN(num)) return null;
-//     return { raw: priceVal, formatted: `$ ${num.toFixed(num % 1 === 0 ? 0 : 2)}` };
-//   };
-
-//   const currentVideo = () => {
-//     const idx = expandedIndex();
-//     const list = videos ?? [];
-//     if (idx == null || idx < 0 || idx >= list.length) return null;
-//     return list[idx];
-//   };
-
-//   const canGoPrev = () => (expandedIndex() ?? 0) > 0;
-//   const canGoNext = () => (expandedIndex() ?? 0) < (videos?.length ?? 0) - 1;
-//   const goPrev = () => {
-//     if (canGoPrev()) setExpandedIndex((i) => i - 1);
-//   };
-//   const goNext = () => {
-//     if (canGoNext()) setExpandedIndex((i) => i + 1);
-//   };
-//   console.log('Checking mux data env key', MUX_DATA_ENV_KEY);
-//   /** Attach HLS or native src when overlay video element and playbackId are set; re-runs when currentVideo changes */
-//   createEffect(() => {
-//     const el = videoEl();
-//     console.log('Checking el', el);
-//     const video = currentVideo();
-//     console.log('Checking video', video);
-//     const playbackId = video?.playbackId;
-//     console.log('Checking playbackId', playbackId);
-//     const url = playbackId ? getPlaybackUrl(playbackId) : null;
-//     console.log('Checking url', url);
-//     if (!el || !url) return;
-//     if (Hls.isSupported()) {
-//       const hls = new Hls();
-//       hls.loadSource(url);
-//       hls.attachMedia(el);
-
-//       if (MUX_DATA_ENV_KEY) {
-//         mux.monitor(el, {
-//           hlsjs: hls,
-//           Hls,
-//           data: {
-//             env_key: MUX_DATA_ENV_KEY,
-//             player_name: 'Video Cart Carousel',
-//             player_init_time: muxPlayerInitTime,
-//             video_id: video?.id ?? playbackId,
-//             video_title: video?.title || 'Untitled',
-//             video_duration: Math.round(Number(video.duration)),
-//             video_stream_type: 'on-demand',
-//           },
-//         });
-//       }
-
-//       let viewSent = false;
-//       const onPlay = async () => {
-//         if (viewSent || !feed?.id || !video?.id) return;
-//         viewSent = true;
-//         const sec = el.currentTime != null ? Math.floor(el.currentTime) : 0;
-//         await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIEW, watchTimeSeconds: sec });
-//       };
-//       el.addEventListener('play', onPlay);
-//       onCleanup(() => el.removeEventListener('play', onPlay));
-
-//       onCleanup(() => {
-//         if (el.mux && typeof el.mux.destroy === 'function') {
-//           try {
-//             el.mux.destroy();
-//           } catch (_) {
-//             console.error('Error destroying mux instance', _);
-//           } finally {
-//             console.log('Mux instance destroyed');
-//           }
-//         }
-//         hls.destroy();
-//       });
-//     } else if (el.canPlayType?.('application/vnd.apple.mpegurl')) {
-//       el.src = url;
-//     } else {
-//       el.src = url;
-//     }
-//   });
-
-//   const scrollTrack = (direction) => {
-//     const el = trackRef();
-//     if (!el) return;
-//     const amount = direction === 'next' ? SCROLL_AMOUNT : -SCROLL_AMOUNT;
-//     el.scrollBy({ left: amount, behavior: 'smooth' });
-//   };
-
-//   const scrollProducts = (e, direction) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-//     const card = e.currentTarget.closest('.video-carousel-card');
-//     const strip = card?.querySelector('.video-carousel-card-products-inner');
-//     if (!strip) return;
-//     const amount = direction === 'next' ? PRODUCT_SCROLL_AMOUNT : -PRODUCT_SCROLL_AMOUNT;
-//     strip.scrollBy({ left: amount, behavior: 'smooth' });
-//   };
-
-//   const handleCardClick = async (video, index) => {
-//     onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });
-//     if (feed?.id && video?.id) {
-//       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.IMPRESSION });
-//     }
-//     setExpandedIndex(index);
-//   };
-
-//   const closeOverlay = () => setExpandedIndex(null);
-
-//   /** On mobile reels: scroll track to the slide at expandedIndex (after layout) */
-//   createEffect(() => {
-//     if (!isMobile() || expandedIndex() == null) return;
-//     const track = reelsTrackRef();
-//     if (!track) return;
-//     const idx = expandedIndex();
-//     const slides = track.querySelectorAll('.video-carousel-reels-slide');
-//     const slideEl = slides[idx];
-//     const scrollToSlide = () => {
-//       if (slideEl) track.scrollTo({ top: slideEl.offsetTop, behavior: 'smooth' });
-//     };
-//     if (slideEl) scrollToSlide();
-//     else {
-//       const raf = requestAnimationFrame(() => {
-//         requestAnimationFrame(scrollToSlide);
-//       });
-//       onCleanup(() => cancelAnimationFrame(raf));
-//     }
-//   });
-
-//   /** On mobile reels: observe slides and set expandedIndex when a slide is in view */
-//   createEffect(() => {
-//     if (!isMobile() || expandedIndex() == null || !videos?.length) return;
-//     const track = reelsTrackRef();
-//     if (!track) return;
-//     const slides = track.querySelectorAll('.video-carousel-reels-slide');
-//     if (!slides.length) return;
-//     const observer = new IntersectionObserver(
-//       (entries) => {
-//         for (const entry of entries) {
-//           if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-//             const idx = Number(entry.target.dataset.reelsIndex);
-//             if (!Number.isNaN(idx)) setExpandedIndex(idx);
-//           }
-//         }
-//       },
-//       { root: track, threshold: [0.25, 0.5, 0.75] }
-//     );
-//     slides.forEach((el) => observer.observe(el));
-//     onCleanup(() => observer.disconnect());
-//   });
-
-//   const handleCardLinkClick = async (e, video) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-//     if (feed?.id && video?.id) {
-//       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.CLICK });
-//     }
-//     const first = video?.productsTagged?.[0];
-//     if (first) {
-//       const productId = typeof first === 'object' ? (first.handle || first.id) : first;
-//       onEvent?.('product_click', { feedId: feed?.id, productId });
-//       if (productId) window.location.href = `/products/${productId}`;
-//     }
-//   };
-
-/* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
 import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
 import Hls from 'hls.js';
 import mux from 'mux-embed';
@@ -251,6 +7,7 @@ import { MUX_DATA_ENV_KEY } from '../../core/config';
 import { api } from '../../api';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
 import './carousel.css';
+import { addToCart } from '../../utils/shopifyService';
 
 /** Fire analytics event to DB (app proxy). Fire-and-forget. */
 async function trackDbEvent(payload) {
@@ -273,6 +30,7 @@ const DEFAULT_SUBTITLE = '';
 export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const [trackRef, setTrackRef] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
+  console.log("feed ----->", feed);
   /** When set, show full-screen story-like overlay for that video index; null = carousel only */
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [videoEl, setVideoEl] = createSignal(null);
@@ -660,6 +418,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                         <div className="video-carousel-overlay-products-inner">
                           <For each={productsForVideo(video)}>
                             {(product) => (
+                              
                               <div className="video-carousel-overlay-product">
                                 <div className="video-carousel-overlay-product-image-wrap">
                                   <img src={product.image} alt={product.title} loading="lazy" />
@@ -670,14 +429,16 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                     <span className="video-carousel-overlay-product-price">{productPrice(product).formatted}</span>
                                   </Show>
                                   <a
-                                    href={`/products/${product.handle}`}
+                                    // href={`/products/${product.handle}`}
                                     className="video-carousel-overlay-product-add video-carousel-overlay-product-shop"
                                     onClick={async () => {
                                       if (feed?.id && video?.id) {
                                         await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
                                         await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
                                       }
+                                      console.log("product zzzz ----->", product),
                                       onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
+                                      await addToCart([{ id: product.id, quantity: 1, properties: { _video_id: video.id, _widget_id: feed.id, timestamp: Date.now(), source: 'video-cart-carousel' } }]);
                                     }}
                                   >
                                     Shop Now
@@ -710,7 +471,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                       <div className="video-carousel-overlay-product-info">
                         <span className="video-carousel-overlay-product-title">{product.title}</span>
                         <a
-                          href={`/products/${product.handle}`}
+                          // href={`/products/${product.handle}`}
                           className="video-carousel-overlay-product-add"
                           onClick={async () => {
                             const cv = currentVideo();
@@ -718,7 +479,9 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                               await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
                               await trackDbEvent({ feedId: feed.id, videoId: cv.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
                             }
+                              console.log("product zzzz ----->", product),
                             onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
+                            await addToCart([{ id: product.variants[0]?.id, quantity: 1 , properties: { _video_id: cv.id, _widget_id: feed.id, timestamp: Date.now(), source: 'video-cart-carousel' } }]);
                           }}
                         >
                           Add

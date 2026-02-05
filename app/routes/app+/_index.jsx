@@ -3,7 +3,15 @@ import { BlockStack, Card, Icon, InlineGrid, InlineStack, Page, Text } from '@sh
 import { ArchiveIcon } from '@shopify/polaris-icons';
 import { useState } from "react";
 import DateRangePicker from "../../components/DatePicker/DatePicker.jsx";
+// import { authenticate } from "../../config/shopify.server.js";
+// import { checkWebpixelStatus } from "../../lib/utils/webPixel.js";
 // import Chart from "../../components/Chart/Chart.jsx";
+
+// export const loader = async ({ request }) => {
+//     const { admin, session } = await authenticate.admin(request);
+//     const existingPixel = await checkWebpixelStatus( {admin} );
+//     return { existingPixel };
+// };
 
 export default function Index() {
 
