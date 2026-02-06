@@ -103,7 +103,7 @@ export const loader = async ({ params, request }) => {
       const videoIds = feedVideos.map((fv) => fv.videoId);
       const videoRecords = await VideoModel.findManyByIds(videoIds);
       const titleMap = new Map(
-        (videoRecords || []).map((v) => [v.id, v.title ?? null])
+        (videoRecords || []).map((v) => [v.id, v.fileName ?? v.title ?? null])
       );
       videos = feedVideos.map((fv) => ({
         videoId: fv.videoId,
@@ -136,14 +136,14 @@ export const loader = async ({ params, request }) => {
     throw new Response("Video not found", { status: 404 });
   }
   type = "video";
-  title = video.title ?? "Video";
+  title = video.fileName ?? video.title ?? "Video";
   entityId = video.id;
   const playbackId = video.videoPlaybackId ?? null;
   videos = [
     {
       videoId: video.id,
       playbackId,
-      title: video.title ?? "Untitled",
+      title: video.fileName ?? video.title ?? "Untitled",
       productsTagged: [],
       status: video.status,
       duration: video.duration,

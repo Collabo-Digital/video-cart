@@ -67,12 +67,16 @@ async function handleVideoReady(data) {
   const playbackId = playback_ids?.[0]?.id ?? null;
   const durationNum = duration != null ? Number(duration) : null;
   const payload = {
-    title: 'Untitled Video',
     serviceProvider: 'mux',
     videoPlaybackId: playbackId,
     duration: Number.isFinite(durationNum) ? durationNum : null,
     aspectRatio: aspect_ratio ?? null,
     status: 'READY',
+  };
+
+  const createPayload = {
+    ...payload,
+    title: 'Untitled Video',
   };
 
   try {
@@ -86,7 +90,7 @@ async function handleVideoReady(data) {
         video = await VideoModel.create({
           videoUploadId: upload_id,
           videoAssetId: assetId,
-          ...payload,
+          ...createPayload,
         });
         console.log('Video created for upload:', upload_id);
       }
@@ -99,7 +103,7 @@ async function handleVideoReady(data) {
         video = await VideoModel.create({
           videoUploadId: `import-${assetId}`,
           videoAssetId: assetId,
-          ...payload,
+          ...createPayload,
         });
         console.log('Video created for asset:', assetId);
       }

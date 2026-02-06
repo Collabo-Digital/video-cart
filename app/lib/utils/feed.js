@@ -19,6 +19,7 @@ export function prepareVideosPayload(uploadedVideos) {
     playbackId: video.playbackId,
     uploadId: video.uploadId,
     assetId: video.assetId,
+    fileName: video.fileName,
     position: video.position ?? 0,
     productsTagged: (video.taggedProducts || []).map((product) =>
       typeof product === 'object' && product !== null

@@ -9,6 +9,7 @@
 
 import { sessionStorage } from "../../../../config/shopify.server";
 import { recordConversionFromPixel } from "../../../../services/analytics/analytics.service.server";
+import { upsertOrderWithItems } from "../../../../models/videoCartOrder.server";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json",
@@ -52,6 +53,9 @@ export const action = async ({ request }) => {
 
     const shop = typeof body?.shop === "string" ? body.shop.trim() : null;
     const items = Array.isArray(body?.items) ? body.items : [];
+    const orderId = (typeof body?.orderId === "string" ? body.orderId : body?.order_id)?.trim() || null;
+    const orderNumber = (typeof body?.orderNumber === "string" ? body.orderNumber : body?.order_number) != null ? String(body.orderNumber ?? body.order_number).trim() || null : null;
+    const currency = (typeof body?.currency === "string" ? body.currency : null)?.trim() || null;
 
     if (!shop) {
       return Response.json(
@@ -73,6 +77,7 @@ export const action = async ({ request }) => {
       return Response.json({ success: true, recorded: 0 }, { status: 200, headers: JSON_HEADERS });
     }
 
+    await upsertOrderWithItems(shop, orderId, orderNumber, items, currency);
     await recordConversionFromPixel(shop, items);
 
     return Response.json(

@@ -58,26 +58,33 @@ export function useVideoUpload() {
     setUploadProgress(0);
 
     try {
-      // Get upload URL from server
+      const fileName = (file?.name && typeof file.name === 'string') ? file.name.trim() : 'Untitled Video';
       const response = await fetch("/api/v1/videos/upload", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ fileName }),
       });
 
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+        if (data.code === 'DUPLICATE_VIDEO' || response.status === 409) {
+          const msg = data.error || 'This video is already in your library.';
+          setError(msg);
+          setIsUploading(false);
+          throw new Error(msg);
+        }
+        throw new Error(data.error || `Server error: ${response.status}`);
       }
-
-      const data = await response.json();
       const uploadUrl = data.data?.url || data.url;
       const uploadId = data.data?.uploadId || data.uploadId;
 
       if (!uploadUrl) {
         throw new Error("Server did not return a valid upload URL");
       }
+
+      console.log('file details ----->', file);
 
       // Create UpChunk upload
       const upload = UpChunk.createUpload({

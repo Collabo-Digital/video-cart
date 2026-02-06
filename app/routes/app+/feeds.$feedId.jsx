@@ -136,16 +136,29 @@ export default function FeedEditorPage() {
   useEffect(() => {
     if (feed?.videos) {
       setUploadedVideos(
-        feed.videos.map((v) => ({
-          ...v,
-          taggedProducts:
-            v.taggedProducts ??
-            (v.productsTagged || []).map((item) =>
-              typeof item === "object" && item !== null
-                ? { ...item, id: item.id != null ? String(item.id) : "" }
-                : { id: String(item), title: "", image: null }
-            ),
-        }))
+        feed.videos.map((v) => {
+          const video = v.video || {};
+          return {
+            id: video.id ?? v.videoId,
+            videoId: v.videoId,
+            playbackId: v.playbackId ?? video.videoPlaybackId,
+            title: video.title,
+            fileName: video.fileName,
+            fileUploadName: video.fileUploadName,
+            duration: video.duration,
+            status: video.status,
+            assetId: video.videoAssetId,
+            uploadId: video.videoUploadId,
+            taggedProducts:
+              v.taggedProducts ??
+              (v.productsTagged || []).map((item) =>
+                typeof item === "object" && item !== null
+                  ? { ...item, id: item.id != null ? String(item.id) : "" }
+                  : { id: String(item), title: "", image: null }
+              ),
+            productsTagged: v.productsTagged,
+          };
+        })
       );
     }
   }, [feed]);
@@ -185,6 +198,15 @@ export default function FeedEditorPage() {
     setUploadedVideos((prev) =>
       prev.map((v, i) =>
         i === videoIndex ? { ...v, taggedProducts: products } : v
+      )
+    );
+    setHasVideoChanges(true);
+  }, []);
+
+  const handleFileNameChange = useCallback((videoIndex, fileName) => {
+    setUploadedVideos((prev) =>
+      prev.map((v, i) =>
+        i === videoIndex ? { ...v, fileName: fileName?.trim() || v.fileName || v.title } : v
       )
     );
     setHasVideoChanges(true);
@@ -287,6 +309,7 @@ export default function FeedEditorPage() {
                             onRemove={() => handleRemoveVideo(index)}
                             shopify={shopify}
                             onTaggedProductsChange={handleTaggedProductsChange}
+                            onFileNameChange={handleFileNameChange}
                           />
                         ))}
                       </InlineGrid>

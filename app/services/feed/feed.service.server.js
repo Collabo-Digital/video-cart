@@ -161,6 +161,9 @@ export async function updateFeed(feedId, data) {
       const videoEntry = videos[i];
       const videoId = await resolveVideoId(videoEntry);
       if (videoId && videoEntry.playbackId) {
+        if (videoEntry.fileName != null && typeof videoEntry.fileName === 'string' && videoEntry.fileName.trim()) {
+          await VideoModel.updateById(videoId, { fileName: videoEntry.fileName.trim() });
+        }
         resolvedVideos.push({
           videoId,
           playbackId: videoEntry.playbackId,

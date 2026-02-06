@@ -51,6 +51,7 @@ export async function findById(id, shopDomain = null) {
     include: {
       videos: {
         orderBy: { position: 'asc' },
+        include: { video: true },
       },
     },
   });
