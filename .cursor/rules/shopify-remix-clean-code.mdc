@@ -1,0 +1,157 @@
+---
+description: Shopify Remix app - React Hook Form, Polaris, Remix, Prisma, MongoDB. Routes call models only; all DB logic in models/; Polaris + Controller for forms.
+alwaysApply: true
+---
+
+# Shopify Remix App – Clean Code Rules
+
+Follow these rules for all code in this project. Do not follow any older architecture (e.g. Routes → Services → Models). Use **Routes → Models → Database** only.
+
+---
+
+## 1. Project Structure
+
+- **routes/** – All pages and API endpoints. No direct DB access.
+- **models/** – ALL database queries and logic. One file per table: `product.server.js`, `order.server.js`.
+- **components/** – Reusable UI with Polaris.
+- **hooks/** – Custom hooks (e.g. form logic).
+- **utils/** – Helpers: `prisma.server.js`, `formatters.js`, `validators.js`.
+
+Do not add a services layer. Routes call model functions only.
+
+---
+
+## 2. Naming
+
+- **Files:** Components `PascalCase.jsx`; models `camelCase.server.js`; hooks `use*.js`; utils `camelCase.js`.
+- **Variables:** camelCase; arrays plural (`products`, `orders`); booleans `is/has/should` prefix.
+- **Functions:** verb + noun – `getProducts()`, `createOrder()`, `updateCustomer()`.
+- **Constants:** `UPPER_SNAKE_CASE`.
+
+---
+
+## 3. Models – Database Logic
+
+- All DB operations go in `app/models/`. Routes must **never** query the database directly.
+- One model file per table. Group by: GET, CREATE, UPDATE, DELETE.
+- Use clear names: `getProducts()`, `getProduct(id)`, `createProduct(data)`, `updateProduct(id, data)`, `deleteProduct(id)`.
+- Always use `.server.js` for model files.
+
+```javascript
+// app/models/product.server.js
+import { prisma } from '~/utils/prisma.server';
+
+export async function getProducts(filters = {}) {
+  return await prisma.product.findMany({
+    where: filters.status ? { status: filters.status } : undefined,
+    orderBy: { createdAt: 'desc' }
+  });
+}
+
+export async function getProduct(id) {
+  return await prisma.product.findUnique({ where: { id } });
+}
+
+export async function createProduct(data) {
+  return await prisma.product.create({ data });
+}
+
+export async function updateProduct(id, data) {
+  return await prisma.product.update({ where: { id }, data });
+}
+
+export async function deleteProduct(id) {
+  return await prisma.product.delete({ where: { id } });
+}
+```
+
+---
+
+## 4. React Hook Form + Polaris
+
+- **Always use `Controller` from react-hook-form** with Polaris components. Do **not** use `register()` with Polaris.
+- Polaris uses controlled `value`/`onChange`; Controller connects them to React Hook Form.
+
+```jsx
+import { useForm, Controller } from 'react-hook-form';
+import { Form, FormLayout, TextField, Select, Checkbox, Button } from '@shopify/polaris';
+
+// In component:
+const { control, handleSubmit, formState: { errors } } = useForm({ defaultValues: { ... } });
+
+<Form onSubmit={handleSubmit(onSubmit)}>
+  <FormLayout>
+    <Controller
+      name="title"
+      control={control}
+      rules={{ required: 'Title is required' }}
+      render={({ field }) => (
+        <TextField label="Product Title" {...field} error={errors.title?.message} autoComplete="off" />
+      )}
+    />
+    <Controller
+      name="featured"
+      control={control}
+      render={({ field: { value, onChange, ...field } }) => (
+        <Checkbox label="Featured" checked={value} onChange={onChange} {...field} />
+      )}
+    />
+    <Button submit primary>Save</Button>
+  </FormLayout>
+</Form>
+```
+
+- Checkbox: use `checked={value}` and `onChange`, not `value`.
+- Spread `{...field}` to pass value, onChange, onBlur to the Polaris component. Show errors via `error={errors.fieldName?.message}`.
+
+---
+
+## 5. Polaris & Pages
+
+- Use `Page` as the wrapper for every page. Use `Card`, `Layout`, `Banner` (errors/success), `DataTable`, `EmptyState` as needed.
+- Prefer Polaris for all UI.
+
+---
+
+## 6. Remix Routes
+
+- **Loader** – Fetch data (GET). Call model functions only. Return `json({ ... })`.
+- **Action** – Form submissions and mutations. Call model functions only. Return `redirect()` or `json()`.
+- No direct Prisma in routes.
+
+Route naming: `app.products._index.tsx` → `/app/products`, `app.products.$id.tsx` → `/app/products/:id`, `api.webhooks.orders.tsx` → API endpoints.
+
+---
+
+## 7. Code Quality
+
+- Descriptive names (e.g. `activeProducts`, not `p`). One function, one responsibility.
+- Prefer async/await; use early returns for errors; validate at function start.
+- Comment the “why”, not the “what”. Prefer simple over clever.
+
+---
+
+## 8. Error Handling
+
+- In models: validate inputs, throw on not found or invalid (e.g. `if (!id) throw new Error('ID required');`).
+- In loaders/actions: try/catch; return `throw new Response('Not found', { status: 404 })` or `json({ error })` as appropriate.
+- In UI: show `actionData?.error` in a `Banner status="critical"`.
+
+---
+
+## 9. Security & Validation
+
+- Never trust user input. Validate in model or before calling model (required fields, types, ranges).
+- Use `.server` for server-only code. Do not expose Prisma client to the browser.
+- Store prices in cents (integers). Use indexes on frequently queried fields.
+
+---
+
+## 10. Golden Rules & Checklist
+
+- Routes call models; models call the database.
+- All forms: React Hook Form + Controller with Polaris (no `register()` on Polaris).
+- All DB logic in `app/models/`. No services layer.
+- Polaris for UI; clear naming; single responsibility; handle errors.
+
+Pre-commit: DB logic only in models; routes thin and model-only; forms use RHF + Controller; Polaris for UI; errors handled; code readable.

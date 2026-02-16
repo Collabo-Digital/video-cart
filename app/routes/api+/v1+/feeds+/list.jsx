@@ -9,9 +9,8 @@ import { getFeedsByShop } from '../../../../services/feed/feed.service.server';
 import { authenticate } from '../../../../config/shopify.server';
 
 export const loader = async ({ request }) => {
-  console.log('request of feeds list ------------------', );
-   await authenticate.public.appProxy(request);
   try {
+    await authenticate.public.appProxy(request);
     const url = new URL(request.url);
     const shop = url.searchParams.get('shop');
 
@@ -32,15 +31,15 @@ export const loader = async ({ request }) => {
 
     // Return simplified feed data for selector
     const feedList = feeds
-    .filter((feed) => feed.isEnabled && !feed.isDeleted)
-    .map((feed) => ({
-      id: feed.id,
-      feedName: feed.feedName,
-      widgetType: feed.widgetType,
-      isEnabled: feed.isEnabled,
-      videoCount: feed.videos?.length || 0,
-      createdAt: feed.createdAt,
-    }));
+      .filter((feed) => feed.isEnabled && !feed.isDeleted)
+      .map((feed) => ({
+        id: feed.id,
+        feedName: feed.feedName,
+        widgetType: feed.widgetType,
+        isEnabled: feed.isEnabled,
+        videoCount: feed.videos?.length || 0,
+        createdAt: feed.createdAt,
+      }));
 
     return new Response(
       JSON.stringify({

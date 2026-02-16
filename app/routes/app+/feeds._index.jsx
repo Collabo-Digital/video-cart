@@ -90,6 +90,7 @@ export default function FeedsPage() {
   };
 
   const handleToggleFeed = (feedId, isEnabled, e) => {
+    console.log('handleToggleFeed ----->', feedId, isEnabled, e);
     e?.stopPropagation?.();
     fetcher.submit(
       { intent: "toggleFeed", feedId, isEnabled: String(isEnabled) },

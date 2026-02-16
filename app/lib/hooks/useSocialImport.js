@@ -66,6 +66,7 @@ export function useSocialImport(source) {
         const results = [];
         for (const url of urls.slice(0, 12)) {
           const d = await resolveUrl(source, url);
+          console.log('d results ----->', d);
           results.push({
             id: d.postUrl,
             postUrl: d.postUrl,

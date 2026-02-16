@@ -51,6 +51,7 @@ export async function findById(id, shopDomain = null) {
     include: {
       videos: {
         orderBy: { position: 'asc' },
+        include: { video: true },
       },
     },
   });
@@ -90,10 +91,10 @@ export async function updateById(id, data) {
  */
 export async function updateVideosProductsTagged(feedId, videos) {
   if (!videos || !Array.isArray(videos)) return;
-  for (const v of videos) {
+  for (const entry of videos) {
     await prisma.feedVideo.updateMany({
-      where: { feedId, videoId: v.videoId },
-      data: { productsTagged: v.productsTagged ?? [] },
+      where: { feedId, videoId: entry.videoId },
+      data: { productsTagged: entry.productsTagged ?? [] },
     });
   }
 }
@@ -130,7 +131,7 @@ export async function syncFeedVideos(feedId, resolvedVideos) {
     });
   }
 
-  const keepVideoIds = resolvedVideos.map((v) => v.videoId).filter(Boolean);
+  const keepVideoIds = resolvedVideos.map((entry) => entry.videoId).filter(Boolean);
   if (keepVideoIds.length > 0) {
     await prisma.feedVideo.deleteMany({
       where: {
@@ -162,5 +163,41 @@ export async function count(filters = {}) {
 
   return prisma.feed.count({
     where: shopDomain ? { shopDomain } : undefined,
+  });
+}
+
+/**
+ * Find all feed-video records for a video, with feed included.
+ * Only returns feeds for the given shop that are not deleted.
+ * @param {string} videoId - Video ID
+ * @param {string} shopDomain - Shop domain for security
+ * @returns {Promise<Array>} Array of FeedVideo with feed included
+ */
+export async function findFeedVideosByVideoId(videoId, shopDomain) {
+  if (!videoId) return [];
+
+  const where = {
+    videoId,
+    feed: {
+      isDeleted: false,
+      ...(shopDomain ? { shopDomain } : {}),
+    },
+  };
+
+  return prisma.feedVideo.findMany({
+    where,
+    include: {
+      feed: {
+        select: {
+          id: true,
+          feedName: true,
+          widgetId: true,
+          shopDomain: true,
+          isEnabled: true,
+          isDeleted: true,
+        },
+      },
+    },
+    orderBy: { addedAt: 'desc' },
   });
 }

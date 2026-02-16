@@ -1,9 +1,3 @@
-/**
- * GET/POST /app/feeds/:feedId
- * 
- * Edit or create a video feed.
- */
-
 import {
   Page,
   Card,
@@ -12,18 +6,24 @@ import {
   BlockStack,
   InlineGrid,
   Tabs,
+  Box,
+  InlineStack,
+  Icon,
 } from "@shopify/polaris";
+import {
+  UploadIcon, SettingsIcon
+} from '@shopify/polaris-icons';
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { SaveBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../../config/shopify.server";
 import { getFeedById, createFeed, updateFeed } from "../../services/feed/feed.service.server";
-import { prepareVideosPayload } from "../../lib/utils/feed";
+import { prepareVideosPayload, isDuplicateVideoInWidget, filterDuplicateVideos } from "../../lib/utils/feed";
 import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
-import { redirect, useLoaderData, useNavigation, useSubmit } from "react-router";
-import { Accordion } from "../../components/Accordion/Accordion";
+import { redirect, useLoaderData, useNavigation, useSubmit, useActionData } from "react-router";
+import { SettingsTab } from "../../components/SettingsTab";
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 
 export const loader = async ({ params, request }) => {
@@ -73,17 +73,19 @@ export const action = async ({ params, request }) => {
 
     return redirect(`/app/feeds/${params.feedId}`);
   } catch (error) {
-    console.error('Feed action error:', error);
-    throw new Response(
+    return new Response(
       JSON.stringify({ error: error.message || 'Failed to save feed' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      }
     );
   }
 };
 
 export default function FeedEditorPage() {
   const { mode, feed } = useLoaderData();
-  console.log('feed ---->', feed);
+  const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
   const shopify = useAppBridge();
@@ -92,6 +94,7 @@ export default function FeedEditorPage() {
   const [error, setError] = useState(null);
   const [hasVideoChanges, setHasVideoChanges] = useState(false);
   const [selected, setSelected] = useState(0);
+  const [settingsTabSelected, setSettingsTabSelected] = useState(0);
 
   const {
     control,
@@ -115,20 +118,29 @@ export default function FeedEditorPage() {
     },
   });
 
-  const tabs = [
+  const widgetTab = [
     {
-      id: 'feeds-settings',
+      id: 'feeds-upload',
       index: 0,
-      content: 'Settings',
-      accessibilityLabel: 'Settings',
-      panelID: 'feeds-settings-content',
+      content: (
+        <InlineStack gap="200" blockAlign="center">
+          <Icon source={UploadIcon} />
+          <span>Uploads</span>
+        </InlineStack>
+      ),
+      panelID: 'feeds-uploads-content',
     },
     {
-      id: 'feeds-analytics',
+      id: "widget-settings",
       index: 1,
-      content: 'Analytics',
-      panelID: 'feeds-analytics-content',
-    },
+      content: (
+        <InlineStack gap="200" blockAlign="center">
+          <Icon source={SettingsIcon} />
+          <span>Settings</span>
+        </InlineStack>
+      ),
+      panelID: 'feeds-settings-content',
+    }
   ];
 
   const hasChanges = isDirty || hasVideoChanges;
@@ -137,16 +149,29 @@ export default function FeedEditorPage() {
   useEffect(() => {
     if (feed?.videos) {
       setUploadedVideos(
-        feed.videos.map((v) => ({
-          ...v,
-          taggedProducts:
-            v.taggedProducts ??
-            (v.productsTagged || []).map((item) =>
-              typeof item === "object" && item !== null
-                ? { ...item, id: item.id != null ? String(item.id) : "" }
-                : { id: String(item), title: "", image: null }
-            ),
-        }))
+        feed.videos.map((v) => {
+          const video = v.video || {};
+          return {
+            id: video.id ?? v.videoId,
+            videoId: v.videoId,
+            playbackId: v.playbackId ?? video.videoPlaybackId,
+            title: video.title,
+            fileName: video.fileName,
+            fileUploadName: video.fileUploadName,
+            duration: video.duration,
+            status: video.status,
+            assetId: video.videoAssetId,
+            uploadId: video.videoUploadId,
+            taggedProducts:
+              v.taggedProducts ??
+              (v.productsTagged || []).map((item) =>
+                typeof item === "object" && item !== null
+                  ? { ...item, id: item.id != null ? String(item.id) : "" }
+                  : { id: String(item), title: "", image: null }
+              ),
+            productsTagged: v.productsTagged,
+          };
+        })
       );
     }
   }, [feed]);
@@ -169,13 +194,33 @@ export default function FeedEditorPage() {
     };
   }, [hasChanges, shopify]);
 
-  const handleVideoUpload = useCallback((newVideo) => {
-    setUploadedVideos((prev) => [...prev, newVideo]);
-    setHasVideoChanges(true);
-    setError(null);
-  }, []);
+  const handleVideoUpload = useCallback(
+    (newVideo) => {
+      if (isDuplicateVideoInWidget(newVideo, uploadedVideos)) {
+        setError("This video is already in the widget. Duplicates are not allowed.");
+        return;
+      }
+      setError(null);
+      setUploadedVideos((prev) => [...prev, newVideo]);
+      setHasVideoChanges(true);
+    },
+    [uploadedVideos]
+  );
 
-
+  const handleVideosFromLibrary = useCallback(
+    (newVideos) => {
+      if (!Array.isArray(newVideos) || newVideos.length === 0) return;
+      const { toAdd, duplicateCount } = filterDuplicateVideos(newVideos, uploadedVideos);
+      if (toAdd.length > 0) {
+        setUploadedVideos((prev) => [...prev, ...toAdd]);
+        setError(duplicateCount > 0 ? `${duplicateCount} duplicate video(s) skipped — already in this widget.` : null);
+      } else {
+        setError(duplicateCount > 0 ? "All selected videos are already in this widget." : null);
+      }
+      setHasVideoChanges(true);
+    },
+    [uploadedVideos]
+  );
 
   const handleRemoveVideo = useCallback((index) => {
     setUploadedVideos((prev) => prev.filter((_, i) => i !== index));
@@ -186,6 +231,15 @@ export default function FeedEditorPage() {
     setUploadedVideos((prev) =>
       prev.map((v, i) =>
         i === videoIndex ? { ...v, taggedProducts: products } : v
+      )
+    );
+    setHasVideoChanges(true);
+  }, []);
+
+  const handleFileNameChange = useCallback((videoIndex, fileName) => {
+    setUploadedVideos((prev) =>
+      prev.map((v, i) =>
+        i === videoIndex ? { ...v, fileName: fileName?.trim() || v.fileName || v.title } : v
       )
     );
     setHasVideoChanges(true);
@@ -222,16 +276,24 @@ export default function FeedEditorPage() {
     setSelected(selected);
   }, []);
 
+  const handleSettingsTabChange = useCallback((index) => {
+    setSettingsTabSelected(index);
+  }, []);
+
   const handleDiscard = useCallback(() => {
-    // Reset form to original values
+    // Reset form to original values (same shape as defaultValues)
     reset({
       feedName: feed?.feedName ?? "",
       widgetType: feed?.widgetType ?? "carousel",
       isEnabled: feed?.isEnabled ?? true,
       settings: {
-        carouselTitle: feed?.settings?.carouselTitle ?? "",
-        carouselDescription: feed?.settings?.carouselDescription ?? "",
-        addToCartText: feed?.settings?.addToCartText ?? "",
+        general: feed?.settings?.general ?? {},
+        design: feed?.settings?.design ?? {},
+        translation: {
+          carouselTitle: feed?.settings?.translation?.carouselTitle ?? feed?.settings?.carouselTitle ?? "",
+          carouselDescription: feed?.settings?.translation?.carouselDescription ?? feed?.settings?.carouselDescription ?? "",
+          addToCartText: feed?.settings?.translation?.addToCartText ?? feed?.settings?.addToCartText ?? "",
+        },
       },
     });
 
@@ -246,6 +308,52 @@ export default function FeedEditorPage() {
     }
   }, [feed, reset, shopify]);
 
+  const UploadsTab = () => {
+    return (
+      <Box padding="400">
+        <BlockStack gap="400">
+          <Text variant="headingMd" as="h2">Import Videos</Text>
+          <VideoUploader
+            setUploadedVideo={handleVideoUpload}
+            onVideosFromLibrary={handleVideosFromLibrary}
+          />
+          <Text variant="headingMd" as="h2">
+            Videos
+          </Text>
+
+          {error && (
+            <Banner tone="critical" onDismiss={() => setError(null)}>
+              {error}
+            </Banner>
+          )}
+
+          {uploadedVideos.length > 0 && (
+            <BlockStack gap="300">
+              <Text variant="headingSm" as="h3">
+                Uploaded Videos ({uploadedVideos.length})
+              </Text>
+              <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
+                {uploadedVideos.map((video, index) => (
+                  <VideoDisplay
+                    key={video.id || video.videoId || index}
+                    video={video}
+                    index={index}
+                    onRemove={() => handleRemoveVideo(index)}
+                    shopify={shopify}
+                    onTaggedProductsChange={handleTaggedProductsChange}
+                    onFileNameChange={handleFileNameChange}
+                  />
+                ))}
+              </InlineGrid>
+            </BlockStack>
+          )}
+        </BlockStack>
+      </Box>
+    );
+  };
+
+
+
   return (
     <>
       <Page
@@ -253,60 +361,35 @@ export default function FeedEditorPage() {
         backAction={{ content: "Feeds", url: "/app/feeds" }}
       >
         <BlockStack gap="400">
+          {actionData?.error && (
+            <Banner tone="critical" onDismiss={() => { }}>
+              {actionData.error}
+            </Banner>
+          )}
           <InlineGrid columns={{ xs: 1, md: "2fr 1fr" }} gap="400">
             {/* Left Column: Videos */}
             <BlockStack gap="400">
-              <Card>
-                <BlockStack gap="400">
-                  <Text variant="headingMd" as="h2">Import Videos</Text>
-                  <VideoUploader setUploadedVideo={handleVideoUpload} />
-                  <Text variant="headingMd" as="h2">
-                    Videos
-                  </Text>
-
-                  {error && (
-                    <Banner tone="critical" onDismiss={() => setError(null)}>
-                      {error}
-                    </Banner>
+              <Card padding="0">
+                <BlockStack gap="300">
+                  <Tabs tabs={widgetTab} selected={selected} onSelect={handleTabChange} fitted />
+                  {selected === 0 && <UploadsTab />}
+                  {selected === 1 && (
+                    <SettingsTab
+                      control={control}
+                      errors={errors}
+                      selectedTab={settingsTabSelected}
+                      onTabChange={handleSettingsTabChange}
+                    />
                   )}
-
-                  {uploadedVideos.length > 0 && (
-                    <BlockStack gap="300">
-                      <Text variant="headingSm" as="h3">
-                        Uploaded Videos ({uploadedVideos.length})
-                      </Text>
-                      <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
-                        {uploadedVideos.map((video, index) => (
-                          <VideoDisplay
-                            key={video.id || video.videoId || index}
-                            video={video}
-                            index={index}
-                            onRemove={() => handleRemoveVideo(index)}
-                            shopify={shopify}
-                            onTaggedProductsChange={handleTaggedProductsChange}
-                          />
-                        ))}
-                      </InlineGrid>
-                    </BlockStack>
-                  )}
-
-
                 </BlockStack>
               </Card>
             </BlockStack>
 
             {/* Right Column: Settings */}
             <BlockStack gap="400">
-              <Card padding="0">
-                <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted />
+              <Card>
+                <AnalyticsTab feedId={feed?.id} />
               </Card>
-
-
-
-              {selected === 0 && <Accordion control={control} errors={errors} />}
-              {selected === 1 && <AnalyticsTab />}
-
-
             </BlockStack>
           </InlineGrid>
         </BlockStack>

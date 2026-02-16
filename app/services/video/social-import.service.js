@@ -12,6 +12,38 @@ import { SOCIAL_SOURCE } from '../../lib/constants/video';
 import { createAssetFromUrl, createVideoForImportedAsset } from './upload.service';
 
 /**
+ * Derive a stable fileUploadName from an Instagram or TikTok URL for duplicate detection.
+ * e.g. https://www.instagram.com/reel/DTkm8GrkjPD/ -> Insta-reel-DTkm8GrkjPD
+ * e.g. https://www.tiktok.com/@user/video/1234567890 -> Tiktok-1234567890
+ * @param {'instagram'|'tiktok'} source
+ * @param {string} url - Full post URL
+ * @returns {string} Name like Insta-reel-XXX or Tiktok-XXX
+ */
+export function deriveFileUploadNameFromUrl(source, url) {
+  if (!url || typeof url !== 'string') return 'Untitled Video';
+  const u = url.trim();
+  try {
+    const parsed = new URL(u);
+    const path = parsed.pathname.replace(/\/+/g, '/').replace(/^\//, '').split('/');
+    if (source === SOCIAL_SOURCE.INSTAGRAM) {
+      const reelMatch = u.match(/\/reel\/([A-Za-z0-9_-]+)/i);
+      if (reelMatch) return `Insta-reel-${reelMatch[1]}`;
+      const pMatch = u.match(/\/p\/([A-Za-z0-9_-]+)/i);
+      if (pMatch) return `Insta-p-${pMatch[1]}`;
+      const last = path.filter(Boolean).pop();
+      return last ? `Insta-${last}` : 'Insta-import';
+    }
+    if (source === SOCIAL_SOURCE.TIKTOK) {
+      const videoMatch = u.match(/\/video\/(\d+)/);
+      if (videoMatch) return `Tiktok-${videoMatch[1]}`;
+      const last = path.filter(Boolean).pop();
+      return last ? `Tiktok-${last}` : 'Tiktok-import';
+    }
+  } catch (_) { }
+  return source === SOCIAL_SOURCE.TIKTOK ? 'Tiktok-import' : 'Insta-import';
+}
+
+/**
  * Resolve an Instagram/TikTok post URL to a direct downloadable video URL + preview.
  * @param {Object} params
  * @param {'instagram'|'tiktok'} params.source
@@ -53,8 +85,8 @@ export async function resolveSocialUrl({ source, url }) {
     if (!data?.status) {
       throw new Error(data?.message || 'Failed to fetch TikTok video');
     }
-    const v = data.video;
-    const directUrl = typeof v === 'string' ? v : Array.isArray(v) ? v[0] : null;
+    const videoField = data.video;
+    const directUrl = typeof videoField === 'string' ? videoField : Array.isArray(videoField) ? videoField[0] : null;
     if (!directUrl) {
       throw new Error('No downloadable video URL found for this TikTok link');
     }
@@ -72,18 +104,23 @@ export async function resolveSocialUrl({ source, url }) {
 
 /**
  * Import a social video into Mux (server-side): resolve → create asset → create Video record.
+ * Uses URL-derived fileUploadName for duplicate check and initial fileName.
  * @param {Object} params
  * @param {'instagram'|'tiktok'} params.source
  * @param {string} params.url
  * @returns {Promise<Object>} Normalized video payload for UI
  */
 export async function importSocialVideo({ source, url }) {
+  const fileUploadName = deriveFileUploadNameFromUrl(source, url);
   const resolved = await resolveSocialUrl({ source, url });
   const asset = await createAssetFromUrl(resolved.directUrl);
+  const displayName = resolved.title?.trim() || fileUploadName;
   const video = await createVideoForImportedAsset({
     assetId: asset.assetId,
     playbackId: asset.playbackId,
-    title: resolved.title || `Imported from ${source}`,
+    title: displayName,
+    fileName: displayName,
+    fileUploadName,
   });
 
   return {
@@ -91,6 +128,8 @@ export async function importSocialVideo({ source, url }) {
     assetId: video.videoAssetId,
     playbackId: video.videoPlaybackId,
     title: video.title,
+    fileName: video.fileName,
+    fileUploadName: video.fileUploadName,
     status: video.status,
     thumbnail: resolved.thumbnail,
   };

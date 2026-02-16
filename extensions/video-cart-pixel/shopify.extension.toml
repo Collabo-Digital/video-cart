@@ -1,0 +1,23 @@
+name = "video-cart-pixel"
+
+uid = "8c6284e9-f582-11d1-8908-db48a2d7b54b808b4e63"
+
+type = "web_pixel_extension"
+
+runtime_context = "strict" 
+
+[settings]
+type = "object"
+
+[settings.fields.accountID]
+name = "Account ID"
+description = "Account ID (shop domain)"
+type = "single_line_text_field"
+validations =  [
+  { name = "min", value = "1" }
+]
+
+[settings.fields.apiBaseUrl]
+name = "API base URL"
+description = "Your app URL for conversion tracking (e.g. https://your-app.trycloudflare.com). Required for checkout conversion analytics."
+type = "single_line_text_field"
