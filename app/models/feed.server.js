@@ -165,3 +165,39 @@ export async function count(filters = {}) {
     where: shopDomain ? { shopDomain } : undefined,
   });
 }
+
+/**
+ * Find all feed-video records for a video, with feed included.
+ * Only returns feeds for the given shop that are not deleted.
+ * @param {string} videoId - Video ID
+ * @param {string} shopDomain - Shop domain for security
+ * @returns {Promise<Array>} Array of FeedVideo with feed included
+ */
+export async function findFeedVideosByVideoId(videoId, shopDomain) {
+  if (!videoId) return [];
+
+  const where = {
+    videoId,
+    feed: {
+      isDeleted: false,
+      ...(shopDomain ? { shopDomain } : {}),
+    },
+  };
+
+  return prisma.feedVideo.findMany({
+    where,
+    include: {
+      feed: {
+        select: {
+          id: true,
+          feedName: true,
+          widgetId: true,
+          shopDomain: true,
+          isEnabled: true,
+          isDeleted: true,
+        },
+      },
+    },
+    orderBy: { addedAt: 'desc' },
+  });
+}

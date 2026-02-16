@@ -161,6 +161,9 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
     VideoAnalyticsModel.findByFeedAndDateRange(feedId, { startDate, endDate }),
   ]);
 
+  console.log("feedRows IMP 000000000000000000000000000000000000000000----->", feedRows);
+  console.log("videoRows IMP 000000000000000000000000000000000000000000----->", videoRows);
+
   // Widget-level totals (per requirements)
   const widget = {
     impressions: 0,      // widgetImpressions
@@ -184,8 +187,9 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
     widget.revenue += Number(row.widgetRevenue ?? 0);
 
   }
-
+  console.log("videoRows IMP 000000000000000000000000000000000000000000----->", videoRows);
   const uniqueVideoIds = [...new Set(videoRows.map((r) => r.videoId).filter(Boolean))];
+  console.log("uniqueVideoIds IMP 000000000000000000000000000000000000000000----->", uniqueVideoIds);
   const videoTitles = new Map();
   if (uniqueVideoIds.length > 0) {
     const videos = await VideoModel.findManyByIds(uniqueVideoIds);
@@ -197,6 +201,7 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
   const byVideo = new Map();
   for (const row of videoRows) {
     const vid = row.videoId;
+    console.log("vid IMP 000000000000000000000000000000000000000000----->", row);
     if (!byVideo.has(vid)) {
       byVideo.set(vid, {
         videoId: vid,

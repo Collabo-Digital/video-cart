@@ -13,7 +13,7 @@ import {
   InlineStack,
   Avatar,
 } from "@shopify/polaris";
-import { useLoaderData, useNavigate, useSearchParams } from "react-router";
+import { useLoaderData, useNavigate, useSearchParams, useSubmit } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import * as VideoModel from "../../models/video.server";
 import { useState, useCallback, useEffect } from "react";
@@ -38,8 +38,9 @@ export const loader = async ({ request }) => {
 
 export default function VideosPage() {
   const { videos, total, page, perPage } = useLoaderData();
-  console.log(videos);
+  console.log("videos IMP 000000000000000000000000000000000000000000----->", videos);
   const navigate = useNavigate();
+  const submit = useSubmit();
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get("search") ?? "";
 
@@ -49,13 +50,21 @@ export default function VideosPage() {
     setSearchValue(urlSearch);
   }, [urlSearch]);
 
-  const handleDelete = useCallback((id) => {
-    console.log(id);
-  }, []);
+
+  const handleDelete = useCallback(
+    (id) => {
+      if (!id) return;
+      const formData = new FormData();
+      formData.set("intent", "delete");
+      formData.set("videoId", id);
+      submit(formData, { method: "post" });
+    },
+    [submit]
+  );
 
   const handleViewAnalytics = useCallback((id) => {
-    console.log(id);
-  }, []);
+    navigate(`/app/analytics/vdid_${id}`);
+  }, [navigate]);
 
   const handleSearchChange = useCallback((value) => setSearchValue(value), []);
   const handleSearchClear = useCallback(() => {

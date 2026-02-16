@@ -16,8 +16,6 @@ function parseAnalyticsParam(param) {
 
   const trimmed = param.trim();
   const [prefix, id] = trimmed.split("_");
-  console.log("prefix ----->" , prefix);
-  console.log("id ----->" , id);
 
   if (!id) return null;
 
@@ -35,7 +33,6 @@ function parseAnalyticsParam(param) {
 
 import {
   Page,
-  Frame,
   InlineGrid,
   Card,
   BlockStack,
@@ -43,14 +40,18 @@ import {
   Button,
   Text,
   Badge,
-  Divider,
   Box,
+  Layout,
+  Tabs,
+  ResourceItem,
+  Avatar,
 } from "@shopify/polaris";
 import { useState } from "react";
+import PropTypes from "prop-types";
 import { useLoaderData } from "react-router";
-import VideoDisplay from "../../components/VideoContainer/VideoContainer";
 import { authenticate } from "../../config/shopify.server";
 import * as VideoModel from "../../models/video.server";
+import * as FeedModel from "../../models/feed.server";
 import { getFeedById } from "../../services/feed/feed.service.server";
 import { getFeedAnalytics, getVideoAnalytics } from "../../services/analytics/analytics.service.server";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server";
@@ -69,13 +70,11 @@ function getDefaultDateRange() {
 export const loader = async ({ params, request }) => {
   const { session } = await authenticate.admin(request);
   const raw = params.id;
-  console.log("raw ----->" , raw);
   if (!raw) {
     throw new Response("Missing id", { status: 400 });
   }
 
   const parsed = parseAnalyticsParam(raw);
-  console.log("parsed ----->" , parsed);
   if (!parsed) {
     throw new Response(
       "Invalid id: use fdid-<feedId> for a feed or vdid-<videoId> for a video",
@@ -119,7 +118,6 @@ export const loader = async ({ params, request }) => {
       videos.map((v) => ({ videoId: v.videoId, playbackId: v.playbackId ?? null })),
       30
     );
-    console.log("muxMetrics for feed", muxMetrics);
     return {
       type,
       entityId,
@@ -139,17 +137,83 @@ export const loader = async ({ params, request }) => {
   title = video.fileName ?? video.title ?? "Video";
   entityId = video.id;
   const playbackId = video.videoPlaybackId ?? null;
+
+  // Fetch all feeds that contain this video (model filters by shop and non-deleted)
+  const feedVideos = await FeedModel.findFeedVideosByVideoId(entityId, session.shop);
+
+  const relatedFeeds = feedVideos.map((fv) => ({
+    feedId: fv.feed.id,
+    feedName: fv.feed.feedName,
+    widgetId: fv.feed.widgetId,
+    productsTagged: fv.productsTagged || [],
+    position: fv.position,
+    playbackId: fv.playbackId,
+  }));
+
+  // Fetch analytics for each related feed
+  const relatedFeedsAnalytics = await Promise.all(
+    relatedFeeds.map(async (feed) => {
+      const feedAnalytics = await getFeedAnalytics(feed.feedId, startDate, endDate);
+      
+      // Extract video-specific analytics for this video from the feed analytics
+      const videoAnalyticsInFeed = feedAnalytics?.videos?.find(
+        (v) => v.videoId === entityId
+      ) || null;
+
+      return {
+        feedId: feed.feedId,
+        analytics: feedAnalytics,
+        videoAnalytics: videoAnalyticsInFeed, // Video-specific analytics in this feed
+      };
+    })
+  );
+
+  // Create a map of feedId -> analytics for easy lookup
+  const relatedFeedsAnalyticsMap = new Map(
+    relatedFeedsAnalytics.map((item) => [item.feedId, item])
+  );
+
+  // Attach analytics to each related feed, including video-specific metrics
+  const relatedFeedsWithAnalytics = relatedFeeds.map((feed) => {
+    const analyticsData = relatedFeedsAnalyticsMap.get(feed.feedId);
+    return {
+      ...feed,
+      analytics: analyticsData?.analytics || null, // Overall feed analytics
+      videoAnalytics: analyticsData?.videoAnalytics || null, // This video's analytics in this feed
+      // Convenience fields for easy access
+      videoRevenue: analyticsData?.videoAnalytics?.revenue || 0,
+      videoOrders: analyticsData?.videoAnalytics?.orders || 0,
+      videoViews: analyticsData?.videoAnalytics?.videoViews || 0,
+      videoProductClicks: analyticsData?.videoAnalytics?.productClicks || 0,
+      videoAddToCart: analyticsData?.videoAnalytics?.addToCart || 0,
+    };
+  });
+
+  // Collect all productsTagged from all feeds (flattened, unique by product id)
+  const allProductsTagged = [];
+  const productIdsSeen = new Set();
+  for (const fv of feedVideos) {
+    const products = Array.isArray(fv.productsTagged) ? fv.productsTagged : [];
+    for (const product of products) {
+      if (product?.id && !productIdsSeen.has(product.id)) {
+        productIdsSeen.add(product.id);
+        allProductsTagged.push(product);
+      }
+    }
+  }
+
   videos = [
     {
       videoId: video.id,
       playbackId,
       title: video.fileName ?? video.title ?? "Untitled",
-      productsTagged: [],
+      productsTagged: allProductsTagged,
       status: video.status,
       duration: video.duration,
     },
   ];
 
+  // Fetch overall analytics for this video (across all feeds)
   const analytics = await getVideoAnalytics(entityId, startDate, endDate);
   const muxMetrics = await getOverallDataMetricsForVideoIds(
     [{ videoId: entityId, playbackId }],
@@ -157,8 +221,6 @@ export const loader = async ({ params, request }) => {
   );
   const hasMux = muxMetrics.aggregate.views > 0 || muxMetrics.aggregate.totalWatchTimeSeconds > 0 ||
     Object.keys(muxMetrics.byVideoId).length > 0;
-  console.log("muxMetrics for video", muxMetrics);
-  console.log("hasMux", hasMux);
   return {
     type,
     entityId,
@@ -166,6 +228,7 @@ export const loader = async ({ params, request }) => {
     videos,
     analytics,
     muxMetrics: hasMux ? muxMetrics : null,
+    relatedFeeds: relatedFeedsWithAnalytics, // Related feeds with their analytics
   };
 };
 
@@ -202,10 +265,10 @@ export default function AnalyticsByIdPage() {
   const summary =
     type === "feed"
       ? [
-          { label: "Widget impressions", value: analytics?.widget?.impressions ?? 0, isRevenue: false },
-          { label: "Widget views", value: analytics?.widget?.views ?? 0, isRevenue: false },
-          { label: "Widget clicks", value: analytics?.widget?.clicks ?? 0, isRevenue: false },
-          { label: "Video plays", value: analytics?.widget?.videoPlays ?? 0, isRevenue: false },
+          // { label: "Widget impressions", value: analytics?.widget?.impressions ?? 0, isRevenue: false },
+          // { label: "Widget views", value: analytics?.widget?.views ?? 0, isRevenue: false },
+          // { label: "Widget clicks", value: analytics?.widget?.clicks ?? 0, isRevenue: false },
+          // { label: "Video plays", value: analytics?.widget?.videoPlays ?? 0, isRevenue: false },
           { label: "Product clicks", value: analytics?.widget?.productClicks ?? 0, isRevenue: false },
           { label: "Add to cart", value: analytics?.widget?.addToCart ?? 0, isRevenue: false },
           { label: "Orders", value: analytics?.widget?.orders ?? 0, isRevenue: false },
@@ -220,8 +283,6 @@ export default function AnalyticsByIdPage() {
           { label: "Orders", value: analytics?.video?.orders ?? 0, isRevenue: false },
           { label: "Revenue", value: Number(analytics?.video?.revenue ?? 0), isRevenue: true },
         ];
-  const muxAggregate = muxMetrics?.aggregate;
-
   const currentIndex = videos.findIndex((v) => v.videoId === selectedVideoId);
   const selectedVideo = currentIndex >= 0 ? videos[currentIndex] : null;
   const hasPrev = currentIndex > 0;
@@ -234,16 +295,230 @@ export default function AnalyticsByIdPage() {
     if (hasNext) setSelectedVideoId(videos[currentIndex + 1].videoId);
   };
 
-  const muxPerVideo = selectedVideoId && muxMetrics?.byVideoId?.[selectedVideoId];
+  const productsTagged = selectedVideoId && videos.find((v) => v.videoId === selectedVideoId)?.productsTagged;
+
+  const tabs = [
+    { id: 'overview', index: 0, content: 'Video Overview' },
+    { id: 'products-tagged', index: 1, content: 'Products Tagged' },
+  ];
+  const [selected, setSelected] = useState(0);
+
+  const handleTabChange = (selected) => {
+    setSelected(selected);
+  };
+
+  const ProductsTaggedTab = ({ product }) => {
+    return (
+      <ResourceItem
+        id={product?.id ?? ""}
+        url={`/products/${product?.handle ?? ""}`}
+        media={
+          <Avatar
+            source={product?.image ? product.image : undefined}
+            initials={
+              product?.image
+                ? undefined
+                : (product?.title || "?").slice(0, 1).toUpperCase()
+            }
+            accessibilityLabel={product?.title || "Product"}
+          />
+        }
+        accessibilityLabel={`View details for ${product?.name ?? ""}`}
+      >
+        <Text variant="bodyMd" as="h3">
+          {product?.title ?? ""}
+        </Text>
+      </ResourceItem>
+    );
+  };
+  ProductsTaggedTab.propTypes = {
+    product: PropTypes.shape({
+      id: PropTypes.string,
+      handle: PropTypes.string,
+      image: PropTypes.string,
+      title: PropTypes.string,
+      name: PropTypes.string,
+    }),
+  };
+
+  // Normalize analytics.videos and find analytics row for selected video
+const videosAnalyticsArray = Array.isArray(analytics?.videos)
+  ? analytics.videos
+  : analytics?.videos
+    ? Object.values(analytics.videos)
+    : [];
+
+const selectedVideoAnalytics =
+  videosAnalyticsArray.find(
+    (v) =>
+      v.videoId === selectedVideoId ||
+      v.videoId === selectedVideo?.videoId
+  ) ?? null;
+
+const videoOverview = [
+  {
+    label: "Views",
+    value: muxMetrics?.byPlaybackId[selectedVideo?.playbackId]?.views ?? 0,
+  },
+  {
+    label: "Average Watch Time",
+    value: formatWatchTime(
+      muxMetrics?.byPlaybackId[selectedVideo?.playbackId]?.avgWatchTimeSeconds ?? 0
+    ),
+  },
+  {
+    label: "Product Clicks",
+    value: selectedVideoAnalytics?.productClicks ?? analytics?.video?.productClicks ?? 0,
+  },
+  {
+    label: "Add to Cart",
+    value: selectedVideoAnalytics?.addToCart ?? analytics?.video?.addToCart ?? 0,
+  },
+  {
+    label: "Orders",
+    value: selectedVideoAnalytics?.orders ?? analytics?.video?.orders ?? 0,
+  },
+  {
+    label: "Revenue",
+    value: selectedVideoAnalytics?.revenue ?? analytics?.video?.revenue ?? 0,
+  },
+];
+
+  const VideoOverviewTab = () => {
+    return (
+      <BlockStack gap="400">
+        <Box padding="300" borderRadius="200" >
+        <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+          {videoOverview.map(({ label, value }) => (
+            <Box key={label} padding="300" background="bg-surface-secondary" borderRadius="200">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm" tone="subdued">
+                {label}
+              </Text>
+              <Text as="p" variant="headingMd" fontWeight="semibold">
+                {formatNumber(value)}
+              </Text>
+              </BlockStack>
+            </Box>
+          ))}
+        </InlineGrid>
+        </Box>
+      </BlockStack>
+    );
+  };
 
   return (
-    <Frame>
       <Page
         title={title}
-        backAction={{ content: "Back", url: "/app/feeds" }}
+        // backAction={{ content: "Back", url: "/app/feeds" }}
         titleMetadata={type ? <Badge tone={type === "feed" ? "info" : "attention"}>{type === "feed" ? "Feed" : "Video"}</Badge> : null}
       >
-        <BlockStack gap="600">
+        <BlockStack gap="400">
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                <Text as="h2" variant="headingMd">
+               {type === "feed" ? "Feed Overview" : "Video Overview"}
+              </Text>
+              <Text as="p" variant="bodySm" tone="subdued">
+                Last 30 days
+              </Text>
+              </InlineStack>
+              <InlineGrid columns={{ xs: 1, md: 4 }} gap="400">
+                 {summary.map(({ label, value, isRevenue }) => (
+                    <Box key={label} padding="300" background="bg-surface-secondary" borderRadius="200">
+                      <BlockStack gap="100">
+                        <Text as="p" variant="bodySm" tone="subdued">
+                          {label}
+                        </Text>
+                        <Text as="p" variant="headingMd" fontWeight="semibold">
+                          {isRevenue ? formatRevenue(value) : formatNumber(value)}
+                        </Text>
+                      </BlockStack>
+                    </Box>
+                  ))}
+              </InlineGrid>
+            </BlockStack>
+          </Card>
+
+            <Layout>
+          <Layout.Section variant="oneThird">
+          <Card>
+            <BlockStack gap="400">
+              <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                <Text as="h2" variant="headingMd">
+                Video
+              </Text>
+              <InlineStack gap="200">
+                <Button
+                  icon={CircleLeftIcon}
+                  onClick={goPrev}
+                  disabled={!hasPrev}
+                  accessibilityLabel="Previous video"
+                />
+                <Button
+                  icon={CircleRightIcon}
+                  onClick={goNext}
+                  disabled={!hasNext}
+                  accessibilityLabel="Next video"
+                />
+              </InlineStack>
+              </InlineStack>
+              <Box paddingBlockStart="200" borderRadius="200" background="bg-surface-secondary" minHeight="350px">
+                {selectedVideo?.playbackId ? (
+    <div
+      style={{
+        width: "100%",
+        minHeight: "350px",
+        maxHeight: "350px",
+        position: "relative",
+        overflow: "hidden",
+        borderRadius: "var(--p-border-radius-200)",
+      }}
+    >
+      <video
+        style={{
+          width: "100%",
+          minHeight: "350px",
+          height: "100%",
+          maxHeight: "350px",
+          objectFit: "contain",
+          display: "block",
+          background: "#000",
+        }}
+        controls
+        src={`https://stream.mux.com/${selectedVideo.playbackId}.m3u8`}
+      >
+        <track kind="captions" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  ) : (
+    <Box padding="400">
+      <Text as="p" tone="subdued">
+        No video selected.
+      </Text>
+    </Box>
+  )}
+              </Box>
+            </BlockStack>
+          </Card>
+          </Layout.Section>
+          <Layout.Section>
+          <Card padding="0">
+            <BlockStack gap="400">
+               <Tabs tabs={tabs} selected={selected} onSelect={handleTabChange} fitted>
+                {selected === 1 ? productsTagged.map((product) => <ProductsTaggedTab key={product.id} product={product} />) : <VideoOverviewTab />}
+                </Tabs>
+            </BlockStack>
+          </Card>
+        {/* </InlineGrid> */}
+          </Layout.Section>
+        </Layout>
+        </BlockStack>
+
+        
+        {/* <BlockStack gap="600">
           <Card>
             <BlockStack gap="400">
               <InlineStack align="space-between" blockAlign="center" wrap={false}>
@@ -385,8 +660,7 @@ export default function AnalyticsByIdPage() {
               )}
             </BlockStack>
           </InlineGrid>
-        </BlockStack>
+        </BlockStack> */}
       </Page>
-    </Frame>
   );
 }

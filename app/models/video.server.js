@@ -210,6 +210,7 @@ export async function findAllPaginatedWithWidgets(options = {}) {
   const videos = rows.map((v) => ({
     id: v.id,
     videoName: v.title || v.fileName || v.fileUploadName || 'Untitled',
+    fileUploadName: v.fileUploadName ?? undefined,
     videoUploadId: v.videoUploadId,
     status: v.status,
     createdAt: v.createdAt,
