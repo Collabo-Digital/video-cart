@@ -1,5 +1,5 @@
-import { Box, VideoThumbnail, Modal, InlineStack, Button, Text, BlockStack } from "@shopify/polaris";
-import { useState, useCallback } from "react";
+import { Box, VideoThumbnail, Modal, InlineStack, Button, Text, BlockStack, TextField } from "@shopify/polaris";
+import { useState, useCallback, useEffect } from "react";
 import { DeleteIcon } from '@shopify/polaris-icons';
 import ResourcePicker from "../ResourcePicker/ResourcePicker";
 
@@ -8,15 +8,17 @@ import ResourcePicker from "../ResourcePicker/ResourcePicker";
  *
  * Renders a single video card (thumbnail, title, remove, product tagging) and a modal player.
  * Tagged products are passed up via onTaggedProductsChange; persistence happens on feed save.
+ * If onFileNameChange is provided, the display name (fileName) is editable; fileUploadName is never changed.
  *
  * @param {Object} props
- * @param {Object} props.video - Video object (playbackId, title, taggedProducts/productsTagged)
+ * @param {Object} props.video - Video object (playbackId, title, fileName, taggedProducts/productsTagged)
  * @param {number} props.index - Index in the feed's video list
  * @param {function(): void} [props.onRemove] - Called when user removes this video
  * @param {Object} [props.shopify] - App Bridge instance (optional)
  * @param {function(number, Array): void} [props.onTaggedProductsChange] - Callback (index, products) when tagged products change
+ * @param {function(number, string): void} [props.onFileNameChange] - Callback (index, fileName) when user edits display name
  */
-export default function VideoDisplay({ video, index, onRemove, shopify, onTaggedProductsChange }) {
+export default function VideoDisplay({ video, index, onRemove, shopify, onTaggedProductsChange, onFileNameChange }) {
   const [active, setActive] = useState(false);
 
   const handleChange = useCallback(() => setActive(!active), [active]);
@@ -61,9 +63,28 @@ export default function VideoDisplay({ video, index, onRemove, shopify, onTagged
   );
 
   const playbackId = getPlaybackId();
-  const videoTitle = video?.title || video?.fileName || 'Untitled Video';
+  const videoTitle = video?.fileName || video?.title || 'Untitled Video';
   const videoDuration = video?.duration ? Math.round(video.duration) : 60;
   const videoStatus = video?.status || 'unknown';
+  const [editingName, setEditingName] = useState(false);
+  const [nameFieldValue, setNameFieldValue] = useState(videoTitle);
+
+  useEffect(() => {
+    const t = video?.fileName || video?.title || 'Untitled Video';
+    if (!editingName) setNameFieldValue(t);
+  }, [video?.fileName, video?.title, editingName]);
+
+  const handleNameBlur = useCallback(() => {
+    setEditingName(false);
+    const trimmed = nameFieldValue?.trim();
+    if (trimmed && trimmed !== (video?.fileName || video?.title)) {
+      onFileNameChange?.(index, trimmed);
+    }
+  }, [index, nameFieldValue, video?.fileName, video?.title, onFileNameChange]);
+
+  const handleNameChange = useCallback((value) => {
+    setNameFieldValue(value);
+  }, []);
 
   // Error state
   if (!playbackId) {
@@ -154,9 +175,24 @@ export default function VideoDisplay({ video, index, onRemove, shopify, onTagged
 
       <BlockStack gap="100">
         <InlineStack align="space-between" blockAlign="center">
-          <Text as="p" variant="bodySm" fontWeight="semibold">
-          {videoTitle}
-        </Text>
+          {onFileNameChange ? (
+            <Box minWidth="0" flex={1}>
+              <TextField
+                label=""
+                labelHidden
+                value={editingName ? nameFieldValue : videoTitle}
+                onChange={handleNameChange}
+                onFocus={() => setEditingName(true)}
+                onBlur={handleNameBlur}
+                autoComplete="off"
+                placeholder="Video name"
+              />
+            </Box>
+          ) : (
+            <Text as="p" variant="bodySm" fontWeight="semibold">
+              {videoTitle}
+            </Text>
+          )}
         {onRemove && (
             <Button
               icon={DeleteIcon}

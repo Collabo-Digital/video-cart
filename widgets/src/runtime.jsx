@@ -48,6 +48,7 @@ export async function initFeeds() {
           window.__video_cart_config__.widgets.push(widgetEntry);
         }
       }
+      if (!feed.shop) feed.shop = shop;
 
       const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;
       const widgetDef = getWidget(widgetType);

@@ -62,7 +62,7 @@ export const loader = async ({ request, params }) => {
           return {
             id: video.id,
             playbackId: video.videoPlaybackId || feedVideo.playbackId,
-            title: video.title,
+            title: video.fileName || video.title,
             duration: video.duration,
             aspectRatio: video.aspectRatio,
             status: video.status,
@@ -89,7 +89,7 @@ export const loader = async ({ request, params }) => {
         feedName: feed.feedName,
         widgetType: feed.widgetType || 'carousel',
         isEnabled: feed.isEnabled,
-        videos: readyVideos,
+        videos: feed.videos,
         settings: {
           autoplay: feed.autoplay,
           showControls: feed.showControls,

@@ -95,7 +95,7 @@ export const loader = async ({ params, request }) => {
           return {
             id: video.id,
             playbackId: video.videoPlaybackId || feedVideo.playbackId,
-            title: video.title,
+            title: video.fileName || video.title,
             duration: video.duration,
             aspectRatio: video.aspectRatio,
             status: video.status,

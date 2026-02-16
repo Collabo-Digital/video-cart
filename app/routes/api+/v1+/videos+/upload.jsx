@@ -24,8 +24,14 @@ export const action = async ({ request }) => {
   }
 
   try {
-    const uploadData = await createUploadUrl();
-    
+    let body = {};
+    try {
+      body = await request.json().catch(() => ({}));
+    } catch (_) {}
+    const fileName = typeof body?.fileName === 'string' ? body.fileName.trim() : null;
+
+    const uploadData = await createUploadUrl({ fileName: fileName || undefined });
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -41,15 +47,17 @@ export const action = async ({ request }) => {
     
   } catch (error) {
     console.error('Upload creation error:', error);
-    
+    const status = error.statusCode === 409 ? 409 : 500;
+    const code = error.code || 'UPLOAD_CREATION_FAILED';
+
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message,
-        code: 'UPLOAD_CREATION_FAILED',
+        code,
       }),
       {
-        status: 500,
+        status,
         headers: {
           'Content-Type': 'application/json',
         },
