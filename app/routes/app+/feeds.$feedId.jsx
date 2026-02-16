@@ -9,6 +9,7 @@ import {
   Box,
   InlineStack,
   Icon,
+  EmptyState,
 } from "@shopify/polaris";
 import {
   UploadIcon, SettingsIcon
@@ -308,6 +309,22 @@ export default function FeedEditorPage() {
     }
   }, [feed, reset, shopify]);
 
+  const EmptyStateUploads = () => {
+    return (
+       <EmptyState
+        heading="Upload your first video"
+        // action={{content: 'Add transfer'}}
+        // secondaryAction={{
+        //   content: 'Learn more',
+        //   url: 'https://help.shopify.com',
+        // }}
+        image="/upload-video.svg"
+      >
+        <p>Add videos to showcase products or attach media to your inventory records.</p>
+      </EmptyState>
+    );
+  };
+
   const UploadsTab = () => {
     return (
       <Box padding="400">
@@ -317,9 +334,15 @@ export default function FeedEditorPage() {
             setUploadedVideo={handleVideoUpload}
             onVideosFromLibrary={handleVideosFromLibrary}
           />
-          <Text variant="headingMd" as="h2">
-            Videos
-          </Text>
+          {uploadedVideos.length === 0 && (
+            <EmptyStateUploads/>
+          )}
+          {uploadedVideos.length > 0 && (
+
+          <BlockStack gap="300">
+            <Text variant="headingMd" as="h2">
+              Videos
+            </Text>
 
           {error && (
             <Banner tone="critical" onDismiss={() => setError(null)}>
@@ -347,6 +370,8 @@ export default function FeedEditorPage() {
               </InlineGrid>
             </BlockStack>
           )}
+          </BlockStack>
+          )}
         </BlockStack>
       </Box>
     );
@@ -371,7 +396,9 @@ export default function FeedEditorPage() {
             <BlockStack gap="400">
               <Card padding="0">
                 <BlockStack gap="300">
-                  <Tabs tabs={widgetTab} selected={selected} onSelect={handleTabChange} fitted />
+                  <Box padding="200" >
+                    <Tabs tabs={widgetTab} selected={selected} onSelect={handleTabChange} fitted />
+                  </Box>
                   {selected === 0 && <UploadsTab />}
                   {selected === 1 && (
                     <SettingsTab

@@ -1,6 +1,6 @@
 
 /* eslint-disable react/prop-types */
-import { InlineStack, BlockStack, Button } from "@shopify/polaris";
+import { InlineStack, BlockStack, Button, ButtonGroup } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import {
   LogoInstagramIcon, LogoTiktokIcon, DesktopIcon, BookIcon
@@ -33,18 +33,20 @@ export default function VideoUploader({ setUploadedVideo, onVideosFromLibrary })
   return (
     <BlockStack gap="400">
       <InlineStack gap="300" wrap>
-        <Button onClick={() => setIgOpen(true)} variant="secondary" icon={LogoInstagramIcon}>
-          Instagram
-        </Button>
-        <Button onClick={() => setTtOpen(true)} variant="secondary" icon={LogoTiktokIcon}>
-          TikTok
-        </Button>
-        <Button onClick={() => setDeviceOpen(true)} variant="secondary" icon={DesktopIcon}>
-          Device
-        </Button>
-        <Button onClick={() => setLibraryOpen(true)} variant="secondary" icon={BookIcon}>
-          Library
-        </Button>
+        <ButtonGroup variant="segmented" fullWidth>
+          <Button onClick={() => setIgOpen(true)} variant="secondary" icon={LogoInstagramIcon}>
+            Instagram
+          </Button>
+          <Button onClick={() => setTtOpen(true)} variant="secondary" icon={LogoTiktokIcon}>
+            TikTok
+          </Button>
+          <Button onClick={() => setDeviceOpen(true)} variant="secondary" icon={DesktopIcon}>
+            Device
+          </Button>
+          <Button onClick={() => setLibraryOpen(true)} variant="secondary" icon={BookIcon}>
+            Library
+          </Button>
+        </ButtonGroup>
       </InlineStack>
 
       <SocialImportModal

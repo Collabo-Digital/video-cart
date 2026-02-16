@@ -77,3 +77,80 @@ export async function upsertIncrement(feedId, date, increments) {
     update: data,
   });
 }
+
+/**
+ * Get aggregated widget-level analytics for a shop (all feeds) in a date range.
+ * @param {string} shopDomain
+ * @param {Object} options - { startDate: Date, endDate: Date }
+ * @returns {Promise<{ widgetImpressions, widgetClicks, widgetVideoPlays, widgetViews, widgetProductClicks, widgetAddToCart, widgetOrders, widgetRevenue }>}
+ */
+export async function getAggregatedByShop(shopDomain, { startDate, endDate }) {
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate);
+  const rows = await prisma.feedAnalytics.findMany({
+    where: {
+      feed: { shopDomain, isDeleted: false },
+      date: { gte: start, lte: end },
+    },
+  });
+  const out = {
+    widgetImpressions: 0,
+    widgetClicks: 0,
+    widgetVideoPlays: 0,
+    widgetViews: 0,
+    widgetProductClicks: 0,
+    widgetAddToCart: 0,
+    widgetOrders: 0,
+    widgetRevenue: 0,
+  };
+  for (const row of rows) {
+    out.widgetImpressions += row.widgetImpressions ?? 0;
+    out.widgetClicks += row.widgetClicks ?? 0;
+    out.widgetVideoPlays += row.widgetVideoPlays ?? 0;
+    out.widgetViews += row.widgetViews ?? 0;
+    out.widgetProductClicks += row.widgetProductClicks ?? 0;
+    out.widgetAddToCart += row.widgetAddToCart ?? 0;
+    out.widgetOrders += row.widgetOrders ?? 0;
+    out.widgetRevenue += (row.widgetRevenue ?? 0);
+  }
+  return out;
+}
+
+/**
+ * Get daily widget-level totals for a shop (for charts). One entry per day.
+ * @param {string} shopDomain
+ * @param {Object} options - { startDate: Date, endDate: Date }
+ * @returns {Promise<Array<{ date: string, widgetImpressions, widgetViews, widgetAddToCart, widgetOrders, widgetRevenue }>>}
+ */
+export async function getDailyByShop(shopDomain, { startDate, endDate }) {
+  const start = toDateOnly(startDate);
+  const end = toDateOnly(endDate);
+  const rows = await prisma.feedAnalytics.findMany({
+    where: {
+      feed: { shopDomain, isDeleted: false },
+      date: { gte: start, lte: end },
+    },
+    orderBy: { date: 'asc' },
+  });
+  const byDate = new Map();
+  for (const row of rows) {
+    const key = row.date.toISOString().slice(0, 10);
+    const cur = byDate.get(key) ?? {
+      date: key,
+      widgetImpressions: 0,
+      widgetViews: 0,
+      widgetAddToCart: 0,
+      widgetOrders: 0,
+      widgetRevenue: 0,
+    };
+    cur.widgetImpressions += row.widgetImpressions ?? 0;
+    cur.widgetViews += row.widgetViews ?? 0;
+    cur.widgetAddToCart += row.widgetAddToCart ?? 0;
+    cur.widgetOrders += row.widgetOrders ?? 0;
+    cur.widgetRevenue += (row.widgetRevenue ?? 0);
+    byDate.set(key, cur);
+  }
+  return Array.from(byDate.entries())
+    .map(([, v]) => v)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}

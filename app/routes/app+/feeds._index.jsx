@@ -132,13 +132,13 @@ export default function FeedsPage() {
         id={feed.id}
         key={feed.id}
         position={index}
-       
+
       >
         <IndexTable.Cell onClick={(e) => e.stopPropagation()}>
           <s-switch
             checked={checked}
             disabled={isToggling && fetcher.state !== "idle"}
-            on-change={(e) => handleToggleFeed(feed.id, e.target.checked, e)}
+            onChange={(e) => handleToggleFeed(feed.id, e.target.checked, e)}
           />
         </IndexTable.Cell>
 

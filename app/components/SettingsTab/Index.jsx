@@ -1,4 +1,4 @@
-import { Box, BlockStack, Tabs, Icon, InlineStack } from "@shopify/polaris";
+import { Box, BlockStack, Tabs, Icon, InlineStack, Card } from "@shopify/polaris";
 import {
     AppsIcon, PaintBrushFlatIcon, TextIcon
 
@@ -46,14 +46,14 @@ export function SettingsTab({ control, errors, selectedTab, onTabChange }) {
     return (
         <Box padding="400">
             <BlockStack gap="400">
-                {/* <Card padding="0" background="bg-surface-secondary"> */}
+                <Card padding="0" background="bg-surface-secondary">
                 <Tabs
                     tabs={SETTINGS_TABS}
                     selected={selectedTab}
                     onSelect={onTabChange}
                     fitted
                 />
-                {/* </Card> */}
+                </Card>
                 {selectedTab === 0 && (
                     <GeneralSettings control={control} errors={errors} />
                 )}

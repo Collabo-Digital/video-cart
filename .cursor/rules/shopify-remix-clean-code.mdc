@@ -115,8 +115,8 @@ const { control, handleSubmit, formState: { errors } } = useForm({ defaultValues
 
 ## 6. Remix Routes
 
-- **Loader** – Fetch data (GET). Call model functions only. Return `json({ ... })`.
-- **Action** – Form submissions and mutations. Call model functions only. Return `redirect()` or `json()`.
+- **Loader** – Fetch data (GET). Call model functions only. Return plain objects (React Router 7 handles serialization automatically).
+- **Action** – Form submissions and mutations. Call model functions only. Return `redirect()` or plain objects.
 - No direct Prisma in routes.
 
 Route naming: `app.products._index.tsx` → `/app/products`, `app.products.$id.tsx` → `/app/products/:id`, `api.webhooks.orders.tsx` → API endpoints.
@@ -134,7 +134,7 @@ Route naming: `app.products._index.tsx` → `/app/products`, `app.products.$id.t
 ## 8. Error Handling
 
 - In models: validate inputs, throw on not found or invalid (e.g. `if (!id) throw new Error('ID required');`).
-- In loaders/actions: try/catch; return `throw new Response('Not found', { status: 404 })` or `json({ error })` as appropriate.
+- In loaders/actions: try/catch; use `throw new Response('Not found', { status: 404 })` for errors, or return `new Response(JSON.stringify({ error }), { status: 400, headers: { 'Content-Type': 'application/json' } })` in actions.
 - In UI: show `actionData?.error` in a `Banner status="critical"`.
 
 ---

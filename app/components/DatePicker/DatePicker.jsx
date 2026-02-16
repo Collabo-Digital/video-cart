@@ -13,14 +13,15 @@ import {
   InlineStack,
   useBreakpoints
 } from '@shopify/polaris';
-import { ArrowRightIcon, CalendarIcon } from '@shopify/polaris-icons';
+import { ArrowRightIcon,  ChevronDownIcon, ChevronUpIcon } from '@shopify/polaris-icons';
 
- const DateRangePicker = ({ onDateRangeSelect, value: { start, end } }) => {
+const DateRangePicker = ({ onDateRangeSelect, value: { start, end } }) => {
+
   const { mdDown } = useBreakpoints();
   const [popoverActive, setPopoverActive] = useState(false);
   const today = new Date(new Date().setHours(0, 0, 0, 0));
   const yesterday = new Date(
-    new Date(new Date().setDate(today.getDate() - 1)).setHours(0, 0, 0, 0)
+    new Date(new Date().setDate(today.getDate() - 1))
   );
   const ranges = [
     { title: 'Today', period: { since: today, until: today } },
@@ -29,53 +30,62 @@ import { ArrowRightIcon, CalendarIcon } from '@shopify/polaris-icons';
       title: 'Last 7 days',
       period: {
         since: new Date(new Date().setDate(today.getDate() - 7)),
-        until: yesterday
+        until: today
       }
     },
     {
       title: 'Last 30 days',
       period: {
         since: new Date(new Date().setDate(today.getDate() - 30)),
-        until: yesterday
+        // until: yesterday
+        until: today
       }
     },
     {
       title: 'Last 90 days',
       period: {
         since: new Date(new Date().setDate(today.getDate() - 90)),
-        until: yesterday
+        // until: yesterday
+        until: today
       }
     },
     {
       title: 'Last 365 Days',
       period: {
         since: new Date(new Date().setDate(today.getDate() - 365)),
-        until: yesterday
+        // until: yesterday
+        until: today
       }
     },
     {
       title: 'Custom',
-      period: { since: yesterday, until: yesterday }
+      period: { since: yesterday, until: today }
     }
   ];
 
   const getDefaultDateRange = () => {
-    const areDatesEqual = (dateX, dateY) => dateX.toDateString() == dateY.toDateString();
+    const areDatesEqual = (dateX, dateY) => {
+      // Normalize both dates to start of day for comparison
+      const d1 = new Date(dateX.getFullYear(), dateX.getMonth(), dateX.getDate());
+      const d2 = new Date(dateY.getFullYear(), dateY.getMonth(), dateY.getDate());
+      return d1.getTime() === d2.getTime();
+    };
 
     if (start && end) {
       const currentRange = ranges.find((range) => {
         const { since, until } = range.period;
-
-        return areDatesEqual(since, start) && areDatesEqual(until, end)
+        return areDatesEqual(since, start) && areDatesEqual(until, end);
       });
 
       if (currentRange) {
         return currentRange;
       } else {
-        return { title: 'Custom', period: { since: start, until: end } };
+        return {
+          title: 'Custom',
+          period: { since: start, until: end }
+        };
       }
     }
-
     return ranges[0];
   };
 
@@ -110,8 +120,11 @@ import { ArrowRightIcon, CalendarIcon } from '@shopify/polaris-icons';
         sectioned={false}
         fullHeight
         activator={
-          <Button icon={CalendarIcon} size='slim' onClick={() => setPopoverActive(!popoverActive)}>
-            {activeDateRange.title}
+          <Button size='slim' onClick={() => setPopoverActive(!popoverActive)}>
+            <InlineStack gap='100'>
+              {activeDateRange.title}
+              <Icon source={popoverActive ? ChevronUpIcon : ChevronDownIcon} />
+            </InlineStack>
           </Button>
         }
         onClose={() => setPopoverActive(false)}

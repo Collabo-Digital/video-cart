@@ -125,3 +125,51 @@ export async function findByShop(shopDomain, options = {}) {
     take: limit,
   });
 }
+
+/**
+ * Find orders for a shop with cursor-based pagination (for dashboard table).
+ * @param {string} shopDomain
+ * @param {{ startDate?: Date, endDate?: Date, limit?: number, cursor?: string }} [options]
+ * @returns {Promise<{ orders: Array, nextCursor: string | null }>}
+ */
+export async function findByShopPaginated(shopDomain, options = {}) {
+  const { startDate, endDate, limit = 5, cursor } = options;
+  const where = { shopDomain };
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = startDate;
+    if (endDate) where.createdAt.lte = endDate;
+  }
+  const orders = await prisma.videoCartOrder.findMany({
+    where,
+    include: { items: true },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+  });
+  const nextCursor = orders.length >= limit ? orders[orders.length - 1].id : null;
+  return { orders, nextCursor };
+}
+
+/**
+ * Get order count and total revenue for a shop, optionally in a date range.
+ * @param {string} shopDomain
+ * @param {{ startDate?: Date, endDate?: Date }} [options]
+ * @returns {Promise<{ orderCount: number, totalRevenue: number }>}
+ */
+export async function getOrderStatsByShop(shopDomain, options = {}) {
+  const { startDate, endDate } = options;
+  const where = { shopDomain };
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = startDate;
+    if (endDate) where.createdAt.lte = endDate;
+  }
+  const orders = await prisma.videoCartOrder.findMany({
+    where,
+    select: { totalRevenue: true },
+  });
+  const orderCount = orders.length;
+  const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.totalRevenue) || 0), 0);
+  return { orderCount, totalRevenue };
+}
