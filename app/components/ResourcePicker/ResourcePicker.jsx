@@ -1,5 +1,8 @@
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { Avatar, BlockStack, Button, InlineStack, Text, Tooltip } from "@shopify/polaris";
+import {
+  ProductAddIcon
+} from '@shopify/polaris-icons';
 import { useCallback } from "react";
 import { toSelectionGid, normalizeProduct } from "../../lib/utils/resourcePicker";
 
@@ -80,7 +83,7 @@ export default function ResourcePicker({
 
   return (
     <>
-      <InlineStack align="space-between" blockAlign="center" gap="300">
+      <BlockStack align="space-between" blockAlign="center" gap="300">
         <InlineStack gap="200" blockAlign="center">
           {firstProduct && (
             <Tooltip content={tooltipContent} width="wide">
@@ -121,8 +124,8 @@ export default function ResourcePicker({
             </Tooltip>
           )}
         </InlineStack>
-        <Button onClick={handleTagProducts}>Tag Products</Button>
-      </InlineStack>
+        <Button variant="primary" onClick={handleTagProducts} icon={ProductAddIcon}>Tag Products</Button>
+      </BlockStack>
     </>
   );
 }

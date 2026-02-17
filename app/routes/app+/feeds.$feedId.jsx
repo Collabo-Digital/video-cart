@@ -335,7 +335,8 @@ export default function FeedEditorPage() {
               </Text>
               <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
                 {uploadedVideos.map((video, index) => (
-                  <VideoDisplay
+                 <Box key={video.id || video.videoId || index} padding="200" borderRadius="200" border="1px solid" background="bg-fill-secondary">
+                   <VideoDisplay
                     key={video.id || video.videoId || index}
                     video={video}
                     index={index}
@@ -344,6 +345,7 @@ export default function FeedEditorPage() {
                     onTaggedProductsChange={handleTaggedProductsChange}
                     onFileNameChange={handleFileNameChange}
                   />
+                 </Box>
                 ))}
               </InlineGrid>
             </BlockStack>

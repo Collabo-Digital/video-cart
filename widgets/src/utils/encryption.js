@@ -1,61 +1,63 @@
-// utils/encoding.js
+/**
+ * Base64 encode/decode for cart line-item tracking (video_id, widget_id, etc.).
+ */
 
 /**
- * Encode tracking data to base64
  * @param {Object} data - Object containing video_id, widget_id, etc.
- * @returns {String} Base64 encoded string
+ * @returns {string|null} Base64 encoded string, or null on failure
  */
 export function encodeTrackingData(data) {
-    try {
-        const jsonString = JSON.stringify(data);
-        const encoded = btoa(jsonString);
-        return encoded;
-    } catch (error) {
-        console.error('Encoding failed:', error);
-        return null;
+  try {
+    return btoa(JSON.stringify(data));
+  } catch (err) {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      console.error('encodeTrackingData failed:', err);
     }
+    return null;
+  }
 }
 
 /**
- * Decode base64 tracking data
- * @param {String} encodedData - Base64 encoded string
- * @returns {Object} Decoded tracking data object
+ * @param {string} encodedData - Base64 encoded string
+ * @returns {Object|null} Decoded tracking data, or null on failure
  */
 export function decodeTrackingData(encodedData) {
-    try {
-        const decoded = atob(encodedData);
-        const data = JSON.parse(decoded);
-        return data;
-    } catch (error) {
-        console.error('Decoding failed:', error);
-        return null;
+  try {
+    return JSON.parse(atob(encodedData));
+  } catch (err) {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      console.error('decodeTrackingData failed:', err);
     }
+    return null;
+  }
 }
 
 /**
- * Encode individual value
- * @param {String} value - Value to encode
- * @returns {String} Base64 encoded value
+ * @param {string} value - Value to encode
+ * @returns {string} Base64 encoded value, or original on failure
  */
 export function encodeValue(value) {
-    try {
-        return btoa(value);
-    } catch (error) {
-        console.error('Value encoding failed:', error);
-        return value;
+  try {
+    return btoa(value);
+  } catch (err) {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      console.error('encodeValue failed:', err);
     }
+    return value;
+  }
 }
 
 /**
- * Decode individual value
- * @param {String} encodedValue - Base64 encoded value
- * @returns {String} Decoded value
+ * @param {string} encodedValue - Base64 encoded value
+ * @returns {string} Decoded value, or original on failure
  */
 export function decodeValue(encodedValue) {
-    try {
-        return atob(encodedValue);
-    } catch (error) {
-        console.error('Value decoding failed:', error);
-        return encodedValue;
+  try {
+    return atob(encodedValue);
+  } catch (err) {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      console.error('decodeValue failed:', err);
     }
+    return encodedValue;
+  }
 }

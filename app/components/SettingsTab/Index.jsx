@@ -46,18 +46,20 @@ export function SettingsTab({ control, errors, selectedTab, onTabChange }) {
     return (
         <Box padding="400">
             <BlockStack gap="400">
-                <Card padding="0" background="bg-surface-secondary">
+                <Box  borderRadius="200"  background="bg-fill-secondary">
+                {/* <Card padding="0" background="bg-surface-secondary"> */}
                 <Tabs
                     tabs={SETTINGS_TABS}
                     selected={selectedTab}
                     onSelect={onTabChange}
                     fitted
                 />
-                </Card>
+                </Box>
+                {/* </Card> */}
                 {selectedTab === 0 && (
                     <GeneralSettings control={control} errors={errors} />
                 )}
-                {selectedTab === 1 && <DesignSettings />}
+                {selectedTab === 1 && <DesignSettings control={control} errors={errors} />}
                 {selectedTab === 2 && (
                     <TranslationSettings control={control} />
                 )}

@@ -27,6 +27,7 @@ export default function AppLayout() {
           <s-link href="/app">Home</s-link>
           <s-link href="/app/feeds">Feeds</s-link>
           <s-link href="/app/videos">Videos</s-link>
+          {/* <s-link href="/app/pricing">Pricing</s-link> */}
         </s-app-nav>
         <Outlet />
       </PolarisAppProvider>

@@ -212,7 +212,7 @@ function AnalyticsTab({ feedId }) {
           )
         )} */}
 
-        <Button icon={ExternalIcon} onClick={() => {
+        <Button variant="primary" icon={ExternalIcon} onClick={() => {
           navigate(`/app/analytics/fdid_${feedId}`);
         }}>
           Detailed Analytics

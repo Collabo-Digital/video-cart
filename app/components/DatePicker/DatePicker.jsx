@@ -121,7 +121,7 @@ const DateRangePicker = ({ onDateRangeSelect, value: { start, end } }) => {
         fullHeight
         activator={
           <Button size='slim' onClick={() => setPopoverActive(!popoverActive)}>
-            <InlineStack gap='100'>
+            <InlineStack gap='100' align='center' blockAlign='center' >
               {activeDateRange.title}
               <Icon source={popoverActive ? ChevronUpIcon : ChevronDownIcon} />
             </InlineStack>

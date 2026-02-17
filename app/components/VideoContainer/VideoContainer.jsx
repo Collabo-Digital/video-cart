@@ -174,7 +174,7 @@ export default function VideoDisplay({ video, index, onRemove, shopify, onTagged
 
 
       <BlockStack gap="100">
-        <InlineStack align="space-between" blockAlign="center">
+        <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
           {onFileNameChange ? (
             <Box minWidth="0" flex={1}>
               <TextField

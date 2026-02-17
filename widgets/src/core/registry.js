@@ -1,4 +1,6 @@
-// Functional widget registry: type → { type, component }
+/**
+ * Widget registry: maps widget type (e.g. 'carousel') to { type, component }.
+ */
 const widgetRegistry = new Map();
 
 export function registerWidget(definition) {
