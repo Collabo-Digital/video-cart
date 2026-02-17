@@ -13,6 +13,11 @@ const WIDGET_TYPE_OPTIONS = [
     { label: "Grid", value: "grid" },
 ];
 
+const ADD_TO_CART_BUTTON_BEHAVIOR_OPTIONS = [
+    { label: "Add to cart", value: "addToCart" },
+    { label: "Open product page", value: "openProductPage" },
+];
+
 /**
  * General settings: feed name, widget type, status.
  * Uses react-hook-form control from parent.
@@ -46,6 +51,18 @@ export function GeneralSettings({ control, errors = {} }) {
                         <Select
                             label="Widget Type"
                             options={WIDGET_TYPE_OPTIONS}
+                            value={field.value}
+                            onChange={field.onChange}
+                        />
+                    )}
+                />
+                <Controller
+                    name="settings.general.addToCartButtonBehavior"
+                    control={control}
+                    render={({ field }) => (
+                        <Select
+                            label="Add to cart button behavior"
+                            options={ADD_TO_CART_BUTTON_BEHAVIOR_OPTIONS}
                             value={field.value}
                             onChange={field.onChange}
                         />

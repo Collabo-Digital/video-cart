@@ -26,6 +26,7 @@ import VideoDisplay from "../../components/VideoContainer/VideoContainer";
 import { redirect, useLoaderData, useNavigation, useSubmit, useActionData } from "react-router";
 import { SettingsTab } from "../../components/SettingsTab";
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
+import { getFeedFormDefaultValues } from "../../lib/constants/settings";
 
 export const loader = async ({ params, request }) => {
   try {
@@ -103,20 +104,7 @@ export default function FeedEditorPage() {
     reset,
     formState: { errors, isDirty },
   } = useForm({
-    defaultValues: {
-      feedName: feed?.feedName ?? "",
-      widgetType: feed?.widgetType ?? "carousel",
-      isEnabled: feed?.isEnabled ?? true,
-      settings: {
-        general: feed?.settings?.general ?? {},
-        design: feed?.settings?.design ?? {},
-        translation: {
-          carouselTitle: feed?.settings?.translation?.carouselTitle ?? feed?.settings?.carouselTitle ?? "",
-          carouselDescription: feed?.settings?.translation?.carouselDescription ?? feed?.settings?.carouselDescription ?? "",
-          addToCartText: feed?.settings?.translation?.addToCartText ?? feed?.settings?.addToCartText ?? "",
-        },
-      },
-    },
+    defaultValues: getFeedFormDefaultValues(feed),
   });
 
   const widgetTab = [
@@ -253,6 +241,7 @@ export default function FeedEditorPage() {
     }
 
     const values = watch();
+    console.log("values ----->", values);
     const videosPayload = prepareVideosPayload(uploadedVideos);
     const settingsPayload = values.settings ?? { general: {}, design: {}, translation: {} };
 
@@ -284,18 +273,7 @@ export default function FeedEditorPage() {
   const handleDiscard = useCallback(() => {
     // Reset form to original values (same shape as defaultValues)
     reset({
-      feedName: feed?.feedName ?? "",
-      widgetType: feed?.widgetType ?? "carousel",
-      isEnabled: feed?.isEnabled ?? true,
-      settings: {
-        general: feed?.settings?.general ?? {},
-        design: feed?.settings?.design ?? {},
-        translation: {
-          carouselTitle: feed?.settings?.translation?.carouselTitle ?? feed?.settings?.carouselTitle ?? "",
-          carouselDescription: feed?.settings?.translation?.carouselDescription ?? feed?.settings?.carouselDescription ?? "",
-          addToCartText: feed?.settings?.translation?.addToCartText ?? feed?.settings?.addToCartText ?? "",
-        },
-      },
+      ...getFeedFormDefaultValues(feed),
     });
 
     // Reset videos to original

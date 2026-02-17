@@ -438,10 +438,14 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                       }
                                       console.log("product zzzz ----->", product),
                                       onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
-                                      await addToCart([{ id: product.id, quantity: 1, properties: { _video_id: video.id, _widget_id: feed.id, timestamp: Date.now(), source: 'video-cart-carousel' } }]);
+                                      if(feed?.settings?.general?.addToCartButtonBehavior === "addToCart") {
+                                        await addToCart([{ id: product.id, quantity: 1, properties: { _video_id: video.id, _widget_id: feed.id, timestamp: Date.now(), source: 'video-cart-carousel' } }]);
+                                      } else {
+                                        window.location.href = `/products/${product.handle}`;
+                                      }
                                     }}
                                   >
-                                    Shop Now
+                                   {feed?.settings?.translation?.addToCartText  || "Check this out"}
                                   </a>
                                 </div>
                               </div>
@@ -481,10 +485,14 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                             }
                               console.log("product zzzz ----->", product),
                             onEvent?.('product_click', { feedId: feed?.id, productId: product.handle });
-                            await addToCart([{ id: product.variants[0]?.id, quantity: 1 , properties: { _video_id: cv.id, _widget_id: feed.id, timestamp: Date.now(), source: 'video-cart-carousel' } }]);
+                            if(feed?.settings?.general?.addToCartButtonBehavior === "addToCart") {
+                              await addToCart([{ id: product.variants[0]?.id, quantity: 1 , properties: { _video_id: cv.id, _widget_id: feed.id, timestamp: Date.now(), source: 'video-cart-carousel' } }]);
+                            } else {
+                              window.location.href = `/products/${product.handle}`;
+                            }
                           }}
                         >
-                          Add
+                          {feed?.settings?.translation?.addToCartText  || "Check this out"}
                         </a>
                       </div>
                     </div>

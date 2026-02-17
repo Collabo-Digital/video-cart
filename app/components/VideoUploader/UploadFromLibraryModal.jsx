@@ -191,8 +191,8 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
                       : "";
                     const isSelected = selectedIds.has(video.id);
                     return (
-                      <Grid.Cell columnSpan={{ xs: 6, sm: 4, md: 3 }} key={video.id}>
-                        <Card padding="0">
+                      <Grid.Cell columnSpan={{ xs: 6, sm: 3, md: 3 }} key={video.id}>
+                        {/* <Card padding="0"> */}
                           <Box
                             as="button"
                             type="button"
@@ -202,13 +202,13 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
                             onClick={() => toggleSelect(video.id)}
                             onKeyDown={(e) => handleCardKeyDown(e, video.id)}
                             width="100%"
-                            minWidth="0"
+                            minHeight="auto"
                             style={{ cursor: "pointer", textAlign: "left" }}
                             aria-pressed={isSelected}
                             aria-label={`${video.videoName || "Video"}${isSelected ? ", selected" : ""}`}
                           >
                             {/* <BlockStack gap="200"> */}
-                              {/* <Box style={{ position: "relative" }}> */}
+                              <Box style={{ position: "relative" }}>
                                 <Thumbnail
                                   source={thumbUrl || ""}
                                   alt={video.videoName || "Video"}
@@ -224,8 +224,8 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
                                     position: "absolute",
                                     top: 8,
                                     left: 8,
-                                    minWidth: 24,
-                                    minHeight: 24,
+                                    minWidth: "600px",
+                                    minHeight: "600px",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -244,10 +244,10 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
                                 <Text as="span" variant="bodySm" truncate>
                                   {video.videoName || "Untitled"}
                                 </Text>
-                              {/* </Box> */}
+                              </Box>
                             {/* </BlockStack> */}
                           {/* </Box> */}
-                        </Card>
+                        {/* </Card> */}
                       </Grid.Cell>
                     );
                   })}
