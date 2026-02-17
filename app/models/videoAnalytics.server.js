@@ -28,6 +28,7 @@ export async function findByFeedAndDateRange(feedId, { startDate, endDate }) {
   return prisma.videoAnalytics.findMany({
     where: {
       feedId,
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
     orderBy: [{ date: 'asc' }, { videoId: 'asc' }],
@@ -46,6 +47,7 @@ export async function findByVideoAndDateRange(videoId, { startDate, endDate }) {
   return prisma.videoAnalytics.findMany({
     where: {
       videoId,
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
     orderBy: [{ date: 'asc' }],
@@ -108,6 +110,7 @@ export async function getAggregatedByShop(shopDomain, { startDate, endDate }) {
   const rows = await prisma.videoAnalytics.findMany({
     where: {
       feed: { shopDomain, isDeleted: false },
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
   });
@@ -144,6 +147,7 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   const rows = await prisma.videoAnalytics.findMany({
     where: {
       feed: { shopDomain, isDeleted: false },
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
     orderBy: { date: 'asc' },

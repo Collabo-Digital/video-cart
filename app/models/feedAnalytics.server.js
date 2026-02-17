@@ -28,6 +28,7 @@ export async function findByFeedAndDateRange(feedId, { startDate, endDate }) {
   return prisma.feedAnalytics.findMany({
     where: {
       feedId,
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
     orderBy: { date: 'asc' },
@@ -90,6 +91,7 @@ export async function getAggregatedByShop(shopDomain, { startDate, endDate }) {
   const rows = await prisma.feedAnalytics.findMany({
     where: {
       feed: { shopDomain, isDeleted: false },
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
   });
@@ -128,6 +130,7 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   const rows = await prisma.feedAnalytics.findMany({
     where: {
       feed: { shopDomain, isDeleted: false },
+      isDeleted: false,
       date: { gte: start, lte: end },
     },
     orderBy: { date: 'asc' },

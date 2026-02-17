@@ -5,6 +5,7 @@
  */
 
 import prisma from '../config/database.server';
+import mux from '../config/mux.server';
 
 /**
  * Find all videos with optional filtering
@@ -133,11 +134,27 @@ export async function upsertByUploadId(data) {
 }
 
 /**
- * Delete video by ID
+ * Delete video by ID (database only)
  * @param {string} id - Video ID
  * @returns {Promise<Object>} Deleted video object
  */
 export async function deleteById(id) {
+  return prisma.video.delete({ where: { id } });
+}
+
+/**
+ * Delete video from Mux and database. Removes Mux asset first, then DB record.
+ * Cascade deletes FeedVideo and VideoAnalytics for this video.
+ * @param {string} id - Video ID
+ * @returns {Promise<Object>} Deleted video object
+ */
+export async function deleteVideoAndMuxAsset(id) {
+  if (!id) throw new Error('Video ID is required');
+  const video = await findById(id);
+  if (!video) throw new Error('Video not found');
+  if (video.videoAssetId) {
+    await mux.video.assets.delete(video.videoAssetId);
+  }
   return prisma.video.delete({ where: { id } });
 }
 

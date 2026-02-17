@@ -12,14 +12,17 @@ import {
   Button,
   InlineStack,
   Avatar,
+  Banner,
+  BlockStack,
 } from "@shopify/polaris";
-import { useLoaderData, useNavigate, useSearchParams, useSubmit } from "react-router";
+import { useLoaderData, useNavigate, useSearchParams, useSubmit, useActionData } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import * as VideoModel from "../../models/video.server";
 import { useState, useCallback, useEffect } from "react";
 import {
   DeleteIcon,ChartVerticalFilledIcon
 } from '@shopify/polaris-icons';
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 const PER_PAGE = 10;
 
@@ -36,31 +39,59 @@ export const loader = async ({ request }) => {
   return { videos, total, page, perPage: PER_PAGE };
 };
 
+export const action = async ({ request }) => {
+  if (request.method !== "POST") return null;
+  await authenticate.admin(request);
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  const videoId = formData.get("videoId");
+
+  if (intent !== "delete" || !videoId) {
+    return { error: "Invalid request" };
+  }
+
+  try {
+    await VideoModel.deleteVideoAndMuxAsset(videoId);
+    return { ok: true };
+  } catch (err) {
+    console.error("Delete video error:", err);
+    return { error: err.message || "Failed to delete video" };
+  }
+};
+
 export default function VideosPage() {
   const { videos, total, page, perPage } = useLoaderData();
-  console.log("videos IMP 000000000000000000000000000000000000000000----->", videos);
+  const appBridge = useAppBridge();
+  const actionData = useActionData();
   const navigate = useNavigate();
   const submit = useSubmit();
   const [searchParams] = useSearchParams();
   const urlSearch = searchParams.get("search") ?? "";
 
   const [searchValue, setSearchValue] = useState(urlSearch);
+  const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
 
   useEffect(() => {
     setSearchValue(urlSearch);
   }, [urlSearch]);
 
+  const handleDeleteClick = useCallback((video) => {
+    setPendingDeleteVideo({ id: video.id, videoName: video.videoName });
+  }, []);
 
-  const handleDelete = useCallback(
-    (id) => {
-      if (!id) return;
-      const formData = new FormData();
-      formData.set("intent", "delete");
-      formData.set("videoId", id);
-      submit(formData, { method: "post" });
-    },
-    [submit]
-  );
+  const handleConfirmDelete = useCallback(() => {
+    if (!pendingDeleteVideo) return;
+    const formData = new FormData();
+    formData.set("intent", "delete");
+    formData.set("videoId", pendingDeleteVideo.id);
+    submit(formData, { method: "post" });
+    setPendingDeleteVideo(null);
+    appBridge.toast.show("Video deleted successfully");
+  }, [pendingDeleteVideo, submit, appBridge]);
+
+  const handleCancelDelete = useCallback(() => {
+    setPendingDeleteVideo(null);
+  }, []);
 
   const handleViewAnalytics = useCallback((id) => {
     navigate(`/app/analytics/vdid_${id}`);
@@ -117,9 +148,7 @@ export default function VideosPage() {
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        {video.widgets?.length > 0 ? (
-          <Badge tone="info">{video.widgets.map((w) => w.name).join(", ")}</Badge>
-        ) : null}
+        {video.widgets?.length > 0 ? video.widgets.map((w) => <Badge tone="info" key={w.id}>{w.name}</Badge>) : null}
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Text as="span" variant="bodySm" tone="subdued">
@@ -139,7 +168,7 @@ export default function VideosPage() {
         <Button
           tone="critical"
           icon={DeleteIcon}
-          onClick={() => handleDelete(video.id)}
+          onClick={() => handleDeleteClick(video)}
         >
           
         </Button>
@@ -175,6 +204,30 @@ export default function VideosPage() {
   return (
     <Frame>
       <Page title="Videos Library">
+        <BlockStack gap="400">
+          {actionData?.error && (
+            <Banner tone="critical" onDismiss={() => {}}>
+              {actionData.error}
+            </Banner>
+          )}
+          {pendingDeleteVideo && (
+            <Banner
+              title="Delete video?"
+              tone="critical"
+              onDismiss={handleCancelDelete}
+              action={{
+                content: "Delete",
+                destructive: true,
+                onAction: handleConfirmDelete,
+              }}
+              secondaryAction={{
+                content: "Cancel",
+                onAction: handleCancelDelete,
+              }}
+            >
+              Delete &quot;{pendingDeleteVideo.videoName}&quot;? This will remove it from the library, from Mux, and from any feeds that use it. This cannot be undone.
+            </Banner>
+          )}
         <Card padding="0">
           <IndexFilters
             sortOptions={sortOptions}
@@ -247,6 +300,7 @@ export default function VideosPage() {
             </IndexTable>
           )}
         </Card>
+        </BlockStack>
       </Page>
     </Frame>
   );

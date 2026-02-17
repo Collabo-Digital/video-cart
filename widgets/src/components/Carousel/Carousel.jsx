@@ -325,6 +325,16 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   };
 
   const addToCartButtonLabel = () => feed?.settings?.translation?.addToCartText || 'Check this out';
+  const addToCartButtonColor = () => {
+    const raw = settings?.design?.addToCartButtonColor ?? feed?.settings?.design?.addToCartButtonColor;
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    return trimmed ? trimmed : null;
+  };
+  const addToCartButtonStyle = () => {
+    const color = addToCartButtonColor();
+    return color ? { 'background-color': color } : undefined;
+  };
 
   return (
     <div className="video-carousel-container" ref={setContainerRef}>
@@ -441,6 +451,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                   <a
                                     href={`/products/${product.handle}`}
                                     className="video-carousel-overlay-product-add video-carousel-overlay-product-shop"
+                                    style={addToCartButtonStyle()}
                                     onClick={(e) => {
                                       e.preventDefault();
                                       handleProductClick(product, video);
@@ -478,6 +489,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                         <a
                           href={`/products/${product.handle}`}
                           className="video-carousel-overlay-product-add"
+                          style={addToCartButtonStyle()}
                           onClick={(e) => {
                             e.preventDefault();
                             handleProductClick(product, currentVideo());
@@ -577,6 +589,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                     <button
                                       type="button"
                                       className="video-carousel-card-product-button"
+                                      style={addToCartButtonStyle()}
                                       onClick={() => handleProductClick(product, video)}
                                     >
                                       Shop

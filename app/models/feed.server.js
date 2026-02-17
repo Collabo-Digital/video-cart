@@ -145,12 +145,29 @@ export async function syncFeedVideos(feedId, resolvedVideos) {
 }
 
 /**
- * Delete feed by ID
+ * Soft-delete feed by ID and all related analytics/order items (set isDeleted = true).
  * @param {string} id - Feed ID
- * @returns {Promise<Object>} Deleted feed object
+ * @returns {Promise<Object>} Updated feed object
  */
 export async function deleteById(id) {
-  return prisma.feed.delete({ where: { id } });
+  return prisma.$transaction(async (tx) => {
+    await tx.feedAnalytics.updateMany({
+      where: { feedId: id },
+      data: { isDeleted: true },
+    });
+    await tx.videoAnalytics.updateMany({
+      where: { feedId: id },
+      data: { isDeleted: true },
+    });
+    await tx.videoCartOrderItem.updateMany({
+      where: { feedId: id },
+      data: { isDeleted: true },
+    });
+    return tx.feed.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
+  });
 }
 
 /**
