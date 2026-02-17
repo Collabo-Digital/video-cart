@@ -8,7 +8,7 @@
  */
 
 import { sessionStorage } from "../../../../config/shopify.server";
-import { recordConversionFromPixel } from "../../../../services/analytics/analytics.service.server";
+import { recordConversionFromPixel } from "../../../../models/analytics.server";
 import { upsertOrderWithItems } from "../../../../models/videoCartOrder.server";
 
 const JSON_HEADERS = {
