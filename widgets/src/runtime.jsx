@@ -1,3 +1,7 @@
+/**
+ * Widget runtime: finds .video-cart-container nodes, fetches feed data, mounts SolidJS widget.
+ */
+
 import { render } from 'solid-js/web';
 import { getWidget, registerWidget } from './core/registry';
 import { CONTAINER_SELECTOR } from './core/config';
@@ -34,7 +38,7 @@ export async function initFeeds() {
     const mountEl = document.getElementById(containerId);
     if (!mountEl) continue;
 
-    const cached = widgets.find((w) => w.containerId === containerId);
+    const cached = widgets.find((entry) => entry.containerId === containerId);
 
     try {
       let feed;
@@ -43,11 +47,12 @@ export async function initFeeds() {
       } else {
         feed = await api.feeds.fetchFeed(feedId, shop);
         const widgetEntry = { feedId, containerId, shop, ...feed };
-        const alreadyStored = widgets.some((w) => w.containerId === containerId);
+        const alreadyStored = widgets.some((entry) => entry.containerId === containerId);
         if (!alreadyStored && window.__video_cart_config__?.widgets) {
           window.__video_cart_config__.widgets.push(widgetEntry);
         }
       }
+      if (!feed.shop) feed.shop = shop;
 
       const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;
       const widgetDef = getWidget(widgetType);
@@ -67,7 +72,7 @@ export async function initFeeds() {
       );
       container.dataset.videoCartInitialized = 'true';
     } catch (err) {
-      if (typeof console !== 'undefined' && console.error) {
+      if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console?.error === 'function') {
         console.error('Video feed error:', err);
       }
       mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';

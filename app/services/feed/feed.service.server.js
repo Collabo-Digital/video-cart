@@ -5,7 +5,40 @@
  */
 
 import * as FeedModel from '../../models/feed.server';
-import { updateVideosProductsTagged as updateFeedVideosProductsTagged } from '../../models/feed.server';
+import { syncFeedVideos } from '../../models/feed.server';
+import * as VideoModel from '../../models/video.server';
+
+/** MongoDB ObjectId is 24 hex characters */
+function isMongoId(str) {
+  return typeof str === 'string' && /^[a-fA-F0-9]{24}$/.test(str);
+}
+
+/**
+ * Resolve payload video to our Video record id (by videoId, playbackId, assetId, or upload id).
+ * @param {{ videoId?: string, id?: string, playbackId?: string, assetId?: string, uploadId?: string }} videoPayload
+ * @returns {Promise<string|null>} Video.id or null
+ */
+async function resolveVideoId(videoPayload) {
+  const candidateId = videoPayload.videoId ?? videoPayload.id;
+  if (candidateId && isMongoId(candidateId)) {
+    const found = await VideoModel.findById(candidateId);
+    if (found) return found.id;
+  }
+  if (videoPayload.playbackId) {
+    const byPlayback = await VideoModel.findByPlaybackId(videoPayload.playbackId);
+    if (byPlayback) return byPlayback.id;
+  }
+  if (videoPayload.assetId) {
+    const byAsset = await VideoModel.findByAssetId(videoPayload.assetId);
+    if (byAsset) return byAsset.id;
+  }
+  const uploadId = videoPayload.uploadId ?? candidateId;
+  if (uploadId) {
+    const byUpload = await VideoModel.findByUploadId(uploadId);
+    if (byUpload) return byUpload.id;
+  }
+  return null;
+}
 
 /**
  * Get all feeds for a shop
@@ -123,7 +156,23 @@ export async function updateFeed(feedId, data) {
   const result = await FeedModel.updateById(feedId, updateData);
 
   if (videos && Array.isArray(videos) && videos.length > 0) {
-    await updateFeedVideosProductsTagged(feedId, videos);
+    const resolvedVideos = [];
+    for (let i = 0; i < videos.length; i++) {
+      const videoEntry = videos[i];
+      const videoId = await resolveVideoId(videoEntry);
+      if (videoId && videoEntry.playbackId) {
+        if (videoEntry.fileName != null && typeof videoEntry.fileName === 'string' && videoEntry.fileName.trim()) {
+          await VideoModel.updateById(videoId, { fileName: videoEntry.fileName.trim() });
+        }
+        resolvedVideos.push({
+          videoId,
+          playbackId: videoEntry.playbackId,
+          position: videoEntry.position ?? i,
+          productsTagged: videoEntry.productsTagged ?? [],
+        });
+      }
+    }
+    await syncFeedVideos(feedId, resolvedVideos);
   }
 
   return result;

@@ -5,10 +5,11 @@ import { AppProvider as PolarisAppProvider } from "@shopify/polaris";
 import { authenticate } from "../../config/shopify.server";
 import enTranslations from '@shopify/polaris/locales/en.json';
 import polarisStyles from '@shopify/polaris/build/esm/styles.css?url';
-import '@shopify/polaris-viz/build/esm/styles.css';
+import polarisVizStyles from '@shopify/polaris-viz/build/esm/styles.css?url';
 
 export const links = () => [
   { rel: "stylesheet", href: polarisStyles },
+  { rel: "stylesheet", href: polarisVizStyles },
 ];
 
 export const loader = async ({ request }) => {
@@ -25,6 +26,8 @@ export default function AppLayout() {
         <s-app-nav>
           <s-link href="/app">Home</s-link>
           <s-link href="/app/feeds">Feeds</s-link>
+          <s-link href="/app/videos">Videos</s-link>
+          {/* <s-link href="/app/pricing">Pricing</s-link> */}
         </s-app-nav>
         <Outlet />
       </PolarisAppProvider>

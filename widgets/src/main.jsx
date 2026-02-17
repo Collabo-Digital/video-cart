@@ -1,3 +1,4 @@
+/** Entry: exposes initFeeds on window and runs it when DOM is ready. */
 import { initFeeds } from './runtime';
 
 if (typeof window !== 'undefined') {

@@ -51,6 +51,7 @@ export async function findById(id, shopDomain = null) {
     include: {
       videos: {
         orderBy: { position: 'asc' },
+        include: { video: true },
       },
     },
   });
@@ -90,21 +91,83 @@ export async function updateById(id, data) {
  */
 export async function updateVideosProductsTagged(feedId, videos) {
   if (!videos || !Array.isArray(videos)) return;
-  for (const v of videos) {
+  for (const entry of videos) {
     await prisma.feedVideo.updateMany({
-      where: { feedId, videoId: v.videoId },
-      data: { productsTagged: v.productsTagged ?? [] },
+      where: { feedId, videoId: entry.videoId },
+      data: { productsTagged: entry.productsTagged ?? [] },
     });
   }
 }
 
 /**
- * Delete feed by ID
+ * Sync feed videos: create or update FeedVideo for each resolved video, remove others.
+ * Used when saving feed so new uploads (resolved by playbackId/assetId) appear in the feed.
+ * @param {string} feedId - Feed ID
+ * @param {Array<{ videoId: string, playbackId: string, position: number, productsTagged: Array }>} resolvedVideos - Resolved videos (videoId = our Video.id)
+ */
+export async function syncFeedVideos(feedId, resolvedVideos) {
+  if (!feedId || !Array.isArray(resolvedVideos)) return;
+
+  for (let i = 0; i < resolvedVideos.length; i++) {
+    const { videoId, playbackId, position, productsTagged } = resolvedVideos[i];
+    if (!videoId || !playbackId) continue;
+
+    await prisma.feedVideo.upsert({
+      where: {
+        feedId_videoId: { feedId, videoId },
+      },
+      create: {
+        feedId,
+        videoId,
+        playbackId,
+        position: position ?? i,
+        productsTagged: productsTagged ?? [],
+      },
+      update: {
+        playbackId,
+        position: position ?? i,
+        productsTagged: productsTagged ?? [],
+      },
+    });
+  }
+
+  const keepVideoIds = resolvedVideos.map((entry) => entry.videoId).filter(Boolean);
+  if (keepVideoIds.length > 0) {
+    await prisma.feedVideo.deleteMany({
+      where: {
+        feedId,
+        videoId: { notIn: keepVideoIds },
+      },
+    });
+  } else {
+    await prisma.feedVideo.deleteMany({ where: { feedId } });
+  }
+}
+
+/**
+ * Soft-delete feed by ID and all related analytics/order items (set isDeleted = true).
  * @param {string} id - Feed ID
- * @returns {Promise<Object>} Deleted feed object
+ * @returns {Promise<Object>} Updated feed object
  */
 export async function deleteById(id) {
-  return prisma.feed.delete({ where: { id } });
+  return prisma.$transaction(async (tx) => {
+    await tx.feedAnalytics.updateMany({
+      where: { feedId: id },
+      data: { isDeleted: true },
+    });
+    await tx.videoAnalytics.updateMany({
+      where: { feedId: id },
+      data: { isDeleted: true },
+    });
+    await tx.videoCartOrderItem.updateMany({
+      where: { feedId: id },
+      data: { isDeleted: true },
+    });
+    return tx.feed.update({
+      where: { id },
+      data: { isDeleted: true },
+    });
+  });
 }
 
 /**
@@ -117,5 +180,41 @@ export async function count(filters = {}) {
 
   return prisma.feed.count({
     where: shopDomain ? { shopDomain } : undefined,
+  });
+}
+
+/**
+ * Find all feed-video records for a video, with feed included.
+ * Only returns feeds for the given shop that are not deleted.
+ * @param {string} videoId - Video ID
+ * @param {string} shopDomain - Shop domain for security
+ * @returns {Promise<Array>} Array of FeedVideo with feed included
+ */
+export async function findFeedVideosByVideoId(videoId, shopDomain) {
+  if (!videoId) return [];
+
+  const where = {
+    videoId,
+    feed: {
+      isDeleted: false,
+      ...(shopDomain ? { shopDomain } : {}),
+    },
+  };
+
+  return prisma.feedVideo.findMany({
+    where,
+    include: {
+      feed: {
+        select: {
+          id: true,
+          feedName: true,
+          widgetId: true,
+          shopDomain: true,
+          isEnabled: true,
+          isDeleted: true,
+        },
+      },
+    },
+    orderBy: { addedAt: 'desc' },
   });
 }

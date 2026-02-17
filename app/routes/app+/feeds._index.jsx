@@ -90,6 +90,7 @@ export default function FeedsPage() {
   };
 
   const handleToggleFeed = (feedId, isEnabled, e) => {
+    console.log('handleToggleFeed ----->', feedId, isEnabled, e);
     e?.stopPropagation?.();
     fetcher.submit(
       { intent: "toggleFeed", feedId, isEnabled: String(isEnabled) },
@@ -131,13 +132,13 @@ export default function FeedsPage() {
         id={feed.id}
         key={feed.id}
         position={index}
-       
+
       >
         <IndexTable.Cell onClick={(e) => e.stopPropagation()}>
           <s-switch
             checked={checked}
             disabled={isToggling && fetcher.state !== "idle"}
-            on-change={(e) => handleToggleFeed(feed.id, e.target.checked, e)}
+            onChange={(e) => handleToggleFeed(feed.id, e.target.checked, e)}
           />
         </IndexTable.Cell>
 

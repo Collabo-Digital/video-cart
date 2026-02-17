@@ -20,7 +20,6 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   hooks: {
     afterAuth: async ({ session, admin }) => {
-      console.log(session);
       await doTaskAfterAuth({ session, admin });
     },
   },

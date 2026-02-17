@@ -66,6 +66,8 @@ As the codebase grows:
 
 - **Widget type** in the API (e.g. `feed.widgetType === 'carousel'`) must match the key used in `registerWidget(type, …)`. Component names (e.g. `VideoCarousel`) are internal; only the type string is the contract.
 - Use clear, consistent names: `initFeeds` for the init function, `CONTAINER_SELECTOR` / `FEED_API_PATH` for constants, `onEvent` for the event callback prop.
+- **Variables and functions:** camelCase; keep names short and meaningful (e.g. `trackRef`, `expandedIndex`, `thumbUrl`). Avoid typos (e.g. `getThumbnailPreviewUrl` not `getTumbnailPreviewUrl`).
+- **CSS classes:** One block prefix per widget (e.g. `video-carousel-*`). Use BEM-style modifiers (e.g. `video-carousel-overlay-reels`). Prefer concise but readable names; avoid unnecessarily long class names.
 
 ---
 

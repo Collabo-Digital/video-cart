@@ -12,11 +12,39 @@ import mux from '../../config/mux.server';
 import * as VideoModel from '../../models/video.server';
 
 /**
- * Create upload URL for client
+ * Normalize and sanitize file name for fileName/fileUploadName (trim, reasonable length).
+ * @param {string} name - Raw file name
+ * @returns {string} Sanitized name
+ */
+function sanitizeFileName(name) {
+  if (typeof name !== 'string' || !name.trim()) return 'Untitled Video';
+  const trimmed = name.trim();
+  const maxLen = 255;
+  return trimmed.length > maxLen ? trimmed.slice(0, maxLen) : trimmed;
+}
+
+/**
+ * Create upload URL for client and create a Video record immediately so the feed can
+ * link to it when the user saves (before the Mux webhook fires). Webhook will update
+ * the same record with playbackId, duration, status READY.
+ * Uses options.fileName for initial title, fileName, and fileUploadName (all same at creation).
  * @param {Object} options - Upload options
+ * @param {string} [options.fileName] - Original file name (used for title, fileName, fileUploadName; required for duplicate check)
  * @returns {Promise<Object>} Upload URL and ID
+ * @throws {Error} If fileUploadName already exists (duplicate)
  */
 export async function createUploadUrl(options = {}) {
+  const rawName = options.fileName;
+  const fileUploadName = sanitizeFileName(rawName || 'Untitled Video');
+
+  const existing = await VideoModel.findByFileUploadName(fileUploadName);
+  if (existing) {
+    const err = new Error('This video is already in your library. A video with the same name has already been uploaded.');
+    err.code = 'DUPLICATE_VIDEO';
+    err.statusCode = 409;
+    throw err;
+  }
+
   const upload = await mux.video.uploads.create({
     new_asset_settings: {
       playback_policy: ['public'],
@@ -24,6 +52,17 @@ export async function createUploadUrl(options = {}) {
     },
     cors_origin: options.corsOrigin || '*',
     test: process.env.NODE_ENV !== 'production',
+  });
+
+  const videoAssetIdPlaceholder = `pending-${upload.id}`;
+  await VideoModel.create({
+    title: fileUploadName,
+    fileName: fileUploadName,
+    fileUploadName,
+    serviceProvider: 'mux',
+    videoUploadId: upload.id,
+    videoAssetId: videoAssetIdPlaceholder,
+    status: 'PROCESSING',
   });
 
   return {
@@ -69,23 +108,56 @@ export async function createAssetFromUrl(videoUrl) {
 }
 
 /**
- * Create a Video record for a server-side imported asset.
+ * Create or update a Video record for a server-side imported asset.
+ * Uses fileName and fileUploadName for display and duplicate detection; fileUploadName must be unique.
  * @param {Object} params
  * @param {string} params.assetId
  * @param {string|null} params.playbackId
- * @param {string} params.title
- * @returns {Promise<Object>} Created video record
+ * @param {string} [params.title]
+ * @param {string} [params.fileName] - Display name (same as fileUploadName at creation)
+ * @param {string} [params.fileUploadName] - Immutable name for duplicate check
+ * @returns {Promise<Object>} Created or updated video record
+ * @throws {Error} If fileUploadName already exists (duplicate)
  */
-export async function createVideoForImportedAsset({ assetId, playbackId, title }) {
-  // videoUploadId is required and unique; for imports we derive a stable id from the asset id
-  const videoUploadId = `import-${assetId}`;
+export async function createVideoForImportedAsset({ assetId, playbackId, title, fileName, fileUploadName }) {
+  const name = fileUploadName || fileName || title || 'Imported Video';
+  const uploadName = (fileUploadName || fileName || title || '').trim();
+  if (uploadName) {
+    const duplicate = await VideoModel.findByFileUploadName(uploadName);
+    if (duplicate) {
+      const err = new Error('This video is already in your library. It has already been imported.');
+      err.code = 'DUPLICATE_VIDEO';
+      err.statusCode = 409;
+      throw err;
+    }
+  }
 
-  return VideoModel.create({
-    title: title || 'Imported Video',
+  const displayName = fileName || title || name;
+  const createPayload = {
+    title: displayName,
+    fileName: displayName,
+    fileUploadName: uploadName || undefined,
     serviceProvider: 'mux',
-    videoUploadId,
-    videoAssetId: assetId,
     videoPlaybackId: playbackId,
     status: 'PROCESSING',
+  };
+
+  const existing = await VideoModel.findByAssetId(assetId);
+  if (existing) {
+    const updatePayload = {
+      title: createPayload.title,
+      fileName: createPayload.fileName,
+      serviceProvider: createPayload.serviceProvider,
+      videoPlaybackId: createPayload.videoPlaybackId,
+      status: createPayload.status,
+    };
+    return VideoModel.updateById(existing.id, updatePayload);
+  }
+
+  const videoUploadId = `import-${assetId}`;
+  return VideoModel.create({
+    videoUploadId,
+    videoAssetId: assetId,
+    ...createPayload,
   });
 }
