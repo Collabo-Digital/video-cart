@@ -6,8 +6,8 @@
  */
 
 import { authenticate } from '../../../../../config/shopify.server';
-import { getFeedById } from '../../../../../services/feed/feed.service.server';
-import { getFeedAnalytics } from '../../../../../services/analytics/analytics.service.server';
+import * as FeedModel from '../../../../../models/feed.server';
+import { getFeedAnalytics } from '../../../../../models/analytics.server';
 
 function parseDate(str) {
   if (!str) return null;
@@ -30,7 +30,9 @@ export const loader = async ({ request, params }) => {
       );
     }
 
-    await getFeedById(feedId, session.shop);
+    if (!session.shop) throw new Error('Shop domain is required');
+    const feed = await FeedModel.findById(feedId, session.shop);
+    if (!feed) throw new Error('Feed not found');
 
     const start = startDate || (() => { const d = new Date(); d.setDate(1); return d; })();
     const end = endDate || new Date();
