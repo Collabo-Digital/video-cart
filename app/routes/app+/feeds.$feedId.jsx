@@ -24,7 +24,7 @@ import { prepareVideosPayload, isDuplicateVideoInWidget, filterDuplicateVideos }
 import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
 import { redirect, useLoaderData, useNavigation, useSubmit, useActionData } from "react-router";
-import { SettingsTab } from "../../components/SettingsTab";
+import { SettingsTab } from "../../components/SettingsTab/Index";
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 import { getFeedFormDefaultValues } from "../../lib/constants/settings";
 

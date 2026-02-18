@@ -5,8 +5,8 @@
  * Callable from storefront widget; optional shop param validates feed belongs to shop.
  */
 
-import { recordEvent, EVENT_TYPES } from '../../../../services/analytics/analytics.service.server';
-import { getFeedById } from '../../../../services/feed/feed.service.server';
+import { recordEvent, EVENT_TYPES } from '../../../../models/analytics.server';
+import * as FeedModel from '../../../../models/feed.server';
 
 const JSON_HEADERS = {
   'Content-Type': 'application/json',
@@ -40,7 +40,9 @@ export const action = async ({ request }) => {
 
     if (shop) {
       try {
-        await getFeedById(feedId, shop);
+        if (!shop) throw new Error('Shop domain is required');
+        const feed = await FeedModel.findById(feedId, shop);
+        if (!feed) throw new Error('Feed not found');
       } catch {
         return new Response(
           JSON.stringify({ success: false, error: 'Feed not found or access denied' }),

@@ -52,8 +52,7 @@ import { useLoaderData } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import * as VideoModel from "../../models/video.server";
 import * as FeedModel from "../../models/feed.server";
-import { getFeedById } from "../../services/feed/feed.service.server";
-import { getFeedAnalytics, getVideoAnalytics } from "../../services/analytics/analytics.service.server";
+import { getFeedAnalytics, getVideoAnalytics } from "../../models/analytics.server";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server";
 import {
   CircleLeftIcon, CircleRightIcon
@@ -90,7 +89,10 @@ export const loader = async ({ params, request }) => {
   const { startDate, endDate } = getDefaultDateRange();
 
   if (paramType === "feed") {
-    const feed = await getFeedById(id, session.shop);
+    if (!id) throw new Error('Feed ID is required');
+    if (!session.shop) throw new Error('Shop domain is required');
+    const feed = await FeedModel.findById(id, session.shop);
+    if (!feed) throw new Response("Feed not found", { status: 404 });
     type = "feed";
     title = feed.feedName ?? "Feed";
     entityId = feed.id;

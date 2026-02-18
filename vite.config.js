@@ -54,5 +54,10 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react"],
+    exclude: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
+  },
+  ssr: {
+    noExternal: [],
+    external: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
   },
 });

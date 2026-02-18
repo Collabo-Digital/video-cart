@@ -5,67 +5,13 @@
  */
 
 import { authenticate } from "../../config/shopify.server";
-import { recordEvent, EVENT_TYPES } from "../../services/analytics/analytics.service.server";
-import { getFeedById } from "../../services/feed/feed.service.server";
+import { recordConversionFromPixel } from "../../models/analytics.server";
 
 const JSON_HEADERS = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
 };
 
-/**
- * Aggregate items by (feedId, videoId) and record VIDEO_ORDER + WIDGET_ORDER.
- * @param {string} shop - shop domain for validation
- * @param {Array<{ video_id: string, widget_id: string, quantity?: number, line_total?: number }>} items
- */
-async function recordConversionEvents(shop, items) {
-  if (!items?.length) return;
-
-  const byFeed = new Map();
-  const byFeedVideo = new Map();
-
-  for (const item of items) {
-    const feedId = item.widget_id;
-    const videoId = item.video_id;
-    if (!feedId || !videoId) continue;
-
-    const revenue = Number(item.line_total) ?? 0;
-
-    const feedKey = feedId;
-    if (!byFeed.has(feedKey)) {
-      byFeed.set(feedKey, { revenue: 0, orderCount: 1 });
-    }
-    const f = byFeed.get(feedKey);
-    f.revenue += revenue;
-
-    const fvKey = `${feedId}\t${videoId}`;
-    if (!byFeedVideo.has(fvKey)) {
-      byFeedVideo.set(fvKey, { feedId, videoId, revenue: 0 });
-    }
-    const v = byFeedVideo.get(fvKey);
-    v.revenue += revenue;
-  }
-
-  for (const [feedId, { revenue }] of byFeed) {
-    await getFeedById(feedId, shop);
-    await recordEvent({
-      feedId,
-      eventType: EVENT_TYPES.WIDGET_ORDER,
-      orderCount: 1,
-      revenueAmount: revenue,
-    });
-  }
-
-  for (const [, { feedId, videoId, revenue }] of byFeedVideo) {
-    await recordEvent({
-      feedId,
-      videoId,
-      eventType: EVENT_TYPES.VIDEO_ORDER,
-      orderCount: 1,
-      revenueAmount: revenue,
-    });
-  }
-}
 
 export const action = async ({ request }) => {
   if (request.method !== "POST") {

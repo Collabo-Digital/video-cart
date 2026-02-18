@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
-import { LineChart } from "@shopify/polaris-viz";
 import { BlockStack, Card, Text } from "@shopify/polaris";
 
 export default function Chart({ chartData = [], title = "Video Views & Conversions", series = "views" }) {
   const [isClient, setIsClient] = useState(false);
+  const [LineChart, setLineChart] = useState(null);
 
   useEffect(() => {
     setIsClient(true);
+    // Dynamically import LineChart only on client-side
+    import("@shopify/polaris-viz").then((module) => {
+      setLineChart(() => module.LineChart);
+    });
   }, []);
 
   const data = useMemo(() => {
@@ -51,7 +55,7 @@ export default function Chart({ chartData = [], title = "Video Views & Conversio
     ];
   }, [chartData, series]);
 
-  if (!isClient) return null;
+  if (!isClient || !LineChart) return null;
 
   return (
     <Card>
