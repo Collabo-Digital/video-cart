@@ -4,7 +4,7 @@
  * Lists all video feeds for the shop.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BlockStack,
   Card,
@@ -16,6 +16,7 @@ import {
   InlineStack,
   Banner,
 } from "@shopify/polaris";
+import {onCLS, onINP, onLCP}  from 'web-vitals'
 import { getFeedsByShop, getFeedById, updateFeed, deleteFeed } from "../../services/feed/feed.service.server";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { authenticate } from "../../config/shopify.server";
@@ -80,6 +81,12 @@ export default function FeedsPage() {
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const [pendingDeleteFeed, setPendingDeleteFeed] = useState(null);
+
+  useEffect(() => {
+    onCLS(console.log);
+    onINP(console.log);
+    onLCP(console.log);
+  }, []);
 
   const handleCreateFeed = () => {
     navigate('/app/feeds/new');

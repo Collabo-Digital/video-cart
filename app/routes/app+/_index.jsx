@@ -23,8 +23,9 @@ import {
   ChatIcon,
   EmailIcon,
 } from "@shopify/polaris-icons";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLoaderData, useSearchParams } from "react-router";
+import {onCLS, onINP, onLCP}  from 'web-vitals'
 import DateRangePicker from "../../components/DatePicker/DatePicker.jsx";
 import { OnboardingSetup } from "../../components/OnboardingSetup/OnboardingSetup.jsx";
 import { authenticate } from "../../config/shopify.server.js";
@@ -212,6 +213,12 @@ export default function Index() {
   const loaderData = useLoaderData?.() ?? {};
   const { analytics = {}, dateRange } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    onCLS(console.log);
+    onINP(console.log);
+    onLCP(console.log);
+  }, []);
 
   const date = useMemo(() => {
     if (dateRange?.start && dateRange?.end) {

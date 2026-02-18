@@ -15,6 +15,7 @@ import {
   Banner,
   BlockStack,
 } from "@shopify/polaris";
+import {onCLS, onINP, onLCP}  from 'web-vitals'
 import { useLoaderData, useNavigate, useSearchParams, useSubmit, useActionData } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import * as VideoModel from "../../models/video.server";
@@ -70,6 +71,12 @@ export default function VideosPage() {
 
   const [searchValue, setSearchValue] = useState(urlSearch);
   const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
+
+  useEffect(() => {
+    onCLS(console.log);
+    onINP(console.log);
+    onLCP(console.log);
+  }, []);
 
   useEffect(() => {
     setSearchValue(urlSearch);

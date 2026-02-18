@@ -23,7 +23,7 @@ import { getFeedById, createFeed, updateFeed } from "../../services/feed/feed.se
 import { prepareVideosPayload, isDuplicateVideoInWidget, filterDuplicateVideos } from "../../lib/utils/feed";
 import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
-import { redirect, useLoaderData, useNavigation, useSubmit, useActionData } from "react-router";
+import { redirect, useLoaderData, useNavigation, useSubmit, useActionData, useNavigate } from "react-router";
 import { SettingsTab } from "../../components/SettingsTab/Index";
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 import { getFeedFormDefaultValues } from "../../lib/constants/settings";
@@ -37,7 +37,7 @@ export const loader = async ({ params, request }) => {
     }
 
     const feed = await getFeedById(params.feedId, session.shop);
-    return { mode: "edit", feed };
+    return { mode: "edit", feed, shop: session.shop };
   } catch (error) {
     console.error('Feed loader error:', error);
     throw new Response("Feed not found", { status: 404 });
@@ -86,12 +86,12 @@ export const action = async ({ params, request }) => {
 };
 
 export default function FeedEditorPage() {
-  const { mode, feed } = useLoaderData();
+  const { mode, feed, shop } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
   const shopify = useAppBridge();
-
+  const navigate = useNavigate();
   const [uploadedVideos, setUploadedVideos] = useState([]);
   const [error, setError] = useState(null);
   const [hasVideoChanges, setHasVideoChanges] = useState(false);
@@ -363,7 +363,7 @@ export default function FeedEditorPage() {
     <>
       <Page
         title={mode === "create" ? "Create Feed" : "Edit Feed"}
-        backAction={{ content: "Feeds", url: "/app/feeds" }}
+        backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`)}}
       >
         <BlockStack gap="400">
           {actionData?.error && (
