@@ -1,6 +1,6 @@
 
 /* eslint-disable react/prop-types */
-import { InlineStack, BlockStack, Button, ButtonGroup } from "@shopify/polaris";
+import { InlineStack, BlockStack, Button, ButtonGroup, InlineGrid, Box } from "@shopify/polaris";
 import { useState, useCallback } from "react";
 import {
   LogoInstagramIcon, LogoTiktokIcon, DesktopIcon, BookIcon
@@ -32,8 +32,7 @@ export default function VideoUploader({ setUploadedVideo, onVideosFromLibrary })
 
   return (
     <BlockStack gap="400">
-      <InlineStack gap="300" wrap>
-        <ButtonGroup variant="segmented" fullWidth>
+        <ButtonGroup variant="segmented" fullWidth={true} >
           <Button onClick={() => setIgOpen(true)} variant="secondary" icon={LogoInstagramIcon}>
             Instagram
           </Button>
@@ -47,7 +46,6 @@ export default function VideoUploader({ setUploadedVideo, onVideosFromLibrary })
             Library
           </Button>
         </ButtonGroup>
-      </InlineStack>
 
       <SocialImportModal
         source={SOCIAL_SOURCE.INSTAGRAM}

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
     BlockStack,
     Card,
@@ -18,7 +18,10 @@ import { onCLS, onINP, onLCP } from 'web-vitals'
 // import { getFeedsByShop } from "../../services/feed/feed.service.server";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../../config/shopify.server";
-import { PlayCircleIcon, QuestionCircleIcon, ChatIcon,  NotificationIcon, SlideshowIcon, StatusIcon, LayoutPopupIcon, LayoutColumns3Icon } from '@shopify/polaris-icons';
+
+import { PlayCircleIcon, QuestionCircleIcon, ChatIcon, NotificationIcon} from '@shopify/polaris-icons';
+
+import { WIDGET_TYPES } from "../../lib/constants/common";
 
 export const loader = async ({ request }) => {
     try {
@@ -35,55 +38,13 @@ export const loader = async ({ request }) => {
 export default function IndexPage() {
     const { feeds } = useLoaderData();
     const navigate = useNavigate();
+    const modalRef = useRef(null);
 
     useEffect(() => {
         onCLS(console.log);
         onINP(console.log);
         onLCP(console.log);
     }, []);
-
-    const widgetTypes = [
-        {
-            id: 1,
-            name: 'Carousel',
-            description: 'Show your videos in a scrollable carousel. Add the template to your store and customize its layout, products, and style in the theme editor.',
-            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
-            icon: SlideshowIcon,
-            onAction: () => {
-                navigate('/app/feeds/new?widgetType=carousel');
-            }
-        },
-        {
-            id: 2,
-            name: 'Stories',
-            description: 'Create story-style videos similar to social media. Add the template and let customers explore products through interactive stories.',
-            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
-            icon: StatusIcon,
-            onAction: () => {
-                navigate('/app/feeds/new?widgetType=stories');
-            }
-        },
-        {
-            id: 3,
-            name: 'Floating',
-            description: 'Add a floating video widget that appears while customers browse. Great for promotions, demos, and quick product discovery.',
-            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
-            icon: LayoutPopupIcon,
-            onAction: () => {
-                navigate('/app/feeds/new?widgetType=floating');
-            }
-        },
-        {
-            id: 4,
-            name: 'Grid',
-            description: 'Display videos in a clean grid layout. Insert the template and create a visual video gallery anywhere on your store.',
-            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
-            icon: LayoutColumns3Icon,
-            onAction: () => {
-                navigate('/app/feeds/new?widgetType=grid');
-            }
-        },
-    ];
 
 
 
@@ -107,7 +68,7 @@ export default function IndexPage() {
                     <VideoThumbnail
                         videoLength={80}
                         thumbnailUrl="https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850"
-                        onClick={() => console.log('clicked')}
+                        onClick={() => modalRef.current?.showOverlay?.()}
                     />
                 </MediaCard>
 
@@ -142,31 +103,31 @@ export default function IndexPage() {
                         <InlineGrid columns={2} gap="200">
 
 
-                            {widgetTypes.map((widgetType) => (
+                            {WIDGET_TYPES.map((widgetType) => (
                                 <Box
-                                key={widgetType.id}
-                                background="bg-surface-secondary"
-                                borderRadius="200"
-                                borderWidth="0165"
-                                borderColor="border"
-                                overflow="hidden"
-                            >
-                                <Box position="relative" >
-                                    <Box
-                                        background="bg-fill-secondary"
-                                        borderRadius="100"
-                                        minHeight="120px"
-                                        position="relative"
-                                    >
-                                        <BlockStack gap="100">
+                                    key={widgetType.id}
+                                    background="bg-surface-secondary"
+                                    borderRadius="200"
+                                    borderWidth="0165"
+                                    borderColor="border"
+                                    overflow="hidden"
+                                >
+                                    <Box position="relative" >
+                                        <Box
+                                            background="bg-fill-secondary"
+                                            borderRadius="100"
+                                            minHeight="120px"
+                                            position="relative"
+                                        >
+                                            <BlockStack gap="100">
 
-                                            <Box  borderStartStartRadius="200" borderEndStartRadius="200" >
-                                                <InlineStack gap="100" wrap={false} blockAlign="center">
-                                                    {/* {[
+                                                <Box borderStartStartRadius="200" borderEndStartRadius="200" >
+                                                    <InlineStack gap="100" wrap={false} blockAlign="center">
+                                                        {/* {[
 
                                                         'https://docs.aspose.com/svg/images/drawing/viewport2_1.png',
                                                     ].map((src, i) => ( */}
-                                                            <Box
+                                                        <Box
                                                             minWidth="48px"
                                                             minHeight="64px"
                                                             borderRadius="100"
@@ -181,45 +142,45 @@ export default function IndexPage() {
                                                                     width: '100%',
                                                                     height: '100%',
                                                                     display: 'block',
-                                                                    borderTopLeftRadius:'10px',
-                                                                    borderTopRightRadius:'10px',
+                                                                    borderTopLeftRadius: '10px',
+                                                                    borderTopRightRadius: '10px',
                                                                 }}
                                                             />
                                                         </Box>
-                                                    {/* ))} */}
+                                                        {/* ))} */}
+                                                    </InlineStack>
+                                                </Box>
+                                            </BlockStack>
+
+                                        </Box>
+                                    </Box>
+
+                                    {/* Content area */}
+                                    <Box padding="300">
+                                        <BlockStack gap="200">
+                                            <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
+                                                <InlineStack gap="100" blockAlign="center">
+                                                    <Icon source={widgetType.icon} tone="subdued" />
+                                                    <Text as="h2" variant="headingMd" fontWeight="bold">
+                                                        {widgetType.name}
+                                                    </Text>
                                                 </InlineStack>
-                                            </Box>
+                                                {/* <Badge tone="subdued">Inactive</Badge> */}
+                                            </InlineStack>
+                                            <Text as="p" variant="bodyMd" tone="subdued">
+                                                {widgetType.description}
+                                            </Text>
+                                            <InlineStack align="end" blockAlign="end">
+                                                <Button size="slim" onClick={() => navigate(widgetType.redirectTo)}>
+                                                    Create
+                                                </Button>
+                                            </InlineStack>
                                         </BlockStack>
-                                        
                                     </Box>
                                 </Box>
-
-                                {/* Content area */}
-                                <Box padding="300">
-                                    <BlockStack gap="200">
-                                        <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
-                                            <InlineStack gap="100" blockAlign="center">
-                                                <Icon source={widgetType.icon} tone="subdued" />
-                                                <Text as="h2" variant="headingMd" fontWeight="bold">
-                                                   {widgetType.name}
-                                                </Text>
-                                            </InlineStack>
-                                            {/* <Badge tone="subdued">Inactive</Badge> */}
-                                        </InlineStack>
-                                        <Text as="p" variant="bodyMd" tone="subdued">
-                                                {widgetType.description}
-                                        </Text>
-                                        <InlineStack align="end" blockAlign="end">
-                                            <Button size="slim" onClick={widgetType.onAction}>
-                                                Create
-                                            </Button>
-                                        </InlineStack>
-                                    </BlockStack>
-                                </Box>
-                            </Box>
                             ))}
 
-                            
+
                         </InlineGrid>
                     </BlockStack>
                 </Card>
@@ -283,6 +244,39 @@ export default function IndexPage() {
                 </Card>
 
             </BlockStack>
+
+            <s-modal
+                ref={modalRef}
+                id="youtube-preview-modal"
+                heading="Shoppable video preview"
+                size="large"
+                padding="none"
+            >
+                <div style={{ position: 'relative', paddingTop: '56.25%', background: '#000' }}>
+                    <iframe
+                        title="YouTube video"
+                        src="https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1"
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            border: 'none',
+                        }}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                    />
+                </div>
+                <s-button
+                    slot="secondary-actions"
+                    variant="secondary"
+                    commandFor="youtube-preview-modal"
+                    command="--hide"
+                >
+                    Close
+                </s-button>
+            </s-modal>
 
         </Page>
     );
