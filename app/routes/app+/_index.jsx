@@ -1,483 +1,289 @@
-import { boundary } from "@shopify/shopify-app-react-router/server";
+import { useEffect } from "react";
 import {
-  Badge,
-  BlockStack,
-  Box,
-  Button,
-  Card,
-  EmptyState,
-  Icon,
-  IndexTable,
-  InlineGrid,
-  InlineStack,
-  Page,
-  Text,
+    BlockStack,
+    Card,
+    Page,
+    Text,
+    Button,
+    InlineStack,
+    Badge,
+    MediaCard,
+    VideoThumbnail,
+    Box,
+    InlineGrid,
+    Icon,
+    ProgressBar,
 } from "@shopify/polaris";
-import {
-  OrderIcon,
-  CashDollarIcon,
-  ViewIcon,
-  MegaphoneIcon,
-  CartSaleIcon,
-  CartDownIcon,
-  ChatIcon,
-  EmailIcon,
-} from "@shopify/polaris-icons";
-import { useState, useMemo, useEffect } from "react";
-import { useLoaderData, useSearchParams } from "react-router";
-import {onCLS, onINP, onLCP}  from 'web-vitals'
-import DateRangePicker from "../../components/DatePicker/DatePicker.jsx";
-import { OnboardingSetup } from "../../components/OnboardingSetup/OnboardingSetup.jsx";
-import { authenticate } from "../../config/shopify.server.js";
-import * as FeedAnalyticsModel from "../../models/feedAnalytics.server.js";
-import * as VideoAnalyticsModel from "../../models/videoAnalytics.server.js";
-import * as VideoCartOrderModel from "../../models/videoCartOrder.server.js";
-import Chart from "../../components/Chart/Chart.jsx";
-
-function getDefaultDateRange() {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(start.getDate() - 7);
-  // start.setHours(0, 0, 0, 0);
-  return { start, end };
-}
-
-function parseDateRange(request) {
-  const url = new URL(request.url);
-  const startParam = url.searchParams.get("start");
-  const endParam = url.searchParams.get("end");
-  if (startParam && endParam) {
-    const start = new Date(startParam);
-    const end = new Date(endParam);
-    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-      return { start, end };
-    }
-  }
-  return getDefaultDateRange();
-}
+import { onCLS, onINP, onLCP } from 'web-vitals'
+// import { getFeedsByShop } from "../../services/feed/feed.service.server";
+import { useLoaderData, useNavigate } from "react-router";
+import { authenticate } from "../../config/shopify.server";
+import { PlayCircleIcon, QuestionCircleIcon, ChatIcon,  NotificationIcon, SlideshowIcon, StatusIcon, LayoutPopupIcon, LayoutColumns3Icon } from '@shopify/polaris-icons';
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  try {
-    const { start, end } = parseDateRange(request);
-    const url = new URL(request.url);
-    const ordersCursor = url.searchParams.get("ordersCursor") ?? undefined;
-
-    const [widgetAgg, videoAgg, orderStats, dailyFeed, dailyVideo, ordersPage] =
-      await Promise.all([
-        FeedAnalyticsModel.getAggregatedByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoAnalyticsModel.getAggregatedByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoCartOrderModel.getOrderStatsByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        FeedAnalyticsModel.getDailyByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoAnalyticsModel.getDailyByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoCartOrderModel.findByShopPaginated(session.shop, {
-          startDate: start,
-          endDate: end,
-          limit: 5,
-          cursor: ordersCursor,
-        }),
-      ]);
-
-    const totalImpressions =
-      (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
-    const totalVideoViews = videoAgg.videoViews ?? 0;
-    const totalAddToCart =
-      (widgetAgg.widgetAddToCart ?? 0) + (videoAgg.videoAddToCart ?? 0);
-    const totalOrders = orderStats.orderCount ?? 0;
-    const totalRevenue = orderStats.totalRevenue ?? 0;
-    const atcRate =
-      totalVideoViews > 0
-        ? totalAddToCart / totalVideoViews
-        : totalImpressions > 0
-          ? totalAddToCart / totalImpressions
-          : 0;
-
-    return {
-      analytics: {
-        totalOrderCount: totalOrders,
-        totalRevenue,
-        atcRate,
-        totalImpressions,
-        totalVideoViews,
-        totalAddToCart,
-        widgetImpressions: widgetAgg.widgetImpressions ?? 0,
-        widgetAddToCart: widgetAgg.widgetAddToCart ?? 0,
-        widgetOrders: widgetAgg.widgetOrders ?? 0,
-        widgetRevenue: widgetAgg.widgetRevenue ?? 0,
-        videoImpressions: videoAgg.videoImpressions ?? 0,
-        videoViews: videoAgg.videoViews ?? 0,
-        videoAddToCart: videoAgg.videoAddToCart ?? 0,
-        videoOrders: videoAgg.videoOrders ?? 0,
-        videoRevenue: videoAgg.videoRevenue ?? 0,
-      },
-      dateRange: { start: start.toISOString(), end: end.toISOString() },
-      chartData: mergeDailyChartData(dailyFeed, dailyVideo),
-      orders: ordersPage.orders,
-      ordersNextCursor: ordersPage.nextCursor,
-    };
-  } catch (error) {
-    console.error("Error in loader:", error);
-    throw new Error("Failed to load analytics data");
-  }
-};
-
-function mergeDailyChartData(dailyFeed, dailyVideo) {
-  const byDate = new Map();
-  for (const row of dailyFeed ?? []) {
-    byDate.set(row.date, {
-      date: row.date,
-      videoViews: 0,
-      orders: row.widgetOrders ?? 0,
-      impressions: row.widgetImpressions ?? 0,
-      addToCart: row.widgetAddToCart ?? 0,
-    });
-  }
-  for (const row of dailyVideo ?? []) {
-    const cur = byDate.get(row.date) ?? {
-      date: row.date,
-      videoViews: 0,
-      orders: 0,
-      impressions: 0,
-      addToCart: 0,
-    };
-    cur.videoViews += row.videoViews ?? 0;
-    cur.orders = (cur.orders ?? 0) + (row.videoOrders ?? 0);
-    cur.impressions += row.videoImpressions ?? 0;
-    cur.addToCart += row.videoAddToCart ?? 0;
-    byDate.set(row.date, cur);
-  }
-  return Array.from(byDate.values()).sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
-}
-
-function formatRevenue(value) {
-  if (value == null || Number.isNaN(value)) return "0";
-  const num = Number(value);
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}k`;
-  return num.toFixed(2);
-}
-
-const defaultOnboardingItems = [
-  {
-    id: "check-app-extension-status",
-    title: "Check app embedded status",
-    description: "Check if the app is embedded in the store.",
-    complete: false,
-    primaryButton: {
-      content: "Check status",
-      props: { onClick: () => { } },
-    },
-  },
-  {
-    id: "add-videos",
-    title: "Add videos to your products",
-    description:
-      "Connect product videos so customers can watch before they buy.",
-    complete: false,
-    primaryButton: {
-      content: "Add videos",
-      props: { url: "/products" },
-    },
-  },
-  {
-    id: "review-analytics",
-    title: "Review your analytics",
-    description:
-      "Check video performance and conversion stats in the dashboard.",
-    complete: false,
-    primaryButton: {
-      content: "View analytics",
-      props: { onClick: () => { } },
-    },
-  },
-];
-
-export default function Index() {
-  const loaderData = useLoaderData?.() ?? {};
-  const { analytics = {}, dateRange } = loaderData;
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  useEffect(() => {
-    onCLS(console.log);
-    onINP(console.log);
-    onLCP(console.log);
-  }, []);
-
-  const date = useMemo(() => {
-    if (dateRange?.start && dateRange?.end) {
-      return { start: new Date(dateRange.start), end: new Date(dateRange.end) };
+    try {
+        const { session } = await authenticate.admin(request);
+        // const feeds = await getFeedsByShop(session.shop);
+        const feeds = [];
+        return { feeds };
+    } catch (error) {
+        console.error("Error fetching feeds:", error);
+        return { feeds: [] };
     }
-    return { start: null, end: null };
-  }, [dateRange?.start, dateRange?.end]);
-
-  const [onboardingItems, setOnboardingItems] = useState(
-    defaultOnboardingItems,
-  );
-  const [showOnboarding, setShowOnboarding] = useState(true);
-
-  const handleOnboardingStepComplete = (id) => {
-    setOnboardingItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, complete: true } : item)),
-    );
-  };
-
-  const handleDateRangeSelect = ({ start, end }) => {
-    const params = new URLSearchParams(searchParams);
-    params.set("start", start.toISOString().slice(0, 10));
-    params.set("end", end.toISOString().slice(0, 10));
-    setSearchParams(params);
-  };
-
-  const atcPercent =
-    analytics.atcRate != null ? (analytics.atcRate * 100).toFixed(1) : "0";
-
-  const conversionStats = [
-    { title: "Orders", count: analytics.totalOrderCount ?? 0, icon: OrderIcon },
-    {
-      title: "Revenue",
-      count: formatRevenue(analytics.totalRevenue),
-      icon: CashDollarIcon,
-    },
-    { title: "ATC rate", count: `${atcPercent}%`, icon: CartSaleIcon },
-    {
-      title: "Impressions",
-      count: analytics.totalImpressions ?? 0,
-      icon: MegaphoneIcon,
-    },
-    {
-      title: "Video views",
-      count: analytics.totalVideoViews ?? 0,
-      icon: ViewIcon,
-    },
-    {
-      title: "Add to cart",
-      count: analytics.totalAddToCart ?? 0,
-      icon: CartDownIcon,
-    },
-  ];
-
-  const orders = loaderData.orders ?? [];
-  const ordersNextCursor = loaderData.ordersNextCursor ?? null;
-
-  const handleOrdersNext = () => {
-    if (!ordersNextCursor) return;
-    const params = new URLSearchParams(searchParams);
-    params.set("ordersCursor", ordersNextCursor);
-    setSearchParams(params);
-  };
-
-  const orderTableEmptyState = (
-    <EmptyState heading="No orders found" image="/order-table.svg">
-      <p>
-        Orders attributed to video cart will appear here for the selected date
-        range.
-      </p>
-    </EmptyState>
-  );
-
-  const orderRowMarkup = orders.map((order, index) => (
-    <IndexTable.Row id={order.id} key={order.id} position={index}>
-      <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span">
-          {order.orderNumber ?? order.orderId ?? "—"}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text variant="bodyMd" tone="subdued">
-          {order.createdAt
-            ? new Date(order.createdAt).toLocaleDateString()
-            : "—"}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text as="span" numeric>
-          {typeof order.totalRevenue === "number"
-            ? `$${Number(order.totalRevenue).toFixed(2)}`
-            : "—"}
-        </Text>
-      </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text as="span" numeric>
-          {Array.isArray(order.items) ? order.items.length : 0}
-        </Text>
-      </IndexTable.Cell>
-      {/* <IndexTable.Cell>
-        <Text variant="bodyMd" tone="subdued">
-          {order.currency ?? "—"}
-        </Text>
-      </IndexTable.Cell> */}
-    </IndexTable.Row>
-  ));
-
-  return (
-    <Page>
-      <BlockStack gap={400}>
-        {/* {showOnboarding && (
-          <OnboardingSetup
-            items={onboardingItems}
-            onDismiss={() => setShowOnboarding(false)}
-            onStepComplete={handleOnboardingStepComplete}
-          />
-        )} */}
-        <InlineStack align="end" blockAlign="center" gap="200">
-          <DateRangePicker
-            value={date}
-            onDateRangeSelect={handleDateRangeSelect}
-          />
-        </InlineStack>
-        <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap={300}>
-          {conversionStats.map((stat, index) => (
-            <Card key={index}>
-              <InlineStack gap="300">
-                <BlockStack gap="200">
-                  <InlineStack align="space-between" gap="200">
-                    <Text as="h2" variant="bodyLg">
-                      {stat.title}
-                    </Text>
-                    <BlockStack align="end" blockAlign="center" gap="200">
-                      {stat.icon && <Icon source={stat.icon} />}
-                    </BlockStack>
-                  </InlineStack>
-                  <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    {stat.count}
-                  </Text>
-                </BlockStack>
-              </InlineStack>
-            </Card>
-          ))}
-        </InlineGrid>
-        <InlineGrid columns={2} gap={300}>
-          <Chart
-            chartData={loaderData.chartData}
-            title="Video Views & Conversions"
-            series="views"
-          />
-          <Chart
-            chartData={loaderData.chartData}
-            title="Impressions & Add to Cart"
-            series="impressions"
-          />
-        </InlineGrid>
-
-        <BlockStack gap="300">
-          <InlineStack gap="200">
-            <Badge>
-          <Text as="h2" variant="headingMd" fontWeight="semibold">
-            Orders Generated
-          </Text>
-        </Badge>
-          </InlineStack>
-
-          <Card padding="0">
-            <IndexTable
-              resourceName={{ singular: "order", plural: "orders" }}
-              itemCount={orders.length}
-              emptyState={orderTableEmptyState}
-              headings={[
-                { title: "Order" },
-                { title: "Date" },
-                { title: "Revenue" },
-                { title: "Items" },
-                // { title: "Currency" },
-              ]}
-              selectable={false}
-              pagination={
-                ordersNextCursor
-                  ? {
-                    hasNext: true,
-                    onNext: handleOrdersNext,
-                  }
-                  : undefined
-              }
-            >
-              {orderRowMarkup}
-            </IndexTable>
-          </Card>
-        </BlockStack>
-
-        <BlockStack gap="300">
-          <Card>
-            <BlockStack gap="200">
-              <Text as="h2" variant="headingMd" fontWeight="semibold">
-                Get Help{" "}
-              </Text>
-              <InlineGrid gap="300" columns={2}>
-                <Box
-                  padding="300"
-                  background="bg-surface-secondary"
-                  borderRadius="200"
-                >
-                  <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                      Live chat
-                    </Text>
-                    <InlineStack
-                      gap="200"
-                      align="space-between"
-                      blockAlign="top"
-                    >
-                      <Text as="p" variant="bodyMd">
-                        Need help? Contact us at
-                      </Text>
-                      <Button icon={ChatIcon} size="slim">
-                        <Text as="p" variant="bodyMd">
-                          Chat with us
-                        </Text>
-                      </Button>
-                    </InlineStack>
-                  </BlockStack>
-                </Box>
-                <Box
-                  padding="300"
-                  background="bg-surface-secondary"
-                  borderRadius="200"
-                >
-                  <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                      Email Support
-                    </Text>
-                    <InlineStack
-                      gap="200"
-                      align="space-between"
-                      blockAlign="top"
-                    >
-                      <Text as="p" variant="bodyMd">
-                        Need help? Contact us at
-                      </Text>
-                      <Button icon={EmailIcon} size="slim">
-                        <Text as="p" variant="bodyMd">
-                          Email us
-                        </Text>
-                      </Button>
-                    </InlineStack>
-                  </BlockStack>
-                </Box>
-              </InlineGrid>
-            </BlockStack>
-          </Card>
-        </BlockStack>
-      </BlockStack>
-    </Page>
-  );
-}
-
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
 };
+
+export default function IndexPage() {
+    const { feeds } = useLoaderData();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        onCLS(console.log);
+        onINP(console.log);
+        onLCP(console.log);
+    }, []);
+
+    const widgetTypes = [
+        {
+            id: 1,
+            name: 'Carousel',
+            description: 'Show your videos in a scrollable carousel. Add the template to your store and customize its layout, products, and style in the theme editor.',
+            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+            icon: SlideshowIcon,
+            onAction: () => {
+                navigate('/app/feeds/new?widgetType=carousel');
+            }
+        },
+        {
+            id: 2,
+            name: 'Stories',
+            description: 'Create story-style videos similar to social media. Add the template and let customers explore products through interactive stories.',
+            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+            icon: StatusIcon,
+            onAction: () => {
+                navigate('/app/feeds/new?widgetType=stories');
+            }
+        },
+        {
+            id: 3,
+            name: 'Floating',
+            description: 'Add a floating video widget that appears while customers browse. Great for promotions, demos, and quick product discovery.',
+            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+            icon: LayoutPopupIcon,
+            onAction: () => {
+                navigate('/app/feeds/new?widgetType=floating');
+            }
+        },
+        {
+            id: 4,
+            name: 'Grid',
+            description: 'Display videos in a clean grid layout. Insert the template and create a visual video gallery anywhere on your store.',
+            image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+            icon: LayoutColumns3Icon,
+            onAction: () => {
+                navigate('/app/feeds/new?widgetType=grid');
+            }
+        },
+    ];
+
+
+
+    console.log(feeds);
+
+    return (
+        <Page
+            title="Video Cart"
+            subtitle="Video Cart is a tool that helps you manage your video cart."
+            titleMetadata={<Badge tone="info">1.0.0</Badge>}
+            compactTitle
+            primaryAction={<Button variant="tertiary" icon={NotificationIcon} size="slim">What's new</Button>}
+        >
+            <BlockStack gap="400">
+
+                <MediaCard
+                    title="Create your first shoppable video"
+                    size="small"
+                    description={`Upload a video and tag products to turn your content into an interactive shopping experience. Customers can watch, explore, and buy — all in one place.`}
+                >
+                    <VideoThumbnail
+                        videoLength={80}
+                        thumbnailUrl="https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850"
+                        onClick={() => console.log('clicked')}
+                    />
+                </MediaCard>
+
+                <Card>
+                    <BlockStack gap="300">
+                        <InlineStack align="start" blockAlign="center" gap="400" wrap={false}>
+                            <BlockStack gap="100">
+                                <Text as="p" variant="bodyMd" fontWeight="semibold">Plan</Text>
+                                <Badge tone="info">Free</Badge>
+                            </BlockStack>
+                            <div style={{ width: '1px', height: 'stretch', backgroundColor: '#e3e3e3' }} />
+                            <Box width="100%" >
+                                <InlineStack align="start" blockAlign="center" gap="200" wrap={false}>
+                                    <Box width="100%">
+                                        <ProgressBar progress={80} size="small" tone="critical" />
+                                    </Box>
+                                    <Text as="p" variant="bodyMd">Limit</Text>
+                                </InlineStack>
+                                <div style={{ paddingTop: '8px' }} />
+                                <Button size="slim">View Billing</Button>
+                            </Box>
+                        </InlineStack>
+                    </BlockStack>
+                </Card>
+
+                <Card>
+                    <BlockStack gap="400">
+                        <BlockStack gap="100">
+                            <Text as="h2" variant="headingMd">Widget Types</Text>
+                            <Text as="p" variant="bodyMd" tone="subdued">Choose the type of widget you want to use to display your video cart.</Text>
+                        </BlockStack>
+                        <InlineGrid columns={2} gap="200">
+
+
+                            {widgetTypes.map((widgetType) => (
+                                <Box
+                                key={widgetType.id}
+                                background="bg-surface-secondary"
+                                borderRadius="200"
+                                borderWidth="0165"
+                                borderColor="border"
+                                overflow="hidden"
+                            >
+                                <Box position="relative" >
+                                    <Box
+                                        background="bg-fill-secondary"
+                                        borderRadius="100"
+                                        minHeight="120px"
+                                        position="relative"
+                                    >
+                                        <BlockStack gap="100">
+
+                                            <Box  borderStartStartRadius="200" borderEndStartRadius="200" >
+                                                <InlineStack gap="100" wrap={false} blockAlign="center">
+                                                    {/* {[
+
+                                                        'https://docs.aspose.com/svg/images/drawing/viewport2_1.png',
+                                                    ].map((src, i) => ( */}
+                                                            <Box
+                                                            minWidth="48px"
+                                                            minHeight="64px"
+                                                            borderRadius="100"
+                                                            overflow="hidden"
+                                                            background="bg-fill-tertiary"
+                                                        >
+                                                            <img
+                                                                alt=""
+                                                                src={widgetType.image}
+                                                                style={{
+                                                                    objectFit: 'cover',
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    display: 'block',
+                                                                    borderTopLeftRadius:'10px',
+                                                                    borderTopRightRadius:'10px',
+                                                                }}
+                                                            />
+                                                        </Box>
+                                                    {/* ))} */}
+                                                </InlineStack>
+                                            </Box>
+                                        </BlockStack>
+                                        
+                                    </Box>
+                                </Box>
+
+                                {/* Content area */}
+                                <Box padding="300">
+                                    <BlockStack gap="200">
+                                        <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
+                                            <InlineStack gap="100" blockAlign="center">
+                                                <Icon source={widgetType.icon} tone="subdued" />
+                                                <Text as="h2" variant="headingMd" fontWeight="bold">
+                                                   {widgetType.name}
+                                                </Text>
+                                            </InlineStack>
+                                            {/* <Badge tone="subdued">Inactive</Badge> */}
+                                        </InlineStack>
+                                        <Text as="p" variant="bodyMd" tone="subdued">
+                                                {widgetType.description}
+                                        </Text>
+                                        <InlineStack align="end" blockAlign="end">
+                                            <Button size="slim" onClick={widgetType.onAction}>
+                                                Create
+                                            </Button>
+                                        </InlineStack>
+                                    </BlockStack>
+                                </Box>
+                            </Box>
+                            ))}
+
+                            
+                        </InlineGrid>
+                    </BlockStack>
+                </Card>
+
+                <Card >
+                    <BlockStack gap="200">
+                        <InlineStack gap="200">
+                            <Text as="h2" variant="headingMd">Need help ?</Text>
+                            <Badge tone="info">Free Setup Assistance</Badge>
+                        </InlineStack>
+                        <Text as="p" variant="bodyMd">Our team is here to help you get started with Video Cart. We offer free setup assistance to help you get the most out of our platform.</Text>
+
+
+                        <InlineGrid columns={3}>
+                            <Box padding="300" background="bg-surface-secondary" borderEndStartRadius="200" borderStartStartRadius="200" borderWidth="0165" borderColor="border">
+                                <BlockStack gap="200">
+                                    <InlineStack align="start" blockAlign="start" gap="200">
+                                        <BlockStack gap="100">
+                                            <Icon source={ChatIcon} />
+                                        </BlockStack>
+                                        <Text as="p" variant="bodyMd" fontWeight="semibold">Live Chat</Text>
+                                    </InlineStack>
+                                    <Text as="p" variant="bodyMd">24/7 live chat support to help you instantly whenever you need assistance.</Text>
+                                    <InlineStack>
+                                        <Button variant="primary" size="slim">Chat with us</Button>
+                                    </InlineStack>
+                                </BlockStack>
+                            </Box>
+                            <Box padding="300" background="bg-surface-secondary" borderWidth="0165" borderColor="border">
+                                <BlockStack gap="200">
+                                    <InlineStack align="start" blockAlign="start" gap="200">
+                                        <BlockStack gap="100">
+                                            <Icon source={PlayCircleIcon} />
+                                        </BlockStack>
+                                        <Text as="p" variant="bodyMd" fontWeight="semibold">Video Tutorials</Text>
+                                    </InlineStack>
+                                    <Text as="p" variant="bodyMd">Learn quickly with short, easy-to-follow video tutorials.</Text>
+                                    <InlineStack>
+                                        <Button size="slim">Watch tutorials</Button>
+                                    </InlineStack>
+                                </BlockStack>
+                            </Box>
+                            <Box padding="300" background="bg-surface-secondary" borderWidth="0165" borderColor="border" borderEndEndRadius="200" borderStartEndRadius="200">
+                                <BlockStack gap="200">
+                                    <InlineStack align="start" blockAlign="start" gap="200">
+                                        <BlockStack gap="100">
+                                            <Icon source={QuestionCircleIcon} />
+                                        </BlockStack>
+                                        <Text as="p" variant="bodyMd" fontWeight="semibold">Help Center</Text>
+                                    </InlineStack>
+                                    <Text as="p" variant="bodyMd">Find answers fast with our detailed guides and documentation.</Text>
+                                    <InlineStack>
+                                        <Button size="slim">Read documentation</Button>
+                                    </InlineStack>
+                                </BlockStack>
+                            </Box>
+
+                        </InlineGrid>
+                    </BlockStack>
+
+                </Card>
+
+            </BlockStack>
+
+        </Page>
+    );
+}

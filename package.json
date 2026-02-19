@@ -69,7 +69,9 @@
     "remix-flat-routes": "^0.8.5",
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "^5.9.3",
-    "vite": "^6.3.6"
+    "vite": "^6.3.6",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-purgecss": "^0.2.13"
   },
   "workspaces": [
     "extensions/*"
