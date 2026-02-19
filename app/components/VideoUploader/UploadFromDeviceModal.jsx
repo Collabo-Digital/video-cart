@@ -1,6 +1,5 @@
 /* eslint-disable react/prop-types */
 import {
-  Modal,
   DropZone,
   Banner,
   ProgressBar,
@@ -11,22 +10,38 @@ import {
   Button,
 } from "@shopify/polaris";
 import { DeleteIcon } from "@shopify/polaris-icons";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useVideoUpload } from "../../lib/hooks/useVideoUpload";
 import { VIDEO_CONFIG } from "../../lib/constants/video";
 
+const MODAL_ID = "upload-from-device-modal";
+
 export default function UploadFromDeviceModal({ open, onClose, onUploaded }) {
+  const modalRef = useRef(null);
   const [file, setFile] = useState(null);
   const [uploadComplete, setUploadComplete] = useState(false);
   const { uploadProgress, isUploading, error, setError, uploadVideo } = useVideoUpload();
 
   useEffect(() => {
-    if (!open) {
+    const el = modalRef.current;
+    if (!el) return;
+    if (open) {
+      el.showOverlay?.();
       setFile(null);
       setUploadComplete(false);
       setError(null);
+    } else {
+      el.hideOverlay?.();
     }
   }, [open, setError]);
+
+  useEffect(() => {
+    const el = modalRef.current;
+    if (!el) return;
+    const handleAfterHide = () => onClose?.();
+    el.addEventListener("afterhide", handleAfterHide);
+    return () => el.removeEventListener("afterhide", handleAfterHide);
+  }, [onClose]);
 
   const handleDropZoneDrop = useCallback(
     (_dropFiles, acceptedFiles) => {
@@ -67,6 +82,7 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded }) {
         setUploadComplete(true);
         setTimeout(() => {
           handleRemoveFile();
+          modalRef.current?.hideOverlay?.();
           onClose?.();
         }, VIDEO_CONFIG.RESET_DELAY_MS);
       });
@@ -114,60 +130,71 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded }) {
     </BlockStack>
   );
 
+  const isUploadDisabled = !file || isUploading;
+
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Upload from device"
-      primaryAction={{
-        content: "Start upload",
-        onAction: handleUpload,
-        loading: isUploading,
-        disabled: !file || isUploading,
-      }}
-      secondaryActions={[{ content: "Cancel", onAction: onClose, disabled: isUploading }]}
-      large
+    <s-modal
+      ref={modalRef}
+      id={MODAL_ID}
+      heading="Upload from device"
+      size="large"
     >
-      <Modal.Section>
-        <BlockStack gap="400">
-          <Banner tone="info">
-            <Text variant="bodySm">
-              Drag & drop a video here or click to browse. Max 500MB per file.
-            </Text>
+      <BlockStack gap="400">
+        <Banner tone="info">
+          <Text variant="bodySm">
+            Drag & drop a video here or click to browse. Max 500MB per file.
+          </Text>
+        </Banner>
+
+        {error && (
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
           </Banner>
+        )}
 
-          {error && (
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          )}
+        {uploadComplete && (
+          <Banner tone="success">
+            <Text>Upload complete! Video is ready.</Text>
+          </Banner>
+        )}
 
-          {uploadComplete && (
-            <Banner tone="success">
-              <Text>Upload complete! Video is ready.</Text>
-            </Banner>
-          )}
+        {uploadedFilePreview}
 
-          {uploadedFilePreview}
+        <DropZone
+          onDrop={handleDropZoneDrop}
+          accept="video/*"
+          disabled={isUploading || uploadComplete}
+        >
+          {fileUploadContent}
+        </DropZone>
 
-          <DropZone
-            onDrop={handleDropZoneDrop}
-            accept="video/*"
-            disabled={isUploading || uploadComplete}
-          >
-            {fileUploadContent}
-          </DropZone>
+        {isUploading && (
+          <BlockStack gap="200">
+            <ProgressBar progress={uploadProgress} size="small" />
+            <Text variant="bodySm" tone="subdued">
+              {uploadProgress}% uploaded
+            </Text>
+          </BlockStack>
+        )}
+      </BlockStack>
 
-          {isUploading && (
-            <BlockStack gap="200">
-              <ProgressBar progress={uploadProgress} size="small" />
-              <Text variant="bodySm" tone="subdued">
-                {uploadProgress}% uploaded
-              </Text>
-            </BlockStack>
-          )}
-        </BlockStack>
-      </Modal.Section>
-    </Modal>
+      <s-button
+        slot="primary-action"
+        variant="primary"
+        disabled={isUploadDisabled}
+        onClick={handleUpload}
+      >
+        {isUploading ? "Uploading…" : "Start upload"}
+      </s-button>
+      <s-button
+        slot="secondary-actions"
+        variant="secondary"
+        commandFor={MODAL_ID}
+        command="--hide"
+        disabled={isUploading}
+      >
+        Cancel
+      </s-button>
+    </s-modal>
   );
 }
