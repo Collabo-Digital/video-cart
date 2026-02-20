@@ -23,8 +23,14 @@ function jsonResponse(data, status = 200) {
 }
 
 export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
   try {
-    await authenticate.admin(request);
+    if (!session) {
+      return jsonResponse(
+        { success: false, error: 'Unauthorized' },
+        401
+      );
+    }
   } catch (err) {
     return jsonResponse(
       { success: false, error: 'Unauthorized' },
@@ -44,6 +50,7 @@ export const loader = async ({ request }) => {
     page,
     perPage,
     search,
+    shopDomain: session.shop,
   });
 
   const totalPages = Math.max(1, Math.ceil(total / perPage));

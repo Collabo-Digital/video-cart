@@ -17,7 +17,7 @@ function jsonResponse(body, status = 200) {
 }
 
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405);
@@ -41,7 +41,7 @@ export const action = async ({ request }) => {
       );
     }
 
-    const data = await importSocialVideo({ source: normalizedSource, url: url.trim() });
+    const data = await importSocialVideo({ source: normalizedSource, url: url.trim(), shopDomain: session.shop });
     return jsonResponse({ success: true, data });
   } catch (error) {
     console.error('Import social error:', error);

@@ -60,18 +60,6 @@ export default function IndexPage() {
         >
             <BlockStack gap="400">
 
-                <MediaCard
-                    title="Create your first shoppable video"
-                    size="small"
-                    description={`Upload a video and tag products to turn your content into an interactive shopping experience. Customers can watch, explore, and buy — all in one place.`}
-                >
-                    <VideoThumbnail
-                        videoLength={80}
-                        thumbnailUrl="https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850"
-                        onClick={() => modalRef.current?.showOverlay?.()}
-                    />
-                </MediaCard>
-
                 <Card>
                     <BlockStack gap="300">
                         <InlineStack align="start" blockAlign="center" gap="400" wrap={false}>
@@ -93,6 +81,20 @@ export default function IndexPage() {
                         </InlineStack>
                     </BlockStack>
                 </Card>
+
+                <MediaCard
+                    title="Create your first shoppable video"
+                    size="small"
+                    description={`Upload a video and tag products to turn your content into an interactive shopping experience. Customers can watch, explore, and buy — all in one place.`}
+                >
+                    <VideoThumbnail
+                        videoLength={80}
+                        thumbnailUrl="https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850"
+                        onClick={() => modalRef.current?.showOverlay?.()}
+                    />
+                </MediaCard>
+
+                
 
                 <Card>
                     <BlockStack gap="400">
