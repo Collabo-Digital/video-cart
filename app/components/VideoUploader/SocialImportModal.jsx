@@ -10,6 +10,7 @@ import {
   Checkbox,
   Thumbnail,
   Spinner,
+  Tabs,
 } from "@shopify/polaris";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SOCIAL_SOURCE } from "../../lib/constants/video";
@@ -36,6 +37,18 @@ export default function SocialImportModal({ source, open, onClose, onImported })
   const [importing, setImporting] = useState(false);
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(() => new Set());
+
+  // const [selectedTab, setSelectedTab] = useState(0);
+  // const TABS = [
+  //   {
+  //     id: "instagram-userId",
+  //     label: "User ID",
+  //   },
+  //   {
+  //     id: "instagram-url",
+  //     label: "URL",
+  //   },
+  // ]
 
   useEffect(() => {
     const el = modalRef.current;
@@ -117,11 +130,13 @@ export default function SocialImportModal({ source, open, onClose, onImported })
       size="large"
     >
       <BlockStack gap="400">
+        {/* <Tabs tabs={TABS} selected={selectedTab} onSelect={setSelectedTab} /> */}
         <Banner tone="info">
           <Text variant="bodySm">
             Paste {sourceLabel} video/post URLs. Private content cannot be imported.
           </Text>
         </Banner>
+
 
         {error && (
           <Banner tone="critical" onDismiss={() => setError(null)}>

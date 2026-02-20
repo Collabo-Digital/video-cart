@@ -16,11 +16,11 @@ import * as VideoModel from '../../models/video.server';
  * @param {string} name - Raw file name
  * @returns {string} Sanitized name
  */
-function sanitizeFileName(name) {
+function sanitizeFileName(name, shopDomain) {
   if (typeof name !== 'string' || !name.trim()) return 'Untitled Video';
   const trimmed = name.trim();
   const maxLen = 255;
-  return trimmed.length > maxLen ? trimmed.slice(0, maxLen) : trimmed;
+  return trimmed.length > maxLen ? trimmed.slice(0, maxLen) : `${trimmed}-${shopDomain}`;
 }
 
 /**
@@ -29,13 +29,19 @@ function sanitizeFileName(name) {
  * the same record with playbackId, duration, status READY.
  * Uses options.fileName for initial title, fileName, and fileUploadName (all same at creation).
  * @param {Object} options - Upload options
+ * @param {string} options.shopDomain - Shop domain (required for Video->Shop relation)
  * @param {string} [options.fileName] - Original file name (used for title, fileName, fileUploadName; required for duplicate check)
  * @returns {Promise<Object>} Upload URL and ID
  * @throws {Error} If fileUploadName already exists (duplicate)
  */
 export async function createUploadUrl(options = {}) {
+  const { shopDomain } = options;
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required for video upload');
+  }
+
   const rawName = options.fileName;
-  const fileUploadName = sanitizeFileName(rawName || 'Untitled Video');
+  const fileUploadName = sanitizeFileName(rawName || 'Untitled Video', shopDomain);
 
   const existing = await VideoModel.findByFileUploadName(fileUploadName);
   if (existing) {
@@ -45,10 +51,12 @@ export async function createUploadUrl(options = {}) {
     throw err;
   }
 
+  const passthrough = JSON.stringify({ shopDomain });
   const upload = await mux.video.uploads.create({
     new_asset_settings: {
       playback_policy: ['public'],
       video_quality: options.quality || 'basic',
+      passthrough,
     },
     cors_origin: options.corsOrigin || '*',
     test: process.env.NODE_ENV !== 'production',
@@ -63,6 +71,7 @@ export async function createUploadUrl(options = {}) {
     videoUploadId: upload.id,
     videoAssetId: videoAssetIdPlaceholder,
     status: 'PROCESSING',
+    shop: { connect: { shopDomain } },
   });
 
   return {
@@ -92,13 +101,19 @@ export async function getUploadStatus(uploadId) {
 /**
  * Create Mux asset from a public video URL (server-side import).
  * @param {string} videoUrl - Publicly accessible URL to a video file
+ * @param {Object} [opts] - Options
+ * @param {string} [opts.shopDomain] - Shop domain (stored in asset passthrough for webhook)
  * @returns {Promise<{assetId: string, status: string, playbackId: (string|null)}>}
  */
-export async function createAssetFromUrl(videoUrl) {
-  const asset = await mux.video.assets.create({
+export async function createAssetFromUrl(videoUrl, opts = {}) {
+  const createOpts = {
     inputs: [{ url: videoUrl }],
     playback_policies: ['public'],
-  });
+  };
+  if (opts.shopDomain) {
+    createOpts.passthrough = JSON.stringify({ shopDomain: opts.shopDomain });
+  }
+  const asset = await mux.video.assets.create(createOpts);
 
   return {
     assetId: asset.id,
@@ -119,9 +134,12 @@ export async function createAssetFromUrl(videoUrl) {
  * @returns {Promise<Object>} Created or updated video record
  * @throws {Error} If fileUploadName already exists (duplicate)
  */
-export async function createVideoForImportedAsset({ assetId, playbackId, title, fileName, fileUploadName }) {
+export async function createVideoForImportedAsset({ assetId, playbackId, title, fileName, fileUploadName, shopDomain }) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required');
+  }
   const name = fileUploadName || fileName || title || 'Imported Video';
-  const uploadName = (fileUploadName || fileName || title || '').trim();
+  const uploadName = sanitizeFileName(fileUploadName || fileName || title || 'Imported Video', shopDomain);
   if (uploadName) {
     const duplicate = await VideoModel.findByFileUploadName(uploadName);
     if (duplicate) {
@@ -159,5 +177,6 @@ export async function createVideoForImportedAsset({ assetId, playbackId, title, 
     videoUploadId,
     videoAssetId: assetId,
     ...createPayload,
+    shop: { connect: { shopDomain } },
   });
 }

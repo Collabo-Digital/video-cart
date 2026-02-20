@@ -178,20 +178,23 @@ export async function count(filters = {}) {
  * @returns {Promise<{ videos: Array, total: number }>}
  */
 export async function findAllPaginatedWithWidgets(options = {}) {
-  const { search = '', page = 1, perPage = 20 } = options;
+  const { search = '', page = 1, perPage = 20, shopDomain } = options;
   const offset = (Math.max(1, page) - 1) * perPage;
   const take = Math.min(100, Math.max(1, perPage));
 
   const searchTrim = typeof search === 'string' ? search.trim() : '';
-  const where = searchTrim
-    ? {
-      OR: [
-        { title: { contains: searchTrim } },
-        { fileName: { contains: searchTrim } },
-        { fileUploadName: { contains: searchTrim } },
-      ],
-    }
-    : undefined;
+  const where = {
+    ...(shopDomain ? { shopDomain } : {}),
+    ...(searchTrim
+      ? {
+        OR: [
+          { title: { contains: searchTrim } },
+          { fileName: { contains: searchTrim } },
+          { fileUploadName: { contains: searchTrim } },
+        ],
+      }
+      : {}),
+  };
 
   const [rows, total] = await Promise.all([
     prisma.video.findMany({
