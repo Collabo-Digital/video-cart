@@ -28,7 +28,12 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 const PER_PAGE = 10;
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
+  try {
+    const { session } = await authenticate.admin(request);
+    if (!session) {
+      return { videos: [], total: 0, page: 1, perPage: PER_PAGE };
+    }
+    const shop = session.shop;
   const url = new URL(request.url);
   const search = url.searchParams.get("search") ?? "";
   const page = Math.max(1, parseInt(url.searchParams.get("page") ?? "1", 10));
@@ -36,8 +41,13 @@ export const loader = async ({ request }) => {
     search,
     page,
     perPage: PER_PAGE,
+    shopDomain: shop,
   });
   return { videos, total, page, perPage: PER_PAGE };
+  } catch (error) {
+    console.error("Error fetching videos:", error);
+    return { videos: [], total: 0, page: 1, perPage: PER_PAGE };
+  }
 };
 
 export const action = async ({ request }) => {
