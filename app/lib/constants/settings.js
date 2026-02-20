@@ -5,6 +5,7 @@
 const DEFAULT_SETTINGS = {
     general: {
         addToCartButtonBehavior: "addToCart",
+
         // future: showPrice: true, maxProducts: 4, ...
     },
     design: {
@@ -32,6 +33,7 @@ export function getFeedFormDefaultValues(feed) {
         feedName: feed?.feedName ?? getDefaultFeedName(),
         widgetType: feed?.widgetType ?? "carousel",
         isEnabled: feed?.isEnabled ?? true,
+        widgetPage: feed?.widgetPage ?? "homePage",
         settings: {
             general: { ...DEFAULT_SETTINGS.general, ...feed?.settings?.general },
             design: { ...DEFAULT_SETTINGS.design, ...feed?.settings?.design },

@@ -11,11 +11,19 @@ import {
 const WIDGET_TYPE_OPTIONS = [
     { label: "Carousel", value: "carousel" },
     { label: "Grid", value: "grid" },
+    { label: "Stories", value: "stories" },
+    { label: "Floating", value: "floating" },
 ];
 
 const ADD_TO_CART_BUTTON_BEHAVIOR_OPTIONS = [
     { label: "Add to cart", value: "addToCart" },
     { label: "Open product page", value: "openProductPage" },
+];
+
+const WIDGET_DISPLAY_PAGE_OPTIONS = [
+    { label: "Homepage", value: "homePage" },
+    { label: "Product page", value: "productPage" },
+    { label: "Collection page", value: "collectionPage" },
 ];
 
 /**
@@ -69,6 +77,18 @@ export function GeneralSettings({ control, errors = {} }) {
                     )}
                 />
                 <Controller
+                    name="widgetPage"
+                    control={control}
+                    render={({ field }) => (
+                        <Select
+                            label="Widget display page"
+                            options={WIDGET_DISPLAY_PAGE_OPTIONS}
+                            value={field.value}
+                            onChange={field.onChange}
+                        />
+                    )}
+                />
+                {/* <Controller
                     name="isEnabled"
                     control={control}
                     render={({ field }) => (
@@ -82,7 +102,7 @@ export function GeneralSettings({ control, errors = {} }) {
                             onChange={(value) => field.onChange(value[0] === "true")}
                         />
                     )}
-                />
+                /> */}
             </InlineGrid>
         </Box>
     );

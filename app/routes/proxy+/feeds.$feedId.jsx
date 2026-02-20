@@ -88,6 +88,7 @@ export const loader = async ({ request, params }) => {
         id: feed.id,
         feedName: feed.feedName,
         widgetType: feed.widgetType || 'carousel',
+        widgetPage: feed.widgetPage,
         isEnabled: feed.isEnabled,
         videos: feed.videos,
         settings: {

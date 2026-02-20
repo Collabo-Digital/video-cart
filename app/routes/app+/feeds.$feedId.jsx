@@ -52,11 +52,14 @@ export const action = async ({ params, request }) => {
     const parsedVideos = JSON.parse(data.videos || "[]");
     const parsedSettings = data.settings ? JSON.parse(data.settings) : undefined;
 
+    console.log("data ----->", data);
+
     if (params.feedId === "new") {
       const feed = await createFeed({
         feedName: data.feedName,
         shopDomain: session.shop,
         widgetType: data.widgetType,
+        widgetPage: data.widgetPage,
         isEnabled: data.isEnabled === "true",
         settings: parsedSettings,
         videos: parsedVideos,
@@ -68,6 +71,7 @@ export const action = async ({ params, request }) => {
     await updateFeed(params.feedId, {
       feedName: data.feedName,
       widgetType: data.widgetType,
+      widgetPage: data.widgetPage,
       isEnabled: data.isEnabled === "true",
       settings: parsedSettings,
       videos: parsedVideos,
@@ -250,6 +254,7 @@ export default function FeedEditorPage() {
         feedName: values.feedName,
         widgetType: values.widgetType,
         isEnabled: values.isEnabled,
+        widgetPage: values.widgetPage,
         settings: JSON.stringify(settingsPayload),
         videos: JSON.stringify(videosPayload),
       },

@@ -118,6 +118,7 @@ export const loader = async ({ params, request }) => {
       id: feed.id,
       feedName: feed.feedName,
       widgetType: feed.widgetType,
+      widgetPage: feed.widgetPage,
       settings: {
         autoplay: feed.autoplay,
         showControls: feed.showControls,
