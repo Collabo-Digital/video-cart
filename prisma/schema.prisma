@@ -57,6 +57,8 @@ model Shop {
   isActive      Boolean   @default(true)
   installedAt   DateTime  @default(now())
   uninstalledAt DateTime?
+  appPlan       String?
+  crispObject   Json?
 
   // Relations
   feeds               Feed[]

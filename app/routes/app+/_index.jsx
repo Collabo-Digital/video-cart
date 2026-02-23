@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
     BlockStack,
     Card,
@@ -13,22 +13,27 @@ import {
     InlineGrid,
     Icon,
     ProgressBar,
+    Popover,
+    ActionList,
 } from "@shopify/polaris";
+import { Crisp } from "crisp-sdk-web";
 import { onCLS, onINP, onLCP } from 'web-vitals'
 // import { getFeedsByShop } from "../../services/feed/feed.service.server";
 import { useLoaderData, useNavigate } from "react-router";
 import { authenticate } from "../../config/shopify.server";
-
-import { PlayCircleIcon, QuestionCircleIcon, ChatIcon, NotificationIcon} from '@shopify/polaris-icons';
+import { initCrisp } from "../../lib/utils/intiCrisp";
+import { PlayCircleIcon, QuestionCircleIcon, ChatIcon, NotificationIcon, PlusIcon } from '@shopify/polaris-icons';
 
 import { WIDGET_TYPES } from "../../lib/constants/common";
+import { findByDomain } from "../../models/shop.server";
 
 export const loader = async ({ request }) => {
     try {
         const { session } = await authenticate.admin(request);
+        const shopData = await findByDomain(session.shop);
         // const feeds = await getFeedsByShop(session.shop);
         const feeds = [];
-        return { feeds };
+        return { feeds, session, shopData };
     } catch (error) {
         console.error("Error fetching feeds:", error);
         return { feeds: [] };
@@ -36,17 +41,23 @@ export const loader = async ({ request }) => {
 };
 
 export default function IndexPage() {
-    const { feeds } = useLoaderData();
+    const { feeds, shopData } = useLoaderData();
     const navigate = useNavigate();
     const modalRef = useRef(null);
+    const [activePopoverId, setActivePopoverId] = useState(null);
+
+    const handleChatWithUs = () => {
+       Crisp.chat.open();
+    };
 
     useEffect(() => {
         onCLS(console.log);
         onINP(console.log);
         onLCP(console.log);
+       if (shopData) {
+        initCrisp(shopData);
+       }
     }, []);
-
-
 
     console.log(feeds);
 
@@ -71,12 +82,12 @@ export default function IndexPage() {
                             <Box width="100%" >
                                 <InlineStack align="start" blockAlign="center" gap="200" wrap={false}>
                                     <Box width="100%">
-                                        <ProgressBar progress={80} size="small" tone="critical" />
+                                        <ProgressBar progress={0} size="small" tone="critical" />
                                     </Box>
-                                    <Text as="p" variant="bodyMd">Limit</Text>
+                                    <Text as="p" variant="bodyMd">∞</Text>
                                 </InlineStack>
                                 <div style={{ paddingTop: '8px' }} />
-                                <Button size="slim">View Billing</Button>
+                                <Button size="slim" onClick={() => navigate('/app/pricing')}>View Billing</Button>
                             </Box>
                         </InlineStack>
                     </BlockStack>
@@ -94,7 +105,7 @@ export default function IndexPage() {
                     />
                 </MediaCard>
 
-                
+
 
                 <Card>
                     <BlockStack gap="400">
@@ -173,9 +184,29 @@ export default function IndexPage() {
                                                 {widgetType.description}
                                             </Text>
                                             <InlineStack align="end" blockAlign="end">
-                                                <Button size="slim" onClick={() => navigate(widgetType.redirectTo)}>
-                                                    Create
-                                                </Button>
+                                                <Popover
+                                                    active={activePopoverId === widgetType.id}
+                                                    activator={
+                                                        <Button
+                                                            icon={PlusIcon}
+                                                            size="slim"
+                                                            onClick={() => setActivePopoverId(activePopoverId === widgetType.id ? null : widgetType.id)}
+                                                        >
+                                                            Create
+                                                        </Button>
+                                                    }
+                                                    autofocusTarget="first-node"
+                                                    onClose={() => setActivePopoverId(null)}
+                                                >
+                                                    <ActionList
+                                                        actionRole="menuitem"
+                                                        items={widgetType.widgetPageOptions.map((option) => ({
+                                                            content: option.content,
+                                                            onAction: () => navigate(option.redirectTo),
+                                                            icon: option.icon,
+                                                        }))}
+                                                    />
+                                                </Popover>
                                             </InlineStack>
                                         </BlockStack>
                                     </Box>
@@ -207,7 +238,7 @@ export default function IndexPage() {
                                     </InlineStack>
                                     <Text as="p" variant="bodyMd">24/7 live chat support to help you instantly whenever you need assistance.</Text>
                                     <InlineStack>
-                                        <Button variant="primary" size="slim">Chat with us</Button>
+                                        <Button variant="primary" size="slim" onClick={() => handleChatWithUs()}>Chat with us</Button>
                                     </InlineStack>
                                 </BlockStack>
                             </Box>
@@ -246,6 +277,9 @@ export default function IndexPage() {
                 </Card>
 
             </BlockStack>
+
+
+
 
             <s-modal
                 ref={modalRef}

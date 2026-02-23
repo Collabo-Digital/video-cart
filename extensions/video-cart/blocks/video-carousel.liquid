@@ -13,6 +13,16 @@
 }
 {% endschema %}
 
+{% assign store_page = 'other' %}
+{% if template.name == 'index' %}
+  {% assign store_page = 'homePage' %}
+{% elsif template.name == 'product' %}
+  {% assign store_page = 'productPage' %}
+{% elsif template.name == 'collection' %}
+  {% assign store_page = 'collectionPage' %}
+{% endif %}
+
+
 {% comment %} Theme editor: feed selector dropdown only {% endcomment %}
 {% if request.design_mode %}
   <div class="video-feed-selector" style="padding: 16px; background: #f6f6f7; border: 1px dashed #d1d5db; border-radius: 8px; margin-bottom: 16px;">
@@ -65,6 +75,11 @@
   })();
   </script>
 {% endif %}
+
+<script>
+  window.__video_cart_config__ = window.__video_cart_config__ || {};
+  window.__video_cart_config__.store_page = '{{ store_page }}';
+</script>
 
 {% comment %} Storefront: single div with feed/widget id; widget handles the rest {% endcomment %}
 {% if block.settings.feed_id != blank %}

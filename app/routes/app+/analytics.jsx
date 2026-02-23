@@ -412,7 +412,7 @@ export default function Index() {
           </Card>
         </BlockStack>
 
-        <BlockStack gap="300">
+        {/* <BlockStack gap="300">
           <Card>
             <BlockStack gap="200">
               <Text as="h2" variant="headingMd" fontWeight="semibold">
@@ -472,7 +472,7 @@ export default function Index() {
               </InlineGrid>
             </BlockStack>
           </Card>
-        </BlockStack>
+        </BlockStack> */}
       </BlockStack>
     </Page>
   );

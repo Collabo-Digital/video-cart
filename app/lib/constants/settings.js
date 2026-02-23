@@ -28,12 +28,15 @@ function getDefaultFeedName() {
  * Returns defaultValues for useForm, merging saved feed data when editing.
  * @param {object|null} feed - Loader feed (null when creating).
  */
-export function getFeedFormDefaultValues(feed) {
+export function getFeedFormDefaultValues(feed, widgetType, widgetPage) {
+    const defaultWidgetType = widgetType || feed?.widgetType || "carousel";
+    const defaultWidgetPage = widgetPage || feed?.widgetPage || "homePage";
+
     return {
         feedName: feed?.feedName ?? getDefaultFeedName(),
-        widgetType: feed?.widgetType ?? "carousel",
+        widgetType: defaultWidgetType,
         isEnabled: feed?.isEnabled ?? true,
-        widgetPage: feed?.widgetPage ?? "homePage",
+        widgetPage: defaultWidgetPage,
         settings: {
             general: { ...DEFAULT_SETTINGS.general, ...feed?.settings?.general },
             design: { ...DEFAULT_SETTINGS.design, ...feed?.settings?.design },

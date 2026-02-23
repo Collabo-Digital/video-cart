@@ -3,7 +3,7 @@
   right: 20px;
   bottom: 20px;
   z-index: 9999;
-  width: 320px;
+  width: 150px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   overflow: hidden;
@@ -21,7 +21,7 @@
 
 .video-floating-thumb-wrap {
   position: relative;
-  height: 180px;
+  height: 250px;
 }
 
 .video-floating-thumb {

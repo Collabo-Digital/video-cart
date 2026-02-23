@@ -81,7 +81,7 @@ export async function initFeeds() {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console?.error === 'function') {
         console.error('Video feed error:', err);
       }
-      mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';
+      // mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';
     }
   }
 }
