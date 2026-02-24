@@ -5,7 +5,7 @@ export const WIDGET_TYPES = [
         id: 1,
         name: 'Carousel',
         description: 'Show your videos in a scrollable carousel. Add the template to your store and customize its layout, products, and style in the theme editor.',
-        image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+        image: '/widgetType/carousel-type.jpeg',
         icon: SlideshowIcon,
         redirectTo: '/app/feeds/new?widgetType=carousel',
         widgetPageOptions: [
@@ -28,7 +28,7 @@ export const WIDGET_TYPES = [
         id: 2,
         name: 'Stories',
         description: 'Create story-style videos similar to social media. Add the template and let customers explore products through interactive stories.',
-        image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+        image: '/widgetType/stories-type.png',
         icon: StatusIcon,
         redirectTo: '/app/feeds/new?widgetType=stories',
         widgetPageOptions: [
@@ -52,7 +52,7 @@ export const WIDGET_TYPES = [
         id: 3,
         name: 'Floating',
         description: 'Add a floating video widget that appears while customers browse. Great for promotions, demos, and quick product discovery.',
-        image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+        image: '/widgetType/floating-type.jpeg',
         icon: LayoutPopupIcon,
         redirectTo: '/app/feeds/new?widgetType=floating',
         widgetPageOptions: [
@@ -76,7 +76,7 @@ export const WIDGET_TYPES = [
         id: 4,
         name: 'Grid',
         description: 'Display videos in a clean grid layout. Insert the template and create a visual video gallery anywhere on your store.',
-        image: 'https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850',
+        image: '/widgetType/grid-type.jpeg',
         icon: LayoutColumns3Icon,
         redirectTo: '/app/feeds/new?widgetType=grid',
         widgetPageOptions: [
