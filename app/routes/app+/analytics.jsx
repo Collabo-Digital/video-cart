@@ -32,7 +32,9 @@ import { authenticate } from "../../config/shopify.server.js";
 import * as FeedAnalyticsModel from "../../models/feedAnalytics.server.js";
 import * as VideoAnalyticsModel from "../../models/videoAnalytics.server.js";
 import * as VideoCartOrderModel from "../../models/videoCartOrder.server.js";
+import * as VideoModel from "../../models/video.server.js";
 import Chart from "../../components/Chart/Chart.jsx";
+import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
 
 function getDefaultDateRange() {
   const end = new Date();
@@ -63,7 +65,7 @@ export const loader = async ({ request }) => {
     const url = new URL(request.url);
     const ordersCursor = url.searchParams.get("ordersCursor") ?? undefined;
 
-    const [widgetAgg, videoAgg, orderStats, dailyFeed, dailyVideo, ordersPage] =
+    const [widgetAgg, videoAgg, shopVideos, orderStats, dailyFeed, dailyVideo, ordersPage] =
       await Promise.all([
         FeedAnalyticsModel.getAggregatedByShop(session.shop, {
           startDate: start,
@@ -73,6 +75,7 @@ export const loader = async ({ request }) => {
           startDate: start,
           endDate: end,
         }),
+        VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop),
         VideoCartOrderModel.getOrderStatsByShop(session.shop, {
           startDate: start,
           endDate: end,
@@ -92,6 +95,8 @@ export const loader = async ({ request }) => {
           cursor: ordersCursor,
         }),
       ]);
+
+      const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30)
 
     const totalImpressions =
       (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
@@ -124,6 +129,7 @@ export const loader = async ({ request }) => {
         videoAddToCart: videoAgg.videoAddToCart ?? 0,
         videoOrders: videoAgg.videoOrders ?? 0,
         videoRevenue: videoAgg.videoRevenue ?? 0,
+        muxMetrics,
       },
       dateRange: { start: start.toISOString(), end: end.toISOString() },
       chartData: mergeDailyChartData(dailyFeed, dailyVideo),
@@ -214,6 +220,8 @@ export default function Index() {
   const { analytics = {}, dateRange } = loaderData;
   const [searchParams, setSearchParams] = useSearchParams();
 
+  console.log("muxMetrics ---------->",   analytics.muxMetrics);
+
   useEffect(() => {
     onCLS(console.log);
     onINP(console.log);
@@ -263,7 +271,7 @@ export default function Index() {
     },
     {
       title: "Video views",
-      count: analytics.totalVideoViews ?? 0,
+      count: analytics.muxMetrics.aggregate.views ?? 0,
       icon: ViewIcon,
     },
     {

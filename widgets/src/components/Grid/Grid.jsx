@@ -4,8 +4,24 @@ import { getThumbnailPreviewUrl } from '../../shared/mux';
 import './grid.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { addToCart } from '../../utils/shopifyService';
+import { api } from '../../api';
+import { EVENT_TYPES } from '../../api/services/analyticsService';
+import { Toast } from '../common/Toast/Toast';
+import { TOAST_DURATION_MS_EXPORT as TOAST_DURATION_MS } from '../common/Toast/Toast';
 
 const DEFAULT_SUBTITLE = '';
+
+async function trackDbEvent(payload) {
+  if (!payload?.feedId || !payload?.eventType) return;
+  try {
+    await api.analytics.recordEvent(payload);
+  } catch (err) {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+      console.error('Analytics event failed:', err);
+    }
+  }
+}
+
 
 export function VideoGrid({ feed, videos, settings, onEvent }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
@@ -13,6 +29,17 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
   const title = () => settings?.translation?.gridTitle || feed?.name || '';
   const subtitle = () => settings?.translation?.gridDescription || feed?.description || DEFAULT_SUBTITLE;
   const productsForVideo = (video) => video?.productsTagged ?? [];
+
+  const [toastVisible, setToastVisible] = createSignal(false);
+  const [toastMessage, setToastMessage] = createSignal('');
+  const [toastType, setToastType] = createSignal('success');
+
+  function showToast(message, type = 'success') {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), TOAST_DURATION_MS);
+  }
 
   const productPrice = (product) => {
     const priceVal = product?.variants?.[0]?.price;
@@ -46,13 +73,45 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
     setExpandedIndex(index);
   };
 
-  const handleProductClick = (event, video, productHandle) => {
+  const handleProductClick = async (event, video, productHandle) => {
     event.stopPropagation();
+    onEvent?.('product_click', { feedId: feed?.id, videoId: video?.id, productId: productHandle, source: 'grid' });
+    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
+    if (feed?.id && video?.id) {
+      await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+    }
+    if (behavior === 'addToCart') {
+      await addToCart([{
+        id: getVariantId(productHandle),
+        quantity: 1,  
+        properties: {
+          _video_id: video?.id,
+          _widget_id: feed?.id,
+          timestamp: Date.now(),
+          source: 'video-cart-grid',
+        },
+      }]).then(async (response) => {
+        if (response.status === 200) {
+          showToast('Added to cart', 'success');
+          await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });
+          await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
+        }
+      }).catch((error) => {
+        showToast('Could not add to cart', 'error');
+      });
+      return;
+    }
+    if (productHandle) window.location.href = `/products/${productHandle}`;
     onEvent?.('product_click', { feedId: feed?.id, videoId: video?.id, productId: productHandle, source: 'grid' });
   };
 
   const handleOverlayProductClick = async (product, video) => {
     onEvent?.('product_click', { feedId: feed?.id, videoId: video?.id, productId: product?.handle, source: 'grid' });
+    if (feed?.id && video?.id) {
+      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+    }
+    await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
     const behavior = feed?.settings?.general?.addToCartButtonBehavior;
     if (behavior === 'addToCart') {
       await addToCart([{
@@ -81,8 +140,24 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
         addToCartButtonLabel={addToCartButtonLabel}
         addToCartButtonStyle={addToCartButtonStyle}
         handleProductClick={handleOverlayProductClick}
-        onVideoChange={(video, index) => {
+        onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video?.id, index, source: 'grid' });
+          if (feed?.id && video?.id) {
+            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+          }
+        }}
+        onFirstPlay={async (video, watchTimeSeconds) => {
+          if (!feed?.id || !video?.id) return;
+          await trackDbEvent({
+            feedId: feed.id,
+            videoId: video.id,
+            eventType: EVENT_TYPES.VIDEO_VIEW,
+            watchTimeSeconds,
+          });
+        }}
+        onProductClick={async (product, video) => {
+          if (!feed?.id || !video?.id) return;
+          await handleProductClick(product, video);
         }}
       />
 
@@ -135,6 +210,12 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
           </For>
         </div>
       </Show>
+      <Toast
+        visible={toastVisible()}
+        message={toastMessage()}
+        type={toastType()}
+        onClose={() => setToastVisible(false)}
+      />
     </section>
   );
 }

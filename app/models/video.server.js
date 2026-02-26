@@ -244,3 +244,17 @@ export async function findAllPaginatedWithWidgets(options = {}) {
 
   return { videos, total };
 }
+
+
+/**
+ * Find video IDs and playback IDs by shop domain
+ * @param {string} shopDomain - Shop domain
+ * @returns {Promise<Array>} Array of video objects with id and videoPlaybackId
+ */
+export async function findVideoIdsAndPlaybackIdsByShop(shopDomain) {
+  const videos = await prisma.video.findMany({
+    where: { shopDomain },
+    select: { id: true, videoPlaybackId: true },
+  });
+  return videos.map((v) => ({ videoId: v.id, playbackId: v.videoPlaybackId }));
+}

@@ -6,6 +6,8 @@ import { EVENT_TYPES } from '../../api/services/analyticsService';
 import './carousel.css';
 import { addToCart } from '../../utils/shopifyService';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
+import { Toast } from '../common/Toast/Toast';
+import { TOAST_DURATION_MS_EXPORT as TOAST_DURATION_MS } from '../common/Toast/Toast';
 
 /** Fire analytics event to DB (app proxy). Fire-and-forget; does not throw. */
 async function trackDbEvent(payload) {
@@ -34,6 +36,16 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const [containerRef, setContainerRef] = createSignal(null);
   /** When set, show full-screen story-like overlay for that video index; null = carousel only */
   const [expandedIndex, setExpandedIndex] = createSignal(null);
+  const [toastVisible, setToastVisible] = createSignal(false);
+  const [toastMessage, setToastMessage] = createSignal('');
+  const [toastType, setToastType] = createSignal('success');
+
+  function showToast(message, type = 'success') {
+    setToastMessage(message);
+    setToastType(type);
+    setToastVisible(true);
+    setTimeout(() => setToastVisible(false), TOAST_DURATION_MS);
+  }
 
   /** Feed impression: once when carousel container enters viewport (stored in DB) */
   createEffect(() => {
@@ -109,16 +121,16 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   /** Variant id for cart: first variant or product id. */
   const getVariantId = (product) => product?.variants?.[0]?.id ?? product?.id;
 
-  /** Single handler: track product click, notify host, then add-to-cart or go to product page. */
+
   const handleProductClick = async (product, video) => {
+
+    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
     if (feed?.id && video?.id) {
       await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
     }
-    onEvent?.('product_click', { feedId: feed?.id, productId: product?.handle });
-    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
     if (behavior === 'addToCart') {
-      await addToCart([{
+      addToCart([{
         id: getVariantId(product),
         quantity: 1,
         properties: {
@@ -127,10 +139,22 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
           timestamp: Date.now(),
           source: 'video-cart-carousel',
         },
-      }]);
+      }]).then(async (response) => {
+        // if (response.status === 200) {
+        console.log("Product is added to cart");
+        showToast('Added to cart', 'success');
+        await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });
+        await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
+        // }
+      }).catch((error) => {
+        console.error('Error adding product to cart:', error);
+        showToast('Could not add to cart', 'error');
+      });
     } else {
       if (product?.handle) window.location.href = `/products/${product.handle}`;
     }
+    
+    onEvent?.('product_click', { feedId: feed?.id, productId: product?.handle });
   };
 
   const addToCartButtonLabel = () => feed?.settings?.translation?.addToCartText || 'Check this out';
@@ -295,6 +319,13 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
       <Show when={!videos?.length}>
         <p style="padding: 2rem; text-align: center; color: #6d7175;">No videos available in this feed.</p>
       </Show>
+
+      <Toast
+        visible={toastVisible()}
+        message={toastMessage()}
+        type={toastType()}
+        onClose={() => setToastVisible(false)}
+      />
     </div>
   );
 }

@@ -55,7 +55,6 @@ export async function upsertIncrement(feedId, date, increments) {
   const add = (a, b) => (a ?? 0) + (b ?? 0);
 
   const data = {
-    // New widget-level fields
     widgetImpressions: add(existing?.widgetImpressions, increments.widgetImpressions),
     widgetClicks: add(existing?.widgetClicks, increments.widgetClicks),
     widgetVideoPlays: add(existing?.widgetVideoPlays, increments.widgetVideoPlays),
@@ -66,15 +65,42 @@ export async function upsertIncrement(feedId, date, increments) {
     widgetRevenue: (existing?.widgetRevenue != null ? Number(existing.widgetRevenue) : 0) + (increments.widgetRevenue ?? 0),
   };
 
+  let shopDomain = existing?.shopDomain;
+  if (!shopDomain) {
+    const feed = await prisma.feed.findUnique({
+      where: { id: feedId },
+      select: { shopDomain: true },
+    });
+    if (!feed) throw new Error(`Feed not found: ${feedId}`);
+    shopDomain = feed.shopDomain;
+  }
+
+
+  let createPayload = {
+    feed: { connect: { id: feedId } },
+    shop: { connect: { shopDomain: shopDomain } },
+    date: dateOnly,
+    ...data,
+  };
+  if (!existing) {
+    const feed = await prisma.feed.findUnique({
+      where: { id: feedId },
+      select: { shopDomain: true },
+    });
+    if (!feed) throw new Error(`Feed not found: ${feedId}`);
+    createPayload = {
+      feed: { connect: { id: feedId } },
+      shop: { connect: { shopDomain: feed.shopDomain } },
+      date: dateOnly,
+      ...data,
+    };
+  }
+
   return prisma.feedAnalytics.upsert({
     where: {
       feedId_date: { feedId, date: dateOnly },
     },
-    create: {
-      feedId,
-      date: dateOnly,
-      ...data,
-    },
+    create: createPayload,
     update: data,
   });
 }

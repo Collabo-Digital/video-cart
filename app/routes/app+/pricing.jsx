@@ -1,7 +1,7 @@
 import { InlineStack, Page } from "@shopify/polaris";
 import { PricingCard } from "../../components/Pricing/Pricing";
 import { authenticate } from "../../config/shopify.server";
-import  ShopModel  from "../../models/shop.server";
+import * as ShopModel  from "../../models/shop.server";
 import { useLoaderData } from "react-router";
 import { APP_PLANS } from "../../lib/constants/common";
 

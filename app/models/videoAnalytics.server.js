@@ -74,7 +74,6 @@ export async function upsertIncrement(videoId, feedId, date, updates) {
   const add = (a, b) => (a ?? 0) + (b ?? 0);
 
   const data = {
-    // New fields (per requirements)
     videoImpressions: add(existing?.videoImpressions, updates.videoImpressions),
     videoViews: add(existing?.videoViews, updates.videoViews),
     videoProductClicks: add(existing?.videoProductClicks, updates.videoProductClicks),
@@ -84,16 +83,46 @@ export async function upsertIncrement(videoId, feedId, date, updates) {
     videoRevenue: (existing?.videoRevenue != null ? Number(existing.videoRevenue) : 0) + (updates.videoRevenue ?? 0),
   };
 
+  let shopDomain;
+  if (existing) {
+    shopDomain = existing.shopDomain;
+  } else {
+    // When creating a new row, ensure both Feed and Video exist (Video may have been removed)
+    const [feed, video] = await Promise.all([
+      prisma.feed.findUnique({
+        where: { id: feedId },
+        select: { shopDomain: true },
+      }),
+      prisma.video.findUnique({
+        where: { id: videoId },
+      }),
+    ]);
+    if (!feed) throw new Error(`Feed not found: ${feedId}`);
+    if (!video) {
+      const feedVideo = await prisma.feedVideo.findUnique({
+        where: { id: videoId },
+        select: { videoId: true },
+      });
+      if (!feedVideo) throw new Error(`Feed video not found: ${feedId}`);
+      videoId = feedVideo.videoId;
+      // return null;
+    }
+    shopDomain = feed.shopDomain;
+  }
+
+  const createPayload = {
+    video: { connect: { id: videoId } },
+    feed: { connect: { id: feedId } },
+    shop: { connect: { shopDomain } },
+    date: dateOnly,
+    ...data,
+  };
+
   return prisma.videoAnalytics.upsert({
     where: {
       videoId_feedId_date: { videoId, feedId, date: dateOnly },
     },
-    create: {
-      videoId,
-      feedId,
-      date: dateOnly,
-      ...data,
-    },
+    create: createPayload,
     update: data,
   });
 }

@@ -40,9 +40,10 @@
     var currentFeedId = '{{ block.settings.feed_id }}'.trim();
     var select = document.getElementById('feed-select-' + blockId);
     var hint = document.getElementById('feed-hint-' + blockId);
+    var feedsEndpoint = '{{ routes.root_url }}apps/video-widget/feeds/list'
 
     function loadFeeds() {
-      fetch('apps/video-widget/feeds/list', { method: 'GET', headers: { 'Content-Type': 'application/json' } })
+      fetch(feedsEndpoint, { method: 'GET', headers: { 'Content-Type': 'application/json' } })
         .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('status ' + r.status)); })
         .then(function(result) {
           if (!result.success || !result.data || !result.data.length) {
