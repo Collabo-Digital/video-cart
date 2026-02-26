@@ -123,7 +123,15 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
           timestamp: Date.now(),
           source: 'video-cart-grid',
         },
-      }]);
+      }]).then(async (response) => {
+        if (response.status === 200) {
+          showToast('Added to cart', 'success');
+          await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });
+          await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
+        }
+      }).catch((error) => {
+        showToast('Could not add to cart', 'error');
+      });
       return;
     }
     if (product?.handle) window.location.href = `/products/${product.handle}`;

@@ -22,6 +22,9 @@ export function VideoOverlayPlayer({
 }) {
   const [videoEl, setVideoEl] = createSignal(null);
   const [reelsTrackRef, setReelsTrackRef] = createSignal(null);
+  const [isMuted, setIsMuted] = createSignal(true);
+  const [currentTime, setCurrentTime] = createSignal(0);
+  const [duration, setDuration] = createSignal(0);
   const [isMobile, setIsMobile] = createSignal(
     typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
   );
@@ -188,6 +191,45 @@ export function VideoOverlayPlayer({
     onCleanup(() => observer.disconnect());
   });
 
+  /** Sync mute state and track currentTime/duration for custom controls */
+  createEffect(() => {
+    const el = videoEl();
+    if (!el) return;
+    el.muted = isMuted();
+    const onTimeUpdate = () => setCurrentTime(el.currentTime);
+    const onLoadedMetadata = () => setDuration(el.duration);
+    const onDurationChange = () => setDuration(el.duration);
+    el.addEventListener('timeupdate', onTimeUpdate);
+    el.addEventListener('loadedmetadata', onLoadedMetadata);
+    el.addEventListener('durationchange', onDurationChange);
+    onTimeUpdate();
+    if (el.duration != null && !Number.isNaN(el.duration)) setDuration(el.duration);
+    onCleanup(() => {
+      el.removeEventListener('timeupdate', onTimeUpdate);
+      el.removeEventListener('loadedmetadata', onLoadedMetadata);
+      el.removeEventListener('durationchange', onDurationChange);
+    });
+  });
+
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function handleSeek(e) {
+    const el = videoEl();
+    const range = e.currentTarget;
+    if (!el || !range) return;
+    const frac = Number(range.value);
+    const t = frac * duration();
+    if (Number.isFinite(t)) {
+      el.currentTime = t;
+      setCurrentTime(t);
+    }
+  }
+
   return (
     <Show when={expandedIndex() != null && videos?.length > 0}>
       <div
@@ -226,11 +268,33 @@ export function VideoOverlayPlayer({
                       id={`video-${currentVideo()?.id}`}
                       ref={setVideoEl}
                       className="video-carousel-overlay-video"
-                      controls
                       autoPlay
                       muted
-                      playsInline
+                      // playsInline
                     />
+                    <div className="video-carousel-custom-controls">
+                      <button
+                        type="button"
+                        className="video-carousel-control-mute"
+                        aria-label={isMuted() ? 'Unmute' : 'Mute'}
+                        onClick={() => setIsMuted((m) => !m)}
+                      >
+                        {isMuted() ? '🔇' : '🔊'}
+                      </button>
+                      <div className="video-carousel-progress-wrap">
+                        <span className="video-carousel-time">{formatTime(currentTime())}</span>
+                        <input
+                          type="range"
+                          className="video-carousel-progress"
+                          min="0"
+                          max={duration() > 0 ? 1 : 0}
+                          step="any"
+                          value={duration() > 0 ? currentTime() / duration() : 0}
+                          onInput={handleSeek}
+                        />
+                        <span className="video-carousel-time">{formatTime(duration())}</span>
+                      </div>
+                    </div>
                   </div>
                 )}
               </Show>
@@ -269,11 +333,34 @@ export function VideoOverlayPlayer({
                         <video
                           ref={setVideoEl}
                           className="video-carousel-overlay-video"
-                          controls
+                          // controls
                           autoPlay
                           muted
-                          playsInline
+                          // playsInline
                         />
+                        <div className="video-carousel-custom-controls">
+                          <button
+                            type="button"
+                            className="video-carousel-control-mute"
+                            aria-label={isMuted() ? 'Unmute' : 'Mute'}
+                            onClick={() => setIsMuted((m) => !m)}
+                          >
+                            {isMuted() ? '🔇' : '🔊'}
+                          </button>
+                          <div className="video-carousel-progress-wrap">
+                            <span className="video-carousel-time">{formatTime(currentTime())}</span>
+                            <input
+                              type="range"
+                              className="video-carousel-progress"
+                              min="0"
+                              max={duration() > 0 ? 1 : 0}
+                              step="any"
+                              value={duration() > 0 ? currentTime() / duration() : 0}
+                              onInput={handleSeek}
+                            />
+                            <span className="video-carousel-time">{formatTime(duration())}</span>
+                          </div>
+                        </div>
                       </div>
                     </Show>
                     <Show when={index() !== expandedIndex()}>

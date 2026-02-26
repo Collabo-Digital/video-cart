@@ -17,7 +17,7 @@ function buildRequest(endpoint, options = {}) {
       ...(options.headers || {}),
     },
   };
-  return fetch(url, config);
+  return fetch(window.location.origin + url, config);
 }
 
 async function handleResponse(response) {
