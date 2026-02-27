@@ -9,7 +9,7 @@ import { authenticate } from '../../../../config/shopify.server';
 import { createUploadUrl } from '../../../../services/video/upload.service';
 
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   if (request.method !== 'POST') {
     return new Response(
@@ -27,10 +27,13 @@ export const action = async ({ request }) => {
     let body = {};
     try {
       body = await request.json().catch(() => ({}));
-    } catch (_) {}
+    } catch (error) {
+      console.error('Error parsing request body:', error);
+      // Fallback body already set above
+    }
     const fileName = typeof body?.fileName === 'string' ? body.fileName.trim() : null;
 
-    const uploadData = await createUploadUrl({ fileName: fileName || undefined });
+    const uploadData = await createUploadUrl({ fileName: fileName || undefined, shopDomain: session.shop });
 
     return new Response(
       JSON.stringify({

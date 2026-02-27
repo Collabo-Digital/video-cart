@@ -33,7 +33,11 @@ export const loader = async ({ params, request }) => {
     const { session } = await authenticate.admin(request);
 
     if (params.feedId === "new") {
-      return { mode: "create", feed: null };
+      const url = new URL(request.url);
+      const widgetPage = url.searchParams.get('widgetPage') || null;
+      const widgetType = url.searchParams.get('widgetType') || null;
+
+      return { mode: "create", feed: null, widgetType, widgetPage };
     }
 
     const feed = await getFeedById(params.feedId, session.shop);
@@ -52,11 +56,14 @@ export const action = async ({ params, request }) => {
     const parsedVideos = JSON.parse(data.videos || "[]");
     const parsedSettings = data.settings ? JSON.parse(data.settings) : undefined;
 
+    console.log("data ----->", data);
+
     if (params.feedId === "new") {
       const feed = await createFeed({
         feedName: data.feedName,
         shopDomain: session.shop,
         widgetType: data.widgetType,
+        widgetPage: data.widgetPage,
         isEnabled: data.isEnabled === "true",
         settings: parsedSettings,
         videos: parsedVideos,
@@ -68,6 +75,7 @@ export const action = async ({ params, request }) => {
     await updateFeed(params.feedId, {
       feedName: data.feedName,
       widgetType: data.widgetType,
+      widgetPage: data.widgetPage,
       isEnabled: data.isEnabled === "true",
       settings: parsedSettings,
       videos: parsedVideos,
@@ -86,7 +94,7 @@ export const action = async ({ params, request }) => {
 };
 
 export default function FeedEditorPage() {
-  const { mode, feed, shop } = useLoaderData();
+  const { mode, feed, shop, widgetType, widgetPage } = useLoaderData();
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -98,13 +106,16 @@ export default function FeedEditorPage() {
   const [selected, setSelected] = useState(0);
   const [settingsTabSelected, setSettingsTabSelected] = useState(0);
 
+  console.log("widgetType ----->", widgetType);
+  console.log("widgetPage ----->", widgetPage);
+
   const {
     control,
     watch,
     reset,
     formState: { errors, isDirty },
   } = useForm({
-    defaultValues: getFeedFormDefaultValues(feed),
+    defaultValues: getFeedFormDefaultValues(feed, widgetType, widgetPage),
   });
 
   const widgetTab = [
@@ -250,6 +261,7 @@ export default function FeedEditorPage() {
         feedName: values.feedName,
         widgetType: values.widgetType,
         isEnabled: values.isEnabled,
+        widgetPage: values.widgetPage,
         settings: JSON.stringify(settingsPayload),
         videos: JSON.stringify(videosPayload),
       },
@@ -289,7 +301,7 @@ export default function FeedEditorPage() {
 
   const EmptyStateUploads = () => {
     return (
-       <EmptyState
+      <EmptyState
         heading="Upload your first video"
         // action={{content: 'Add transfer'}}
         // secondaryAction={{
@@ -313,44 +325,44 @@ export default function FeedEditorPage() {
             onVideosFromLibrary={handleVideosFromLibrary}
           />
           {uploadedVideos.length === 0 && (
-            <EmptyStateUploads/>
+            <EmptyStateUploads />
           )}
           {uploadedVideos.length > 0 && (
 
-          <BlockStack gap="300">
-            <Text variant="headingMd" as="h2">
-              Videos
-            </Text>
-
-          {error && (
-            <Banner tone="critical" onDismiss={() => setError(null)}>
-              {error}
-            </Banner>
-          )}
-
-          {uploadedVideos.length > 0 && (
             <BlockStack gap="300">
-              <Text variant="headingSm" as="h3">
-                Uploaded Videos ({uploadedVideos.length})
+              <Text variant="headingMd" as="h2">
+                Videos
               </Text>
-              <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
-                {uploadedVideos.map((video, index) => (
-                 <Box key={video.id || video.videoId || index} padding="200" borderRadius="200" border="1px solid" background="bg-fill-secondary">
-                   <VideoDisplay
-                    key={video.id || video.videoId || index}
-                    video={video}
-                    index={index}
-                    onRemove={() => handleRemoveVideo(index)}
-                    shopify={shopify}
-                    onTaggedProductsChange={handleTaggedProductsChange}
-                    onFileNameChange={handleFileNameChange}
-                  />
-                 </Box>
-                ))}
-              </InlineGrid>
+
+              {error && (
+                <Banner tone="critical" onDismiss={() => setError(null)}>
+                  {error}
+                </Banner>
+              )}
+
+              {uploadedVideos.length > 0 && (
+                <BlockStack gap="300">
+                  <Text variant="headingSm" as="h3">
+                    Uploaded Videos ({uploadedVideos.length})
+                  </Text>
+                  <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
+                    {uploadedVideos.map((video, index) => (
+                      <Box key={video.id || video.videoId || index} padding="200" borderRadius="200" border="1px solid" background="bg-fill-secondary">
+                        <VideoDisplay
+                          key={video.id || video.videoId || index}
+                          video={video}
+                          index={index}
+                          onRemove={() => handleRemoveVideo(index)}
+                          shopify={shopify}
+                          onTaggedProductsChange={handleTaggedProductsChange}
+                          onFileNameChange={handleFileNameChange}
+                        />
+                      </Box>
+                    ))}
+                  </InlineGrid>
+                </BlockStack>
+              )}
             </BlockStack>
-          )}
-          </BlockStack>
           )}
         </BlockStack>
       </Box>
@@ -363,7 +375,7 @@ export default function FeedEditorPage() {
     <>
       <Page
         title={mode === "create" ? "Create Feed" : "Edit Feed"}
-        backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`)}}
+        backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`) }}
       >
         <BlockStack gap="400">
           {actionData?.error && (

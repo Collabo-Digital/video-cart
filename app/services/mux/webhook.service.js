@@ -57,7 +57,16 @@ async function handleVideoReady(data) {
     playback_ids,
     duration,
     aspect_ratio,
+    passthrough,
   } = asset;
+
+  let shopDomain = null;
+  if (passthrough && typeof passthrough === 'string') {
+    try {
+      const parsed = JSON.parse(passthrough);
+      shopDomain = parsed?.shopDomain;
+    } catch (_) {}
+  }
 
   if (!assetId) {
     console.error('Missing asset id in webhook data. Keys:', Object.keys(asset || {}));
@@ -86,30 +95,36 @@ async function handleVideoReady(data) {
       if (existing) {
         video = await VideoModel.updateById(existing.id, { ...payload, videoAssetId: assetId });
         console.log('Video updated for upload:', upload_id);
-      } else {
+      } else if (shopDomain) {
         video = await VideoModel.create({
           videoUploadId: upload_id,
           videoAssetId: assetId,
           ...createPayload,
+          shop: { connect: { shopDomain } },
         });
         console.log('Video created for upload:', upload_id);
+      } else {
+        console.warn('Mux webhook: skipping Video create for upload', upload_id, '- no shopDomain in passthrough');
       }
     } else {
       const existing = await VideoModel.findByAssetId(assetId);
       if (existing) {
         video = await VideoModel.updateById(existing.id, payload);
         console.log('Video updated for asset:', assetId);
-      } else {
+      } else if (shopDomain) {
         video = await VideoModel.create({
           videoUploadId: `import-${assetId}`,
           videoAssetId: assetId,
           ...createPayload,
+          shop: { connect: { shopDomain } },
         });
         console.log('Video created for asset:', assetId);
+      } else {
+        console.warn('Mux webhook: skipping Video create for asset', assetId, '- no shopDomain in passthrough');
       }
     }
-    console.log('Video saved to MongoDB id:', video?.id);
-    return video;
+    if (video) console.log('Video saved to MongoDB id:', video.id);
+    return video ?? null;
   } catch (err) {
     console.error('Mux webhook handleVideoReady DB error:', err.message, err.stack);
     throw err;
@@ -127,6 +142,16 @@ async function handleVideoError(data) {
 
   const { upload_id, id: assetId } = data;
 
+  const asset = data?.data && typeof data.data === 'object' ? data.data : data;
+  const passthrough = asset?.passthrough;
+  let shopDomain = null;
+  if (passthrough && typeof passthrough === 'string') {
+    try {
+      const parsed = JSON.parse(passthrough);
+      shopDomain = parsed?.shopDomain;
+    } catch (_) {}
+  }
+
   if (upload_id) {
     const existing = await VideoModel.findByUploadId(upload_id);
     if (existing) {
@@ -134,15 +159,19 @@ async function handleVideoError(data) {
       console.log('Video marked as ERRORED (upload):', upload_id);
       return video;
     }
-    const video = await VideoModel.create({
-      videoUploadId: upload_id,
-      videoAssetId: assetId ?? `unknown-${upload_id}`,
-      title: 'Untitled Video',
-      serviceProvider: 'mux',
-      status: 'ERRORED',
-    });
-    console.log('Video created with ERRORED (upload):', upload_id);
-    return video;
+    if (shopDomain) {
+      const video = await VideoModel.create({
+        videoUploadId: upload_id,
+        videoAssetId: assetId ?? `unknown-${upload_id}`,
+        title: 'Untitled Video',
+        serviceProvider: 'mux',
+        status: 'ERRORED',
+        shop: { connect: { shopDomain } },
+      });
+      console.log('Video created with ERRORED (upload):', upload_id);
+      return video;
+    }
+    console.warn('Mux webhook: skipping Video create for ERRORED upload', upload_id, '- no shopDomain');
   }
 
   if (assetId) {
@@ -152,15 +181,19 @@ async function handleVideoError(data) {
       console.log('Video marked as ERRORED (asset):', assetId);
       return video;
     }
-    const video = await VideoModel.create({
-      videoUploadId: `import-${assetId}`,
-      videoAssetId: assetId,
-      title: 'Untitled Video',
-      serviceProvider: 'mux',
-      status: 'ERRORED',
-    });
-    console.log('Video created with ERRORED (asset):', assetId);
-    return video;
+    if (shopDomain) {
+      const video = await VideoModel.create({
+        videoUploadId: `import-${assetId}`,
+        videoAssetId: assetId,
+        title: 'Untitled Video',
+        serviceProvider: 'mux',
+        status: 'ERRORED',
+        shop: { connect: { shopDomain } },
+      });
+      console.log('Video created with ERRORED (asset):', assetId);
+      return video;
+    }
+    console.warn('Mux webhook: skipping Video create for ERRORED asset', assetId, '- no shopDomain');
   }
 
   return null;

@@ -1,7 +1,8 @@
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { visualizer } from 'rollup-plugin-visualizer'
+import viteCompression from 'vite-plugin-compression';
+import purgecss from 'vite-plugin-purgecss';
 
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
@@ -50,12 +51,65 @@ export default defineConfig({
       allow: ["app", "node_modules"],
     },
   },
-  plugins: [reactRouter(), tsconfigPaths()],
+  plugins: [reactRouter(), tsconfigPaths(), purgecss({
+    content: [
+      './app/**/*.{js,jsx,ts,tsx}',
+      './app/**/*.html',
+    ],
+    safelist: {
+      // Safelist Polaris classes - they use dynamic class names
+      standard: [
+        /^Polaris/,
+        /^p[0-9]/,
+        /^m[0-9]/,
+        /^w[0-9]/,
+        /^h[0-9]/,
+        /^flex/,
+        /^grid/,
+        /^hidden/,
+        /^block/,
+        /^inline/,
+        /^relative/,
+        /^absolute/,
+        /^fixed/,
+        /^sticky/,
+        /^z-[0-9]/,
+        /^opacity-/,
+        /^bg-/,
+        /^text-/,
+        /^border-/,
+        /^rounded-/,
+        /^shadow-/,
+        /^hover:/,
+        /^focus:/,
+        /^active:/,
+        /^transition/,
+        /^transform/,
+        /^scale-/,
+        /^rotate-/,
+        /^translate-/,
+      ],
+      // Keep all classes that contain these patterns (Polaris uses data attributes)
+      deep: [/\[data-polaris/],
+      // Keep all keyframes
+      greedy: [/^@keyframes/, /^@media/],
+    },
+    // Fonts and other assets
+    fontFace: true,
+    keyframes: true,
+  }), viteCompression({ algorithm: 'brotliCompress' })],
   build: {
     assetsInlineLimit: 0,
     target: 'esnext',
-    minify: 'esbuild',
-    sourcemap: true,
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_debugger: true,
+        dead_code: true,
+        unused: true,
+        passes: 3,
+      },
+    },
     rollupOptions: {
       output: {
         // Organize assets by type
@@ -73,13 +127,14 @@ export default defineConfig({
       },
       treeshake: {
         moduleSideEffects: false,
-        propertyReadSideEffects: false
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false
       }
     }
   },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react"],
-    // exclude: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
+    exclude: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
   },
   ssr: {
     noExternal: [],

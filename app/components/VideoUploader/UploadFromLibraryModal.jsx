@@ -1,6 +1,5 @@
 /* eslint-disable react/prop-types */
 import {
-  Modal,
   Text,
   TextField,
   BlockStack,
@@ -13,9 +12,10 @@ import {
   Button,
 } from "@shopify/polaris";
 import { SearchIcon } from "@shopify/polaris-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const PER_PAGE = 12;
+const MODAL_ID = "upload-from-library-modal";
 
 /**
  * Converts a library video (from API list) to the shape expected by the feed editor.
@@ -135,6 +135,7 @@ function VideoCard({ video, isSelected, onToggle }) {
 }
 
 export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
+  const modalRef = useRef(null);
   const [videos, setVideos] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -172,13 +173,30 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
-    setPage(1);
-    setSearch("");
-    setSearchInput("");
-    setSelectedIds(new Set());
-    fetchVideos(1, "");
+    const el = modalRef.current;
+    if (!el) return;
+    if (open) {
+      el.showOverlay?.();
+      setPage(1);
+      setSearch("");
+      setSearchInput("");
+      setSelectedIds(new Set());
+      fetchVideos(1, "");
+    } else {
+      el.hideOverlay?.();
+    }
   }, [open, fetchVideos]);
+
+  useEffect(() => {
+    const el = modalRef.current;
+    if (!el) return;
+    const handleAfterHide = () => {
+      setSelectedIds(new Set());
+      onClose?.();
+    };
+    el.addEventListener("afterhide", handleAfterHide);
+    return () => el.removeEventListener("afterhide", handleAfterHide);
+  }, [onClose]);
 
   const handleSearchSubmit = useCallback(() => {
     setSearch(searchInput);
@@ -233,39 +251,27 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
       onSelected?.(feedVideos);
     }
     setSelectedIds(new Set());
-    onClose();
+    modalRef.current?.hideOverlay?.();
+    onClose?.();
   }, [videos, selectedIds, onSelected, onClose]);
 
-  const handleClose = useCallback(() => {
-    setSelectedIds(new Set());
-    onClose();
-  }, [onClose]);
+  const isImportDisabled = selectedIds.size === 0;
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title="Select videos to import"
+    <s-modal
+      ref={modalRef}
+      id={MODAL_ID}
+      heading="Select videos to import"
       size="large"
-      primaryAction={{
-        content: "Import",
-        onAction: handleAddSelected,
-        disabled: selectedIds.size === 0,
-      }}
-      secondaryActions={[{ content: "Cancel", onAction: handleClose }]}
     >
-      <Modal.Section>
-        <BlockStack gap="400">
-          {/* Search bar */}
+      <BlockStack gap="400">
+        {/* Search bar */}
           <InlineStack gap="300" align="center" blockAlign="center">
             <TextField
             label="Search"
             labelHidden
             value={searchInput}
-            onChange={(value) => {
-              console.log("value ----->", value);
-              setSearchInput(value);
-            }}
+            onChange={setSearchInput}
             placeholder="Search videos"
             autoComplete="off"
             clearButton
@@ -276,7 +282,6 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
               fetchVideos(1, "");
             }}
             onKeyDown={(e) => {
-              console.log("e.key ----->", e.key);
               if (e.key === "Enter") handleSearchSubmit();
             }}
           />
@@ -352,8 +357,24 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
               )}
             </>
           )}
-        </BlockStack>
-      </Modal.Section>
-    </Modal>
+      </BlockStack>
+
+      <s-button
+        slot="primary-action"
+        variant="primary"
+        disabled={isImportDisabled}
+        onClick={handleAddSelected}
+      >
+        Import
+      </s-button>
+      <s-button
+        slot="secondary-actions"
+        variant="secondary"
+        commandFor={MODAL_ID}
+        command="--hide"
+      >
+        Cancel
+      </s-button>
+    </s-modal>
   );
 }

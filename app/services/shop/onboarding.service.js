@@ -89,6 +89,7 @@ export async function doTaskAfterAuth({ session, admin }) {
         // App specific
         isActive: true,
         installedAt: new Date(),
+        appPlan: 'free',
       });
 
       console.log('Shop saved to database successfully:', {

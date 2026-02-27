@@ -104,9 +104,10 @@ export async function updateVideosProductsTagged(feedId, videos) {
  * Used when saving feed so new uploads (resolved by playbackId/assetId) appear in the feed.
  * @param {string} feedId - Feed ID
  * @param {Array<{ videoId: string, playbackId: string, position: number, productsTagged: Array }>} resolvedVideos - Resolved videos (videoId = our Video.id)
+ * @param {string} shopDomain - Shop domain (required for FeedVideo create)
  */
-export async function syncFeedVideos(feedId, resolvedVideos) {
-  if (!feedId || !Array.isArray(resolvedVideos)) return;
+export async function syncFeedVideos(feedId, resolvedVideos, shopDomain) {
+  if (!feedId || !Array.isArray(resolvedVideos) || !shopDomain) return;
 
   for (let i = 0; i < resolvedVideos.length; i++) {
     const { videoId, playbackId, position, productsTagged } = resolvedVideos[i];
@@ -117,8 +118,9 @@ export async function syncFeedVideos(feedId, resolvedVideos) {
         feedId_videoId: { feedId, videoId },
       },
       create: {
-        feedId,
-        videoId,
+        feed: { connect: { id: feedId } },
+        video: { connect: { id: videoId } },
+        shop: { connect: { shopDomain } },
         playbackId,
         position: position ?? i,
         productsTagged: productsTagged ?? [],

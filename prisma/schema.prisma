@@ -32,39 +32,47 @@ model Session {
 }
 
 model Shop {
-  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
-  shopId             String?
-  shopDomain         String    @unique
-  name               String?
-  email              String?
-  contactEmail       String?
-  customerEmail      String?
-  shopOwner          String?
-  accessToken        String
-  
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  shopId        String?
+  shopDomain    String  @unique
+  name          String?
+  email         String?
+  contactEmail  String?
+  customerEmail String?
+  shopOwner     String?
+  accessToken   String
+
   // Plan Info
   planName           String?
   planDisplayName    String?
-  partnerDevelopment Boolean   @default(false)
-  shopifyPlus        Boolean   @default(false)
-  
+  partnerDevelopment Boolean @default(false)
+  shopifyPlus        Boolean @default(false)
+
   // Timestamps
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-  shopCreatedAt      DateTime?
-  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  shopCreatedAt DateTime?
+
   // App specific
-  isActive           Boolean   @default(true)
-  installedAt        DateTime  @default(now())
-  uninstalledAt      DateTime?
-  
+  isActive      Boolean   @default(true)
+  installedAt   DateTime  @default(now())
+  uninstalledAt DateTime?
+  appPlan       String?
+  crispObject   Json?
+
   // Relations
-  feeds              Feed[]
+  feeds               Feed[]
+  videos              Video[]
+  feedVideos          FeedVideo[]
+  feedAnalytics       FeedAnalytics[]
+  videoAnalytics      VideoAnalytics[]
+  videoCartOrderItems VideoCartOrderItem[]
 }
 
 model Video {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   title           String?
+  shopDomain      String
   // Display name: user can update. Falls back to fileUploadName if not set.
   fileName        String?
   // Original name at upload/import; never updated. Used for duplicate detection.
@@ -79,41 +87,44 @@ model Video {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@index([fileUploadName])
-
   // Relations
-  feedVideos      FeedVideo[]
+  feedVideos     FeedVideo[]
   videoAnalytics VideoAnalytics[]
+  shop           Shop             @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
+
+  @@index([fileUploadName])
+  @@index([shopDomain])
 }
 
 model Feed {
-  id             String      @id @default(auto()) @map("_id") @db.ObjectId
-  widgetId       String      @unique @default(uuid())
-  feedName       String
-  shopDomain     String
-  widgetType     String      @default("carousel") // carousel | grid
-  isEnabled      Boolean     @default(true)
-  isDeleted      Boolean     @default(false)
-  
+  id         String  @id @default(auto()) @map("_id") @db.ObjectId
+  widgetId   String  @unique @default(uuid())
+  feedName   String
+  shopDomain String
+  widgetType String  @default("carousel") // carousel | grid
+  widgetPage String  @default("homePage") // homepage | productPage | collectionPage
+  isEnabled  Boolean @default(true)
+  isDeleted  Boolean @default(false)
+
   // Settings
-  autoplay       Boolean     @default(false)
-  showControls   Boolean     @default(true)
-  showTitle      Boolean     @default(true)
+  autoplay     Boolean @default(false)
+  showControls Boolean @default(true)
+  showTitle    Boolean @default(true)
   // Structured settings: { general: {}, design: {}, translation: {} }
   // - general: options from General accordion (extensible)
   // - design: design/display options (extensible)
   // - translation: UI strings (carouselTitle, carouselDescription, addToCartText, etc.)
-  settings       Json?
-  
+  settings     Json?
+
   // Timestamps
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   // Relations
-  shop            Shop             @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
-  videos          FeedVideo[]
-  feedAnalytics   FeedAnalytics[]
-  videoAnalytics  VideoAnalytics[]
+  shop           Shop             @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
+  videos         FeedVideo[]
+  feedAnalytics  FeedAnalytics[]
+  videoAnalytics VideoAnalytics[]
 
   @@index([shopDomain])
   @@index([isDeleted])
@@ -121,80 +132,88 @@ model Feed {
 
 // Junction table for Feed-Video many-to-many relationship
 model FeedVideo {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  feedId          String   @db.ObjectId
-  videoId         String   @db.ObjectId
-  playbackId      String
-  
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  feedId     String @db.ObjectId
+  videoId    String @db.ObjectId
+  playbackId String
+  shopDomain String
+
   // Product tagging: array of product objects (id, title, handle, image, etc.) as JSON
-  productsTagged  Json     @default("[]")
-  
+  productsTagged Json @default("[]")
+
   // Order in feed
-  position        Int      @default(0)
-  
+  position Int @default(0)
+
   // Timestamps
-  addedAt         DateTime @default(now())
-  
+  addedAt DateTime @default(now())
+
   // Relations
-  feed            Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
-  video           Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  
+  feed  Feed  @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  shop  Shop  @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
+
   @@unique([feedId, videoId])
   @@index([feedId])
   @@index([videoId])
+  @@index([shopDomain])
 }
 
 // Feed-level analytics: one row per feed per day (UTC date)
 model FeedAnalytics {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  feedId      String   @db.ObjectId
-  date        DateTime // UTC start-of-day
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  feedId     String   @db.ObjectId
+  date       DateTime // UTC start-of-day
+  shopDomain String
 
   // Widget-level analytics (per requirements)
-  widgetImpressions  Int   @default(0) // widget loaded + visible
-  widgetClicks       Int   @default(0) // widget clicks / interactions
-  widgetVideoPlays   Int   @default(0) // video plays initiated from widget
-  widgetViews        Int   @default(0) // (optional stored) clicks + video plays
-  widgetProductClicks Int  @default(0) // product clicks from widget
-  widgetAddToCart    Int   @default(0) // add-to-cart events attributed to widget
-  widgetOrders       Int   @default(0) // completed checkouts attributed to widget
-  widgetRevenue      Float @default(0) // revenue from widget-driven purchases
+  widgetImpressions   Int   @default(0) // widget loaded + visible
+  widgetClicks        Int   @default(0) // widget clicks / interactions
+  widgetVideoPlays    Int   @default(0) // video plays initiated from widget
+  widgetViews         Int   @default(0) // (optional stored) clicks + video plays
+  widgetProductClicks Int   @default(0) // product clicks from widget
+  widgetAddToCart     Int   @default(0) // add-to-cart events attributed to widget
+  widgetOrders        Int   @default(0) // completed checkouts attributed to widget
+  widgetRevenue       Float @default(0) // revenue from widget-driven purchases
 
-  extras      Json?
-  isDeleted   Boolean  @default(false)
+  extras    Json?
+  isDeleted Boolean @default(false)
 
-  feed        Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  feed Feed @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  shop Shop @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
 
   @@unique([feedId, date])
   @@index([date])
   @@index([isDeleted])
+  @@index([shopDomain])
 }
 
 // Video-in-feed analytics: one row per (video, feed) per day
 model VideoAnalytics {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  videoId        String   @db.ObjectId
-  feedId         String   @db.ObjectId
-  date           DateTime // UTC start-of-day
-
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  videoId            String   @db.ObjectId
+  feedId             String   @db.ObjectId
+  date               DateTime // UTC start-of-day
+  shopDomain         String
   // Video-level analytics (per requirements)
-  videoImpressions  Int   @default(0) // video visible in widget
-  videoViews        Int   @default(0) // video views (play events)
-  videoProductClicks Int  @default(0) // product click count per video
-  videoAtcClicks    Int   @default(0) // ATC button clicks for tagged products
-  videoAddToCart    Int   @default(0) // add-to-cart events attributed to video
-  videoOrders       Int   @default(0) // completed checkouts attributed to video
-  videoRevenue      Float @default(0) // revenue attributed to video
+  videoImpressions   Int      @default(0) // video visible in widget
+  videoViews         Int      @default(0) // video views (play events)
+  videoProductClicks Int      @default(0) // product click count per video
+  videoAtcClicks     Int      @default(0) // ATC button clicks for tagged products
+  videoAddToCart     Int      @default(0) // add-to-cart events attributed to video
+  videoOrders        Int      @default(0) // completed checkouts attributed to video
+  videoRevenue       Float    @default(0) // revenue attributed to video
 
-  extras         Json?
-  isDeleted      Boolean  @default(false)
+  extras    Json?
+  isDeleted Boolean @default(false)
 
-  video         Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  feed          Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  feed  Feed  @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  shop  Shop  @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
 
   @@unique([videoId, feedId, date])
   @@index([date])
   @@index([isDeleted])
+  @@index([shopDomain])
 }
 
 // Orders that had at least one line item attributed to the video-cart widget (from pixel).
@@ -203,7 +222,7 @@ model VideoCartOrder {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   shopDomain   String
   orderId      String   @unique // Shopify order GID e.g. gid://shopify/Order/123
-  orderNumber  String?  // display number e.g. #1001
+  orderNumber  String? // display number e.g. #1001
   totalRevenue Float    @default(0) // sum of line_total for app-attributed items only
   currency     String?
   createdAt    DateTime @default(now())
@@ -216,21 +235,24 @@ model VideoCartOrder {
 
 // One row per line item that had _tracking (video_id + widget_id).
 model VideoCartOrderItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId   String   @db.ObjectId
-  feedId    String   @db.ObjectId
-  videoId   String   @db.ObjectId
-  productId String?
-  variantId String?
-  quantity  Int      @default(1)
-  lineTotal Float    @default(0)
-  createdAt DateTime @default(now())
-  isDeleted Boolean  @default(false)
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId    String   @db.ObjectId
+  feedId     String   @db.ObjectId
+  videoId    String   @db.ObjectId
+  shopDomain String
+  productId  String?
+  variantId  String?
+  quantity   Int      @default(1)
+  lineTotal  Float    @default(0)
+  createdAt  DateTime @default(now())
+  isDeleted  Boolean  @default(false)
 
   order VideoCartOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  shop  Shop           @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
 
   @@index([orderId])
   @@index([feedId])
   @@index([videoId])
   @@index([feedId, isDeleted])
+  @@index([shopDomain])
 }

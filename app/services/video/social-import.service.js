@@ -19,7 +19,7 @@ import { createAssetFromUrl, createVideoForImportedAsset } from './upload.servic
  * @param {string} url - Full post URL
  * @returns {string} Name like Insta-reel-XXX or Tiktok-XXX
  */
-export function deriveFileUploadNameFromUrl(source, url) {
+export function deriveFileUploadNameFromUrl(source, url, shopDomain) {
   if (!url || typeof url !== 'string') return 'Untitled Video';
   const u = url.trim();
   try {
@@ -31,13 +31,13 @@ export function deriveFileUploadNameFromUrl(source, url) {
       const pMatch = u.match(/\/p\/([A-Za-z0-9_-]+)/i);
       if (pMatch) return `Insta-p-${pMatch[1]}`;
       const last = path.filter(Boolean).pop();
-      return last ? `Insta-${last}` : 'Insta-import';
+      return last ? `Insta-${last}-${shopDomain}` : `Insta-import-${shopDomain}`;
     }
     if (source === SOCIAL_SOURCE.TIKTOK) {
       const videoMatch = u.match(/\/video\/(\d+)/);
       if (videoMatch) return `Tiktok-${videoMatch[1]}`;
       const last = path.filter(Boolean).pop();
-      return last ? `Tiktok-${last}` : 'Tiktok-import';
+      return last ? `Tiktok-${last}-${shopDomain}` : `Tiktok-import-${shopDomain}`;
     }
   } catch (_) { }
   return source === SOCIAL_SOURCE.TIKTOK ? 'Tiktok-import' : 'Insta-import';
@@ -108,12 +108,16 @@ export async function resolveSocialUrl({ source, url }) {
  * @param {Object} params
  * @param {'instagram'|'tiktok'} params.source
  * @param {string} params.url
+ * @param {string} params.shopDomain - Shop domain (required for Video–Shop relation)
  * @returns {Promise<Object>} Normalized video payload for UI
  */
-export async function importSocialVideo({ source, url }) {
-  const fileUploadName = deriveFileUploadNameFromUrl(source, url);
+export async function importSocialVideo({ source, url, shopDomain }) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required');
+  }
+  const fileUploadName = deriveFileUploadNameFromUrl(source, url, shopDomain);
   const resolved = await resolveSocialUrl({ source, url });
-  const asset = await createAssetFromUrl(resolved.directUrl);
+  const asset = await createAssetFromUrl(resolved.directUrl, { shopDomain });
   const displayName = resolved.title?.trim() || fileUploadName;
   const video = await createVideoForImportedAsset({
     assetId: asset.assetId,
@@ -121,6 +125,7 @@ export async function importSocialVideo({ source, url }) {
     title: displayName,
     fileName: displayName,
     fileUploadName,
+    shopDomain,
   });
 
   return {

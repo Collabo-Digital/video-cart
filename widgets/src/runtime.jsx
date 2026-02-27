@@ -7,11 +7,17 @@ import { getWidget, registerWidget } from './core/registry';
 import { CONTAINER_SELECTOR } from './core/config';
 import { api } from './api';
 import { VideoCarousel } from './components/Carousel/Carousel';
+import { VideoStories } from './components/Stories/Stories';
+import { VideoFloating } from './components/Floating/Floating';
+import { VideoGrid } from './components/Grid/Grid';
 
 const DEFAULT_WIDGET_TYPE = 'carousel';
 
 function registerStorefrontWidgets() {
   registerWidget({ type: 'carousel', component: VideoCarousel });
+  registerWidget({ type: 'stories', component: VideoStories });
+  registerWidget({ type: 'floating', component: VideoFloating });
+  registerWidget({ type: 'grid', component: VideoGrid });
 }
 
 export async function initFeeds() {
@@ -75,7 +81,7 @@ export async function initFeeds() {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console?.error === 'function') {
         console.error('Video feed error:', err);
       }
-      mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';
+      // mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';
     }
   }
 }

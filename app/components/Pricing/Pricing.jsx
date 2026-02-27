@@ -10,13 +10,13 @@ import {
 } from '@shopify/polaris';
 
 export const PricingCard = ({
+  id,
   title,
-  description,
-  price,
-  features,
   featuredText,
-  button,
-  frequency
+  description,
+  features,
+  price,
+  frequency,
 }) => {
   return (
     <div
@@ -53,9 +53,9 @@ export const PricingCard = ({
               {price}
             </Text>
             <Box paddingBlockEnd='200'>
-              <Text as='p' variant='bodySm'>
+              {/* <Text as='p' variant='bodySm'>
                 / {frequency}
-              </Text>
+              </Text> */}
             </Box>
           </InlineStack>
 
@@ -68,9 +68,7 @@ export const PricingCard = ({
           </BlockStack>
 
           <Box paddingBlockStart='200' paddingBlockEnd='200'>
-            <ButtonGroup fullWidth>
-              <Button {...button.props}>{button.content}</Button>
-            </ButtonGroup>
+            <Button disabled={featuredText} variant="primary" size="slim">{featuredText ? "Selected" : "Select Plan"}</Button>
           </Box>
         </BlockStack>
       </Card>

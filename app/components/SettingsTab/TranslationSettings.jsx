@@ -1,6 +1,7 @@
 import { Controller } from "react-hook-form";
 import PropTypes from "prop-types";
-import { TextField, Box, InlineGrid } from "@shopify/polaris";
+import { TextField, Box, InlineGrid, InlineStack, Tooltip, Icon, Text } from "@shopify/polaris";
+import { InfoIcon } from '@shopify/polaris-icons';
 
 /**
  * Translation settings: carousel title, description, add to cart text.
@@ -15,7 +16,7 @@ export function TranslationSettings({ control }) {
                     control={control}
                     render={({ field }) => (
                         <TextField
-                            label="Carousel Title"
+                            label={<InlineStack gap="200"><Text as="p" variant="bodyLg">Carousel Title</Text><Tooltip dismissOnMouseOut content="Choose the title of the carousel."><Icon  source={InfoIcon} /></Tooltip></InlineStack>}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                             autoComplete="off"
@@ -27,7 +28,7 @@ export function TranslationSettings({ control }) {
                     control={control}
                     render={({ field }) => (
                         <TextField
-                            label="Carousel Description"
+                            label={<InlineStack gap="200"><Text as="p" variant="bodyLg">Carousel Description</Text><Tooltip dismissOnMouseOut content="Choose the description of the carousel."><Icon  source={InfoIcon} /></Tooltip></InlineStack>}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                             autoComplete="off"
@@ -39,7 +40,7 @@ export function TranslationSettings({ control }) {
                     control={control}
                     render={({ field }) => (
                         <TextField
-                            label="Add to Cart Text"
+                            label={<InlineStack gap="200"><Text as="p" variant="bodyLg">Add to Cart Text</Text><Tooltip dismissOnMouseOut content="Choose the text of the add to cart button."><Icon  source={InfoIcon} /></Tooltip></InlineStack>}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                             autoComplete="off"
