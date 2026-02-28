@@ -72,6 +72,7 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
     });
     const created = await prisma.videoCartOrderItem.createMany({
       data: normalized.map((i) => ({
+        shopDomain,
         orderId: existing.id,
         feedId: i.feedId,
         videoId: i.videoId,
@@ -89,6 +90,7 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
       ...orderData,
       items: {
         create: normalized.map((i) => ({
+          shopDomain,
           feedId: i.feedId,
           videoId: i.videoId,
           productId: i.productId ?? null,

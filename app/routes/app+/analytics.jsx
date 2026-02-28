@@ -1,46 +1,57 @@
-import { boundary } from "@shopify/shopify-app-react-router/server";
+// ─── Remix / React ───────────────────────────────────────────────────────────
+import { useState, useMemo, useCallback } from "react";
+import { useLoaderData, useSearchParams } from "react-router";
+
+// ─── Polaris ─────────────────────────────────────────────────────────────────
 import {
+  ActionList,
   Badge,
   BlockStack,
   Box,
   Button,
   Card,
+  ChoiceList,
   EmptyState,
   Icon,
   IndexTable,
   InlineGrid,
   InlineStack,
   Page,
+  Popover,
   Text,
 } from "@shopify/polaris";
 import {
   OrderIcon,
-  CashDollarIcon,
-  ViewIcon,
-  MegaphoneIcon,
-  CartSaleIcon,
-  CartDownIcon,
-  ChatIcon,
-  EmailIcon,
+  ChartVerticalIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  RewardIcon
 } from "@shopify/polaris-icons";
-import { useState, useMemo, useEffect } from "react";
-import { useLoaderData, useSearchParams } from "react-router";
-import {onCLS, onINP, onLCP}  from 'web-vitals'
+
+
+// ─── Internal ────────────────────────────────────────────────────────────────
 import DateRangePicker from "../../components/DatePicker/DatePicker.jsx";
-import { OnboardingSetup } from "../../components/OnboardingSetup/OnboardingSetup.jsx";
 import { authenticate } from "../../config/shopify.server.js";
 import * as FeedAnalyticsModel from "../../models/feedAnalytics.server.js";
 import * as VideoAnalyticsModel from "../../models/videoAnalytics.server.js";
 import * as VideoCartOrderModel from "../../models/videoCartOrder.server.js";
 import * as VideoModel from "../../models/video.server.js";
 import Chart from "../../components/Chart/Chart.jsx";
+import SparkLine from "../../components/Chart/SparkLine.jsx";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────────────────────────────────────
 
 function getDefaultDateRange() {
   const end = new Date();
+  end.setHours(23, 59, 59, 999);
+
   const start = new Date();
   start.setDate(start.getDate() - 7);
-  // start.setHours(0, 0, 0, 0);
+  start.setHours(0, 0, 0, 0);
+
   return { start, end };
 }
 
@@ -50,7 +61,11 @@ function parseDateRange(request) {
   const endParam = url.searchParams.get("end");
   if (startParam && endParam) {
     const start = new Date(startParam);
+    start.setHours(0, 0, 0, 0);
+
     const end = new Date(endParam);
+    end.setHours(23, 59, 59, 999);
+
     if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
       return { start, end };
     }
@@ -58,119 +73,6 @@ function parseDateRange(request) {
   return getDefaultDateRange();
 }
 
-export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  try {
-    const { start, end } = parseDateRange(request);
-    const url = new URL(request.url);
-    const ordersCursor = url.searchParams.get("ordersCursor") ?? undefined;
-
-    const [widgetAgg, videoAgg, shopVideos, orderStats, dailyFeed, dailyVideo, ordersPage] =
-      await Promise.all([
-        FeedAnalyticsModel.getAggregatedByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoAnalyticsModel.getAggregatedByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop),
-        VideoCartOrderModel.getOrderStatsByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        FeedAnalyticsModel.getDailyByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoAnalyticsModel.getDailyByShop(session.shop, {
-          startDate: start,
-          endDate: end,
-        }),
-        VideoCartOrderModel.findByShopPaginated(session.shop, {
-          startDate: start,
-          endDate: end,
-          limit: 5,
-          cursor: ordersCursor,
-        }),
-      ]);
-
-      const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30)
-
-    const totalImpressions =
-      (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
-    const totalVideoViews = videoAgg.videoViews ?? 0;
-    const totalAddToCart =
-      (widgetAgg.widgetAddToCart ?? 0) + (videoAgg.videoAddToCart ?? 0);
-    const totalOrders = orderStats.orderCount ?? 0;
-    const totalRevenue = orderStats.totalRevenue ?? 0;
-    const atcRate =
-      totalVideoViews > 0
-        ? totalAddToCart / totalVideoViews
-        : totalImpressions > 0
-          ? totalAddToCart / totalImpressions
-          : 0;
-
-    return {
-      analytics: {
-        totalOrderCount: totalOrders,
-        totalRevenue,
-        atcRate,
-        totalImpressions,
-        totalVideoViews,
-        totalAddToCart,
-        widgetImpressions: widgetAgg.widgetImpressions ?? 0,
-        widgetAddToCart: widgetAgg.widgetAddToCart ?? 0,
-        widgetOrders: widgetAgg.widgetOrders ?? 0,
-        widgetRevenue: widgetAgg.widgetRevenue ?? 0,
-        videoImpressions: videoAgg.videoImpressions ?? 0,
-        videoViews: videoAgg.videoViews ?? 0,
-        videoAddToCart: videoAgg.videoAddToCart ?? 0,
-        videoOrders: videoAgg.videoOrders ?? 0,
-        videoRevenue: videoAgg.videoRevenue ?? 0,
-        muxMetrics,
-      },
-      dateRange: { start: start.toISOString(), end: end.toISOString() },
-      chartData: mergeDailyChartData(dailyFeed, dailyVideo),
-      orders: ordersPage.orders,
-      ordersNextCursor: ordersPage.nextCursor,
-    };
-  } catch (error) {
-    console.error("Error in loader:", error);
-    throw new Error("Failed to load analytics data");
-  }
-};
-
-function mergeDailyChartData(dailyFeed, dailyVideo) {
-  const byDate = new Map();
-  for (const row of dailyFeed ?? []) {
-    byDate.set(row.date, {
-      date: row.date,
-      videoViews: 0,
-      orders: row.widgetOrders ?? 0,
-      impressions: row.widgetImpressions ?? 0,
-      addToCart: row.widgetAddToCart ?? 0,
-    });
-  }
-  for (const row of dailyVideo ?? []) {
-    const cur = byDate.get(row.date) ?? {
-      date: row.date,
-      videoViews: 0,
-      orders: 0,
-      impressions: 0,
-      addToCart: 0,
-    };
-    cur.videoViews += row.videoViews ?? 0;
-    cur.orders = (cur.orders ?? 0) + (row.videoOrders ?? 0);
-    cur.impressions += row.videoImpressions ?? 0;
-    cur.addToCart += row.videoAddToCart ?? 0;
-    byDate.set(row.date, cur);
-  }
-  return Array.from(byDate.values()).sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
-}
 
 function formatRevenue(value) {
   if (value == null || Number.isNaN(value)) return "0";
@@ -180,126 +82,322 @@ function formatRevenue(value) {
   return num.toFixed(2);
 }
 
-const defaultOnboardingItems = [
-  {
-    id: "check-app-extension-status",
-    title: "Check app embedded status",
-    description: "Check if the app is embedded in the store.",
-    complete: false,
-    primaryButton: {
-      content: "Check status",
-      props: { onClick: () => { } },
+function mergeDailyChartData(dailyFeed, dailyVideo) {
+  const byDate = new Map();
+
+  for (const row of dailyFeed ?? []) {
+    byDate.set(row.date, {
+      date: row.date,
+      videoViews: 0,
+      orders: row.widgetOrders ?? 0,
+      impressions: row.widgetImpressions ?? 0,
+      addToCart: row.widgetAddToCart ?? 0,
+    });
+  }
+
+  for (const row of dailyVideo ?? []) {
+    const cur = byDate.get(row.date) ?? {
+      date: row.date,
+      videoViews: 0,
+      orders: 0,
+      impressions: 0,
+      addToCart: 0,
+    };
+    cur.videoViews += row.videoViews ?? 0;
+    cur.orders += row.videoOrders ?? 0;
+    cur.impressions += row.videoImpressions ?? 0;
+    cur.addToCart += row.videoAddToCart ?? 0;
+    byDate.set(row.date, cur);
+  }
+
+  return Array.from(byDate.values()).sort((a, b) =>
+    a.date.localeCompare(b.date),
+  );
+}
+
+function getChartTrend(chartData, key, asPercent = false) {
+  if (!chartData?.length || chartData.length < 2) return null;
+  const prev = chartData[chartData.length - 2][key] ?? 0;
+  const curr = chartData[chartData.length - 1][key] ?? 0;
+  const diff = curr - prev;
+  if (diff === 0 && !asPercent) return null;
+  if (asPercent) {
+    const pct = prev === 0 ? 100 : ((curr - prev) / prev) * 100;
+    return { direction: diff > 0 ? "up" : "down", diff: `${Math.abs(pct).toFixed(1)}%` };
+  }
+  return { direction: diff > 0 ? "up" : "down", diff: Math.abs(diff) };
+}
+
+
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+
+  const { start, end } = parseDateRange(request);
+  const url = new URL(request.url);
+  const ordersCursor = url.searchParams.get("ordersCursor") ?? undefined;
+
+  // Previous period window (for percent-change comparisons)
+  const rangeMs = end - start;
+  const prevEnd = new Date(start);
+  prevEnd.setDate(prevEnd.getDate() - 1);
+  const prevStart = new Date(prevEnd.getTime() - rangeMs);
+
+  const [
+    widgetAgg, videoAgg, shopVideos,
+    orderStats, prevOrderStats,
+    dailyFeed, dailyVideo,
+    ordersPage,
+  ] = await Promise.all([
+    FeedAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
+    VideoAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
+    VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop),
+    VideoCartOrderModel.getOrderStatsByShop(session.shop, { startDate: start, endDate: end }),
+    VideoCartOrderModel.getOrderStatsByShop(session.shop, { startDate: prevStart, endDate: prevEnd }),
+    FeedAnalyticsModel.getDailyByShop(session.shop, { startDate: start, endDate: end }),
+    VideoAnalyticsModel.getDailyByShop(session.shop, { startDate: start, endDate: end }),
+    VideoCartOrderModel.findByShopPaginated(session.shop, {
+      startDate: start,
+      endDate: end,
+      limit: 5,
+      cursor: ordersCursor,
+    }),
+  ]);
+
+  const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+
+  const totalImpressions = (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
+  const totalVideoViews = videoAgg.videoViews ?? 0;
+  const totalAddToCart = (widgetAgg.widgetAddToCart ?? 0) + (videoAgg.videoAddToCart ?? 0);
+  const totalOrders = orderStats.orderCount ?? 0;
+  const totalRevenue = orderStats.totalRevenue ?? 0;
+  const atcRate =
+    totalVideoViews > 0 ? totalAddToCart / totalVideoViews
+      : totalImpressions > 0 ? totalAddToCart / totalImpressions
+        : 0;
+
+  return {
+    analytics: {
+      totalOrderCount: totalOrders,
+      totalRevenue,
+      atcRate,
+      totalImpressions,
+      totalVideoViews,
+      totalAddToCart,
+      widgetImpressions: widgetAgg.widgetImpressions ?? 0,
+      widgetAddToCart: widgetAgg.widgetAddToCart ?? 0,
+      videoImpressions: videoAgg.videoImpressions ?? 0,
+      videoViews: videoAgg.videoViews ?? 0,
+      videoAddToCart: videoAgg.videoAddToCart ?? 0,
+      muxMetrics,
+      percentChange: {
+        orders: getChartTrend(dailyFeed, "widgetOrders"),
+        revenue: getChartTrend(dailyFeed, "widgetRevenue", true),
+        addToCart: getChartTrend(dailyFeed, "widgetAddToCart"),
+        views: getChartTrend(dailyFeed, "videoViews"),
+      },
     },
-  },
-  {
-    id: "add-videos",
-    title: "Add videos to your products",
-    description:
-      "Connect product videos so customers can watch before they buy.",
-    complete: false,
-    primaryButton: {
-      content: "Add videos",
-      props: { url: "/products" },
-    },
-  },
-  {
-    id: "review-analytics",
-    title: "Review your analytics",
-    description:
-      "Check video performance and conversion stats in the dashboard.",
-    complete: false,
-    primaryButton: {
-      content: "View analytics",
-      props: { onClick: () => { } },
-    },
-  },
+    dateRange: { start: start.toISOString(), end: end.toISOString() },
+    chartData: mergeDailyChartData(dailyFeed, dailyVideo),
+    orders: ordersPage.orders,
+    ordersNextCursor: ordersPage.nextCursor ?? null,
+  };
+};
+
+const LineIcon = () => (
+  <svg
+    width="20" height="20" viewBox="0 0 24 24"
+    fill="none" xmlns="http://www.w3.org/2000/svg"
+    transform="rotate(270)"
+  >
+    <path
+      d="M12 15V9"
+      stroke="#919191" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const DashedLabel = ({ children }) => (
+  <Box borderBlockEndWidth="050" borderStyle="dashed" borderColor="border-disabled">
+    {children}
+  </Box>
+);
+
+function ChangeBadge({ value }) {
+  if (value == null) return <Text tone="subdued">—</Text>;
+  return (
+    <Badge tone={value?.direction === "up" ? "success" : "critical"}>
+      <InlineStack blockAlign="center" wrap={false}>
+        {value.direction === "up" ? `+${value.diff}` : `-${value.diff}`}
+        {value.direction === "up" ? <Icon source={ArrowUpIcon} /> : <Icon source={ArrowDownIcon} />}
+      </InlineStack>
+    </Badge>
+  );
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MetricCard  — top summary strip
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MetricCard({ title, value, change, sparkline, isLast = false }) {
+
+  return (
+    <Box
+      borderInlineEndWidth={isLast ? undefined : "050"}
+      borderStyle="solid"
+      borderColor="border-disabled"
+      paddingInlineEnd="300"
+    >
+      <InlineStack gap="200" wrap={false}>
+        <BlockStack gap="200">
+          <Text as="h2" variant="bodyMd" fontWeight="semibold">
+            <DashedLabel>{title}</DashedLabel>
+          </Text>
+          <InlineStack gap="200" blockAlign="center" wrap={false}>
+            <Text as="h3" variant="headingLg" fontWeight="medium">
+              {value}
+            </Text>
+            <ChangeBadge value={change} />
+          </InlineStack>
+        </BlockStack>
+        <SparkLine values={sparkline} />
+      </InlineStack>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OverviewRow — right-hand summary list
+// ─────────────────────────────────────────────────────────────────────────────
+
+function OverviewRow({ label, value, shaded }) {
+  return (
+    <Box
+      padding="300"
+      background={shaded ? "bg-surface-secondary" : undefined}
+      borderRadius="200"
+    >
+      <InlineStack gap="200" align="space-between">
+        <Text as="h3" variant="bodyMd" fontWeight="medium">{label}</Text>
+        <InlineStack gap="100" blockAlign="center">
+          <Text as="h3" variant="bodyMd" fontWeight="medium">{value ?? "—"}</Text>
+          <LineIcon />
+        </InlineStack>
+      </InlineStack>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Page component
+// ─────────────────────────────────────────────────────────────────────────────
+
+const METRIC_CHOICES = [
+  { label: "Impressions", value: "impressions" },
+  { label: "Views", value: "videoViews" },
+  { label: "Add to cart", value: "addToCart" },
+  { label: "Orders", value: "orders" },
+  { label: "Revenue", value: "revenue" },
+  { label: "ATC rate", value: "atcRate" },
+  { label: "Product Clicks", value: "productClicks" },
 ];
 
-export default function Index() {
-  const loaderData = useLoaderData?.() ?? {};
-  const { analytics = {}, dateRange } = loaderData;
+export default function AnalyticsPage() {
+  const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null } =
+    useLoaderData() ?? {};
+
+
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedMetrics, setSelectedMetrics] = useState(["orders", "revenue"]);
+  const [popoverActive, setPopoverActive] = useState(false);
+  const [tableView, setTableView] = useState("feeds");
 
-  console.log("muxMetrics ---------->",   analytics.muxMetrics);
+  const togglePopover = useCallback(() => setPopoverActive((v) => !v), []);
 
-  useEffect(() => {
-    onCLS(console.log);
-    onINP(console.log);
-    onLCP(console.log);
-  }, []);
+  const [active, setActive] = useState(false);
 
-  const date = useMemo(() => {
-    if (dateRange?.start && dateRange?.end) {
-      return { start: new Date(dateRange.start), end: new Date(dateRange.end) };
-    }
-    return { start: null, end: null };
-  }, [dateRange?.start, dateRange?.end]);
+  const toggleActive = useCallback(() => setActive((active) => !active), []);
 
-  const [onboardingItems, setOnboardingItems] = useState(
-    defaultOnboardingItems,
-  );
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  // Parsed date objects for the DateRangePicker (memoised to avoid churn)
+  const date = useMemo(() => ({
+    start: dateRange?.start ? new Date(dateRange.start) : null,
+    end: dateRange?.end ? new Date(dateRange.end) : null,
+  }), [dateRange?.start, dateRange?.end]);
 
-  const handleOnboardingStepComplete = (id) => {
-    setOnboardingItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, complete: true } : item)),
-    );
-  };
+  function toLocalDateString(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
 
-  const handleDateRangeSelect = ({ start, end }) => {
+  const handleDateRangeSelect = useCallback(({ start, end }) => {
     const params = new URLSearchParams(searchParams);
-    params.set("start", start.toISOString().slice(0, 10));
-    params.set("end", end.toISOString().slice(0, 10));
+    params.set("start", toLocalDateString(start));
+    params.set("end", toLocalDateString(end));
     setSearchParams(params);
-  };
+  }, [searchParams, setSearchParams]);
 
-  const atcPercent =
-    analytics.atcRate != null ? (analytics.atcRate * 100).toFixed(1) : "0";
-
-  const conversionStats = [
-    { title: "Orders", count: analytics.totalOrderCount ?? 0, icon: OrderIcon },
-    {
-      title: "Revenue",
-      count: formatRevenue(analytics.totalRevenue),
-      icon: CashDollarIcon,
-    },
-    { title: "ATC rate", count: `${atcPercent}%`, icon: CartSaleIcon },
-    {
-      title: "Impressions",
-      count: analytics.totalImpressions ?? 0,
-      icon: MegaphoneIcon,
-    },
-    {
-      title: "Video views",
-      count: analytics.muxMetrics.aggregate.views ?? 0,
-      icon: ViewIcon,
-    },
-    {
-      title: "Add to cart",
-      count: analytics.totalAddToCart ?? 0,
-      icon: CartDownIcon,
-    },
-  ];
-
-  const orders = loaderData.orders ?? [];
-  const ordersNextCursor = loaderData.ordersNextCursor ?? null;
-
-  const handleOrdersNext = () => {
+  const handleOrdersNext = useCallback(() => {
     if (!ordersNextCursor) return;
     const params = new URLSearchParams(searchParams);
     params.set("ordersCursor", ordersNextCursor);
     setSearchParams(params);
-  };
+  }, [ordersNextCursor, searchParams, setSearchParams]);
 
-  const orderTableEmptyState = (
-    <EmptyState heading="No orders found" image="/order-table.svg">
-      <p>
-        Orders attributed to video cart will appear here for the selected date
-        range.
-      </p>
-    </EmptyState>
+  const atcPercent =
+    analytics.atcRate != null ? (analytics.atcRate * 100).toFixed(1) : "0";
+
+  // ── Top metric cards config ────────────────────────────────────────────────
+  const metricCards = [
+    {
+      title: "Total Orders",
+      value: analytics.totalOrderCount ?? 0,
+      change: analytics.percentChange?.orders,
+      sparkline: chartData.map((d) => d.orders ?? 0),
+    },
+    {
+      title: "Revenue",
+      value: formatRevenue(analytics.totalRevenue),
+      change: analytics.percentChange?.revenue,
+      sparkline: chartData.map((d) => d.revenue ?? 0),
+    },
+    {
+      title: "Add to cart",
+      value: analytics.totalAddToCart ?? 0,
+      change: analytics.percentChange?.addToCart,
+      sparkline: chartData.map((d) => d.addToCart ?? 0),
+    },
+    {
+      title: "Total Views",
+      value: analytics.muxMetrics?.aggregate?.views ?? 0,
+      change: analytics.percentChange?.views,
+      sparkline: chartData.map((d) => d.videoViews ?? 0),
+      isLast: true,
+    },
+  ];
+
+  console.log("metricCards ---------->", metricCards);
+
+  const activator = (
+    <Button onClick={toggleActive} disclosure>
+      {tableView === "feeds" ? "Feeds" : "Videos"}
+    </Button>
   );
 
+
+
+  // ── Overview rows config ───────────────────────────────────────────────────
+  const overviewRows = [
+    { label: "Impressions", value: analytics.widgetImpressions },
+    { label: "Views", value: analytics.videoImpressions },
+    { label: "Add to cart", value: analytics.videoAddToCart },
+    { label: "ATC rate", value: `${atcPercent}%` },
+    { label: "Product Clicks", value: analytics.productClicks },
+  ];
+
+  // ── Orders table ───────────────────────────────────────────────────────────
   const orderRowMarkup = orders.map((order, index) => (
     <IndexTable.Row id={order.id} key={order.id} position={index}>
       <IndexTable.Cell>
@@ -309,9 +407,7 @@ export default function Index() {
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Text variant="bodyMd" tone="subdued">
-          {order.createdAt
-            ? new Date(order.createdAt).toLocaleDateString()
-            : "—"}
+          {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "—"}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
@@ -326,92 +422,125 @@ export default function Index() {
           {Array.isArray(order.items) ? order.items.length : 0}
         </Text>
       </IndexTable.Cell>
-      {/* <IndexTable.Cell>
-        <Text variant="bodyMd" tone="subdued">
-          {order.currency ?? "—"}
-        </Text>
-      </IndexTable.Cell> */}
     </IndexTable.Row>
   ));
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <Page>
-      <BlockStack gap={400}>
-        {/* {showOnboarding && (
-          <OnboardingSetup
-            items={onboardingItems}
-            onDismiss={() => setShowOnboarding(false)}
-            onStepComplete={handleOnboardingStepComplete}
-          />
-        )} */}
-        <InlineStack align="end" blockAlign="center" gap="200">
-          <DateRangePicker
-            value={date}
-            onDateRangeSelect={handleDateRangeSelect}
-          />
-        </InlineStack>
-        <InlineGrid columns={{ xs: 1, sm: 2, md: 3 }} gap={300}>
-          {conversionStats.map((stat, index) => (
-            <Card key={index}>
-              <InlineStack gap="300">
-                <BlockStack gap="200">
-                  <InlineStack align="space-between" gap="200">
-                    <Text as="h2" variant="bodyLg">
-                      {stat.title}
-                    </Text>
-                    <BlockStack align="end" blockAlign="center" gap="200">
-                      {stat.icon && <Icon source={stat.icon} />}
-                    </BlockStack>
-                  </InlineStack>
-                  <Text as="h3" variant="headingMd" fontWeight="semibold">
-                    {stat.count}
-                  </Text>
-                </BlockStack>
+    <Page
+      title="Analytics"
+      subtitle="Track your video cart performance and conversion rates"
+      titleMetadata={<Icon source={ChartVerticalIcon} />}
+      primaryAction={
+        <DateRangePicker value={date} onDateRangeSelect={handleDateRangeSelect} />
+      }
+    >
+      <BlockStack gap={600}>
+
+        {/* ── Top summary strip ── */}
+        <Card>
+          <InlineGrid columns={4} gap={300}>
+            {metricCards.map((card) => (
+              <MetricCard key={card.title} {...card} />
+            ))}
+          </InlineGrid>
+        </Card>
+
+        {/* ── Chart + overview ── */}
+        <InlineGrid columns={["twoThirds", "oneThird"]} gap={300}>
+          <Card>
+            <BlockStack gap="600">
+              <InlineStack align="space-between">
+                <Text as="h2" variant="bodyMd" fontWeight="semibold">
+                  <DashedLabel>Performance Metrics</DashedLabel>
+                </Text>
+                <Popover
+                  active={popoverActive}
+                  activator={
+                    <Button onClick={togglePopover} disclosure variant="tertiary">
+                      Select metrics
+                    </Button>
+                  }
+                  onClose={togglePopover}
+                >
+                  <Card>
+                    <ChoiceList
+                      allowMultiple
+                      choices={METRIC_CHOICES}
+                      selected={selectedMetrics}
+                      onChange={setSelectedMetrics}
+                    />
+                  </Card>
+                </Popover>
               </InlineStack>
-            </Card>
-          ))}
-        </InlineGrid>
-        <InlineGrid columns={2} gap={300}>
-          <Chart
-            chartData={loaderData.chartData}
-            title="Video Views & Conversions"
-            series="views"
-          />
-          <Chart
-            chartData={loaderData.chartData}
-            title="Impressions & Add to Cart"
-            series="impressions"
-          />
+
+              <Chart chartData={chartData} title="" series="views" metrics={selectedMetrics} />
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="bodyMd" fontWeight="semibold">
+                <DashedLabel>Total Overview</DashedLabel>
+              </Text>
+              {overviewRows.map((row, i) => (
+                <OverviewRow key={row.label} {...row} shaded={i % 2 !== 0} />
+              ))}
+            </BlockStack>
+          </Card>
         </InlineGrid>
 
+
+        {/* ── Performance table ── */}
+
         <BlockStack gap="300">
-          <InlineStack gap="200">
-            <Badge>
-          <Text as="h2" variant="headingMd" fontWeight="semibold">
-            Orders Generated
-          </Text>
-        </Badge>
+          <InlineStack align="space-between">
+            <InlineStack gap="100" blockAlign="center">
+              <Icon source={RewardIcon} />
+              <Text as="h2" variant="headingMd" fontWeight="semibold">
+                Top Performance
+              </Text>
+            </InlineStack>
+            <Popover
+              active={active}
+              activator={activator}
+              autofocusTarget="first-node"
+              onClose={toggleActive}
+            >
+              <ActionList
+                actionRole="menuitem"
+                items={[
+                  {
+                    content: tableView === "feeds" ? "Videos" : "Feeds",
+                    onAction: () => {
+                      setTableView(tableView === "feeds" ? "videos" : "feeds");
+                      toggleActive();
+                    },
+                  },
+                ]}
+              />
+            </Popover>
           </InlineStack>
 
           <Card padding="0">
             <IndexTable
               resourceName={{ singular: "order", plural: "orders" }}
               itemCount={orders.length}
-              emptyState={orderTableEmptyState}
+              emptyState={
+                <EmptyState heading="No orders found" image="/order-table.svg">
+                  <p>Orders attributed to video cart will appear here for the selected date range.</p>
+                </EmptyState>
+              }
               headings={[
                 { title: "Order" },
                 { title: "Date" },
                 { title: "Revenue" },
                 { title: "Items" },
-                // { title: "Currency" },
               ]}
               selectable={false}
               pagination={
                 ordersNextCursor
-                  ? {
-                    hasNext: true,
-                    onNext: handleOrdersNext,
-                  }
+                  ? { hasNext: true, onNext: handleOrdersNext }
                   : undefined
               }
             >
@@ -420,72 +549,46 @@ export default function Index() {
           </Card>
         </BlockStack>
 
-        {/* <BlockStack gap="300">
-          <Card>
-            <BlockStack gap="200">
+        {/* ── Orders table ── */}
+
+        <BlockStack gap="300">
+          <InlineStack>
+            <InlineStack gap="100" blockAlign="start">
+              <Icon source={OrderIcon} />
               <Text as="h2" variant="headingMd" fontWeight="semibold">
-                Get Help{" "}
+                Orders Generated
               </Text>
-              <InlineGrid gap="300" columns={2}>
-                <Box
-                  padding="300"
-                  background="bg-surface-secondary"
-                  borderRadius="200"
-                >
-                  <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                      Live chat
-                    </Text>
-                    <InlineStack
-                      gap="200"
-                      align="space-between"
-                      blockAlign="top"
-                    >
-                      <Text as="p" variant="bodyMd">
-                        Need help? Contact us at
-                      </Text>
-                      <Button icon={ChatIcon} size="slim">
-                        <Text as="p" variant="bodyMd">
-                          Chat with us
-                        </Text>
-                      </Button>
-                    </InlineStack>
-                  </BlockStack>
-                </Box>
-                <Box
-                  padding="300"
-                  background="bg-surface-secondary"
-                  borderRadius="200"
-                >
-                  <BlockStack gap="200">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                      Email Support
-                    </Text>
-                    <InlineStack
-                      gap="200"
-                      align="space-between"
-                      blockAlign="top"
-                    >
-                      <Text as="p" variant="bodyMd">
-                        Need help? Contact us at
-                      </Text>
-                      <Button icon={EmailIcon} size="slim">
-                        <Text as="p" variant="bodyMd">
-                          Email us
-                        </Text>
-                      </Button>
-                    </InlineStack>
-                  </BlockStack>
-                </Box>
-              </InlineGrid>
-            </BlockStack>
+            </InlineStack>
+          </InlineStack>
+
+          <Card padding="0">
+            <IndexTable
+              resourceName={{ singular: "order", plural: "orders" }}
+              itemCount={orders.length}
+              emptyState={
+                <EmptyState heading="No orders found" image="/order-table.svg">
+                  <p>Orders attributed to video cart will appear here for the selected date range.</p>
+                </EmptyState>
+              }
+              headings={[
+                { title: "Order" },
+                { title: "Date" },
+                { title: "Revenue" },
+                { title: "Items" },
+              ]}
+              selectable={false}
+              pagination={
+                ordersNextCursor
+                  ? { hasNext: true, onNext: handleOrdersNext }
+                  : undefined
+              }
+            >
+              {orderRowMarkup}
+            </IndexTable>
           </Card>
-        </BlockStack> */}
+        </BlockStack>
+
       </BlockStack>
     </Page>
   );
 }
-
-export const headers = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};

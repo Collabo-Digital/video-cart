@@ -8,6 +8,7 @@ import { getFeedById } from "../../services/feed/feed.service.server";
 import * as VideoModel from "../../models/video.server";
 
 export const loader = async ({ request, params }) => {
+  console.log('request of feeds $feedId hitted' );
   try {
     const { session } = await authenticate.public.appProxy(request);
     console.log('session of feeds $feedId', session);
