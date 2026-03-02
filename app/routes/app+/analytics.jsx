@@ -1,8 +1,6 @@
-// ─── Remix / React ───────────────────────────────────────────────────────────
-import { useState, useMemo, useCallback } from "react";
-import { useLoaderData, useSearchParams } from "react-router";
 
-// ─── Polaris ─────────────────────────────────────────────────────────────────
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { useFetcher, useLoaderData, useSearchParams } from "react-router";
 import {
   ActionList,
   Badge,
@@ -29,7 +27,6 @@ import {
 } from "@shopify/polaris-icons";
 
 
-// ─── Internal ────────────────────────────────────────────────────────────────
 import DateRangePicker from "../../components/DatePicker/DatePicker.jsx";
 import { authenticate } from "../../config/shopify.server.js";
 import * as FeedAnalyticsModel from "../../models/feedAnalytics.server.js";
@@ -39,95 +36,7 @@ import * as VideoModel from "../../models/video.server.js";
 import Chart from "../../components/Chart/Chart.jsx";
 import SparkLine from "../../components/Chart/SparkLine.jsx";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Utilities
-// ─────────────────────────────────────────────────────────────────────────────
-
-function getDefaultDateRange() {
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-
-  const start = new Date();
-  start.setDate(start.getDate() - 7);
-  start.setHours(0, 0, 0, 0);
-
-  return { start, end };
-}
-
-function parseDateRange(request) {
-  const url = new URL(request.url);
-  const startParam = url.searchParams.get("start");
-  const endParam = url.searchParams.get("end");
-  if (startParam && endParam) {
-    const start = new Date(startParam);
-    start.setHours(0, 0, 0, 0);
-
-    const end = new Date(endParam);
-    end.setHours(23, 59, 59, 999);
-
-    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime())) {
-      return { start, end };
-    }
-  }
-  return getDefaultDateRange();
-}
-
-
-function formatRevenue(value) {
-  if (value == null || Number.isNaN(value)) return "0";
-  const num = Number(value);
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}k`;
-  return num.toFixed(2);
-}
-
-function mergeDailyChartData(dailyFeed, dailyVideo) {
-  const byDate = new Map();
-
-  for (const row of dailyFeed ?? []) {
-    byDate.set(row.date, {
-      date: row.date,
-      videoViews: 0,
-      orders: row.widgetOrders ?? 0,
-      impressions: row.widgetImpressions ?? 0,
-      addToCart: row.widgetAddToCart ?? 0,
-    });
-  }
-
-  for (const row of dailyVideo ?? []) {
-    const cur = byDate.get(row.date) ?? {
-      date: row.date,
-      videoViews: 0,
-      orders: 0,
-      impressions: 0,
-      addToCart: 0,
-    };
-    cur.videoViews += row.videoViews ?? 0;
-    cur.orders += row.videoOrders ?? 0;
-    cur.impressions += row.videoImpressions ?? 0;
-    cur.addToCart += row.videoAddToCart ?? 0;
-    byDate.set(row.date, cur);
-  }
-
-  return Array.from(byDate.values()).sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
-}
-
-function getChartTrend(chartData, key, asPercent = false) {
-  if (!chartData?.length || chartData.length < 2) return null;
-  const prev = chartData[chartData.length - 2][key] ?? 0;
-  const curr = chartData[chartData.length - 1][key] ?? 0;
-  const diff = curr - prev;
-  if (diff === 0 && !asPercent) return null;
-  if (asPercent) {
-    const pct = prev === 0 ? 100 : ((curr - prev) / prev) * 100;
-    return { direction: diff > 0 ? "up" : "down", diff: `${Math.abs(pct).toFixed(1)}%` };
-  }
-  return { direction: diff > 0 ? "up" : "down", diff: Math.abs(diff) };
-}
-
+import { parseDateRange, formatRevenue, mergeDailyChartData, getChartTrend } from "../../lib/utils/common.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -147,6 +56,8 @@ export const loader = async ({ request }) => {
     orderStats, prevOrderStats,
     dailyFeed, dailyVideo,
     ordersPage,
+    feedsData,
+    videosData,
   ] = await Promise.all([
     FeedAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
     VideoAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
@@ -161,6 +72,8 @@ export const loader = async ({ request }) => {
       limit: 5,
       cursor: ordersCursor,
     }),
+    FeedAnalyticsModel.getListofFeedsWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
+    VideoAnalyticsModel.getListofVideosWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
   ]);
 
   const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
@@ -196,6 +109,8 @@ export const loader = async ({ request }) => {
         views: getChartTrend(dailyFeed, "videoViews"),
       },
     },
+    feedsData,
+    videosData,
     dateRange: { start: start.toISOString(), end: end.toISOString() },
     chartData: mergeDailyChartData(dailyFeed, dailyVideo),
     orders: ordersPage.orders,
@@ -236,9 +151,6 @@ function ChangeBadge({ value }) {
 }
 
 
-// ─────────────────────────────────────────────────────────────────────────────
-// MetricCard  — top summary strip
-// ─────────────────────────────────────────────────────────────────────────────
 
 function MetricCard({ title, value, change, sparkline, isLast = false }) {
 
@@ -267,9 +179,6 @@ function MetricCard({ title, value, change, sparkline, isLast = false }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// OverviewRow — right-hand summary list
-// ─────────────────────────────────────────────────────────────────────────────
 
 function OverviewRow({ label, value, shaded }) {
   return (
@@ -289,9 +198,6 @@ function OverviewRow({ label, value, shaded }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Page component
-// ─────────────────────────────────────────────────────────────────────────────
 
 const METRIC_CHOICES = [
   { label: "Impressions", value: "impressions" },
@@ -304,9 +210,14 @@ const METRIC_CHOICES = [
 ];
 
 export default function AnalyticsPage() {
-  const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null } =
-    useLoaderData() ?? {};
+  const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null, feedsData, videosData } = useLoaderData() ?? {};
 
+  const [feeds, setFeeds] = useState(feedsData.feedsWithAnalytics);
+  const [feedsHasMore, setFeedsHasMore] = useState(feedsData?.nextCursor ?? false);
+  const [feedsPreviousCursor, setFeedsPreviousCursor] = useState(feedsData?.previousCursor ?? null);
+  const [videos, setVideos] = useState(videosData?.videosWithAnalytics ?? []);
+  const [videosHasMore, setVideosHasMore] = useState(videosData?.nextCursor ?? false);
+  const [videosPreviousCursor, setVideosPreviousCursor] = useState(videosData?.previousCursor ?? null);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMetrics, setSelectedMetrics] = useState(["orders", "revenue"]);
@@ -318,6 +229,34 @@ export default function AnalyticsPage() {
   const [active, setActive] = useState(false);
 
   const toggleActive = useCallback(() => setActive((active) => !active), []);
+
+  const feedsTableHeadings = [
+    { title: "Feed name" },
+    { title: "Revenue" },
+    { title: "Orders" },
+  ];
+
+  const videosTableHeadings = [
+    { title: "Video title" },
+    { title: "Revenue" },
+    { title: "Orders" },
+  ];
+
+  // After your existing useState declarations for feeds/videos
+
+  useEffect(() => {
+    const nextFeeds = feedsData?.feedsWithAnalytics ?? [];
+    setFeeds(nextFeeds);
+    setFeedsHasMore(feedsData?.nextCursor ?? false);
+    setFeedsPreviousCursor(feedsData?.previousCursor ?? null);
+  }, [feedsData, dateRange?.start, dateRange?.end]);
+
+  useEffect(() => {
+    const nextVideos = videosData?.videosWithAnalytics ?? [];
+    setVideos(nextVideos);
+    setVideosHasMore(videosData?.nextCursor ?? false);
+    setVideosPreviousCursor(videosData?.previousCursor ?? null);
+  }, [videosData, dateRange?.start, dateRange?.end]);
 
   // Parsed date objects for the DateRangePicker (memoised to avoid churn)
   const date = useMemo(() => ({
@@ -331,6 +270,94 @@ export default function AnalyticsPage() {
     const d = String(date.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
+
+  const handleFeedsNext = useCallback(async () => {
+    const response = await fetch("/api/v1/analytics/feeds/getListofFeeds", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cursor: feedsHasMore,
+        direction: "next",
+        take: 5,
+        startDate: date.start,
+        endDate: date.end,
+      }),
+
+    });
+
+    const data = await response.json();
+    if (data.success) {
+      setFeeds(data.data.feedsWithAnalytics);
+      setFeedsHasMore(data.data.nextCursor);
+      setFeedsPreviousCursor(data.data.previousCursor);
+    }
+
+  }, [feedsHasMore, date.start, date.end]);
+
+  const handleFeedsPrevious = useCallback(async () => {
+    const response = await fetch("/api/v1/analytics/feeds/getListofFeeds", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cursor: feedsPreviousCursor,
+        direction: "previous",
+        take: 5,
+        startDate: date.start,
+        endDate: date.end,
+      }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      setFeeds(data.data.feedsWithAnalytics);
+      setFeedsHasMore(data.data.nextCursor);
+      setFeedsPreviousCursor(data.data.previousCursor);
+    }
+
+  }, [feedsPreviousCursor, date.start, date.end]);
+
+  const handleVideosNext = useCallback(async () => {
+    const response = await fetch("/api/v1/analytics/videos/getListofVideos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cursor: videosHasMore,
+        direction: "next",
+        take: 5,
+      }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      setVideos(data.data.videosWithAnalytics);
+      setVideosHasMore(data.data.nextCursor);
+      setVideosPreviousCursor(data.data.previousCursor);
+    }
+  }, [videosHasMore]);
+
+  const handleVideosPrevious = useCallback(async () => {
+    const response = await fetch("/api/v1/analytics/videos/getListofVideos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        cursor: videosPreviousCursor,
+        direction: "previous",
+        take: 5,
+      }),
+    });
+    const data = await response.json();
+    if (data.success) {
+      setVideos(data.data.videosWithAnalytics);
+      setVideosHasMore(data.data.nextCursor);
+      setVideosPreviousCursor(data.data.previousCursor);
+    }
+  }, [videosPreviousCursor]);
 
   const handleDateRangeSelect = useCallback(({ start, end }) => {
     const params = new URLSearchParams(searchParams);
@@ -349,7 +376,7 @@ export default function AnalyticsPage() {
   const atcPercent =
     analytics.atcRate != null ? (analytics.atcRate * 100).toFixed(1) : "0";
 
-  // ── Top metric cards config ────────────────────────────────────────────────
+
   const metricCards = [
     {
       title: "Total Orders",
@@ -378,17 +405,67 @@ export default function AnalyticsPage() {
     },
   ];
 
-  console.log("metricCards ---------->", metricCards);
-
   const activator = (
-    <Button onClick={toggleActive} disclosure>
+    <Button onClick={toggleActive} disclosure variant="tertiary">
       {tableView === "feeds" ? "Feeds" : "Videos"}
     </Button>
   );
 
+  const feedRowMarkup = feeds?.length > 0 ? feeds.map((feed, index) => (
+    <IndexTable.Row id={feed.id} key={feed.id} position={index}>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {feed?.feed?.feedName}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {feed?.widgetRevenue ? `$${Number(feed?.widgetRevenue).toFixed(2)}` : "—"}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {feed?.widgetOrders}
+        </Text>
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  )) : [];
+
+  const videoRowMarkup = videos?.length > 0 ? videos.map((video, index) => (
+    <IndexTable.Row id={video.id} key={video.id} position={index}>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {video?.video?.title}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {video?.videoRevenue ? `$${Number(video?.videoRevenue).toFixed(2)}` : "—"}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {video?.videoOrders}
+        </Text>
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  )) : [];
+
+  const FeedsEmptyState = (
+    <EmptyState heading="No feeds found "
+      image="/empty-feeds-analatyics-table.svg">
+      <p>No feeds found for the selected date range.</p>
+    </EmptyState>
+  );
+
+  const VideosEmptyState = (
+    <EmptyState heading="No videos found" image="/empty-video-analtyics-table.svg">
+      <p>No videos found for the selected date range.</p>
+    </EmptyState>
+  );
 
 
-  // ── Overview rows config ───────────────────────────────────────────────────
+
   const overviewRows = [
     { label: "Impressions", value: analytics.widgetImpressions },
     { label: "Views", value: analytics.videoImpressions },
@@ -397,7 +474,7 @@ export default function AnalyticsPage() {
     { label: "Product Clicks", value: analytics.productClicks },
   ];
 
-  // ── Orders table ───────────────────────────────────────────────────────────
+
   const orderRowMarkup = orders.map((order, index) => (
     <IndexTable.Row id={order.id} key={order.id} position={index}>
       <IndexTable.Cell>
@@ -425,7 +502,7 @@ export default function AnalyticsPage() {
     </IndexTable.Row>
   ));
 
-  // ─────────────────────────────────────────────────────────────────────────
+
   return (
     <Page
       title="Analytics"
@@ -498,7 +575,7 @@ export default function AnalyticsPage() {
             <InlineStack gap="100" blockAlign="center">
               <Icon source={RewardIcon} />
               <Text as="h2" variant="headingMd" fontWeight="semibold">
-                Top Performance
+                Top Performance {tableView === "feeds" ? "Feeds" : "Videos"}
               </Text>
             </InlineStack>
             <Popover
@@ -524,27 +601,32 @@ export default function AnalyticsPage() {
 
           <Card padding="0">
             <IndexTable
-              resourceName={{ singular: "order", plural: "orders" }}
-              itemCount={orders.length}
-              emptyState={
-                <EmptyState heading="No orders found" image="/order-table.svg">
-                  <p>Orders attributed to video cart will appear here for the selected date range.</p>
-                </EmptyState>
-              }
-              headings={[
-                { title: "Order" },
-                { title: "Date" },
-                { title: "Revenue" },
-                { title: "Items" },
-              ]}
+              resourceName={{ singular: tableView === "feeds" ? "feed" : "video", plural: tableView === "feeds" ? "feeds" : "videos" }}
+              itemCount={tableView === "feeds" ? feeds.length : videos?.length ?? 0}
+              headings={tableView === "feeds" ? feedsTableHeadings : videosTableHeadings}
               selectable={false}
-              pagination={
-                ordersNextCursor
-                  ? { hasNext: true, onNext: handleOrdersNext }
-                  : undefined
-              }
+              emptyState={tableView === "feeds" ? FeedsEmptyState : VideosEmptyState}
+              {...(tableView === "feeds" && (feedsHasMore || feedsPreviousCursor)
+                ? {
+                  pagination: {
+                    hasNext: feedsHasMore,
+                    onNext: handleFeedsNext,
+                    hasPrevious: !!feedsPreviousCursor,
+                    onPrevious: handleFeedsPrevious,
+                  },
+                }
+                : tableView === "videos" && (videosHasMore || videosPreviousCursor)
+                  ? {
+                    pagination: {
+                      hasNext: videosHasMore,
+                      onNext: handleVideosNext,
+                      hasPrevious: !!videosPreviousCursor,
+                      onPrevious: handleVideosPrevious,
+                    },
+                  }
+                  : {})}
             >
-              {orderRowMarkup}
+              {tableView === "feeds" ? feedRowMarkup : videoRowMarkup}
             </IndexTable>
           </Card>
         </BlockStack>

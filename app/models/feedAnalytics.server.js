@@ -6,6 +6,10 @@
 
 import prisma from '../config/database.server';
 
+const FEEDS_PAGE_SIZE = 10;
+const ORDER_DESC = [{ widgetRevenue: 'desc' }, { id: 'asc' }];
+const ORDER_ASC = [{ widgetRevenue: 'asc' }, { id: 'desc' }];
+
 /**
  * Normalize to UTC start-of-day for date bucketing
  * @param {Date} d
@@ -182,4 +186,85 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   return Array.from(byDate.entries())
     .map(([, v]) => v)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Get list of feeds with analytics for a shop
+ * @param {string} shopDomain
+ * @param {Object} filters - { widgetRevenue: number }
+ * @param {string} orderBy - 'desc' or 'asc'
+ * @returns {Promise<Array>}
+ */
+export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
+  const { cursor, direction = 'next', take = FEEDS_PAGE_SIZE, startDate, endDate } = options;
+
+  const where = { shopDomain, isDeleted: false };
+  if (startDate != null && endDate != null) {
+    where.date = { gte: toDateOnly(startDate), lte: toDateOnly(endDate) };
+  }
+
+  const include = {
+    feed: {
+      select: {
+        id: true,
+        feedName: true,
+        widgetId: true,
+        widgetType: true,
+        isEnabled: true,
+        shopDomain: true,
+      },
+    },
+  };
+
+  if (!cursor) {
+    const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
+      where,
+      orderBy: ORDER_DESC,
+      take: take + 1,
+      include,
+    });
+    const hasMore = feedsWithAnalyticsItems.length > take;
+    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
+    return {
+      feedsWithAnalytics,
+      nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
+      previousCursor: null,
+    };
+  }
+
+  if (direction === 'next') {
+    const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
+      where,
+      orderBy: ORDER_DESC,
+      cursor: { id: cursor },
+      skip: 1,
+      take: take + 1,
+      include,
+    });
+    const hasMore = feedsWithAnalyticsItems.length > take;
+    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
+    return {
+      feedsWithAnalytics,
+      nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
+      previousCursor: cursor,
+    };
+  }
+
+  const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
+    where,
+    orderBy: ORDER_ASC,
+    cursor: { id: cursor },
+    skip: 1,
+    take: take + 1,
+    include,
+  });
+  const hasMore = feedsWithAnalyticsItems.length > take;
+  const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
+  feedsWithAnalytics.reverse();
+
+  return {
+    feedsWithAnalytics,
+    nextCursor: cursor,
+    previousCursor: hasMore ? feedsWithAnalytics[0].id : null,
+  };
 }

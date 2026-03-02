@@ -6,6 +6,10 @@
 
 import prisma from '../config/database.server';
 
+const VIDEOS_PAGE_SIZE = 10;
+const VIDEO_ORDER_DESC = [{ videoRevenue: 'desc' }, { id: 'asc' }];
+const VIDEO_ORDER_ASC = [{ videoRevenue: 'asc' }, { id: 'desc' }];
+
 /**
  * Normalize to UTC start-of-day for date bucketing
  * @param {Date} d
@@ -202,4 +206,84 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   return Array.from(byDate.entries())
     .map(([, v]) => v)
     .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+
+/**
+ * Get list of videos with analytics for a shop (cursor-based, previous + next).
+ * @param {string} shopDomain
+ * @param {Object} options - { cursor?, direction: 'next'|'prev', take? }
+ * @returns {Promise<{ items: Array, nextCursor: string | null, previousCursor: string | null }>}
+ */
+export async function getListofVideosWithAnalytics(shopDomain, options = {}) {
+  const { cursor, direction = 'next', take = VIDEOS_PAGE_SIZE, startDate, endDate } = options;
+
+  const where = { shopDomain, isDeleted: false };
+  if (startDate != null && endDate != null) {
+    where.date = { gte: toDateOnly(startDate), lte: toDateOnly(endDate) };
+  }
+
+  const include = {
+    video: {
+      select: {
+        id: true,
+        title: true,
+        videoPlaybackId: true,
+      },
+    },
+  };
+
+  if (!cursor) {
+    const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
+      where,
+      orderBy: VIDEO_ORDER_DESC,
+      take: take + 1,
+      include,
+    });
+    const hasMore = videosWithAnalyticsItems.length > take;
+    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
+
+    return {
+      videosWithAnalytics,
+      nextCursor: hasMore ? videosWithAnalytics[videosWithAnalytics.length - 1].id : null,
+      previousCursor: null,
+    };
+  }
+
+  if (direction === 'next') {
+    const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
+      where,
+      orderBy: VIDEO_ORDER_DESC,
+      cursor: { id: cursor },
+      skip: 1,
+      take: take + 1,
+      include,
+    });
+    const hasMore = videosWithAnalyticsItems.length > take;
+    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
+
+    return {
+      videosWithAnalytics,
+      nextCursor: hasMore ? videosWithAnalytics[videosWithAnalytics.length - 1].id : null,
+      previousCursor: cursor,
+    };
+  }
+
+  const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
+    where,
+    orderBy: VIDEO_ORDER_ASC,
+    cursor: { id: cursor },
+    skip: 1,
+    take: take + 1,
+    include,
+  });
+  const hasMore = videosWithAnalyticsItems.length > take;
+  const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
+  videosWithAnalytics.reverse();
+
+  return {
+    videosWithAnalytics,
+    nextCursor: cursor,
+    previousCursor: hasMore ? videosWithAnalytics[0].id : null,
+  };
 }
