@@ -26,14 +26,18 @@ import { PlayCircleIcon, QuestionCircleIcon, ChatIcon, NotificationIcon, PlusIco
 
 import { WIDGET_TYPES } from "../../lib/constants/common";
 import { findByDomain } from "../../models/shop.server";
+import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server";
+import * as VideoModel from "../../models/video.server";
 
 export const loader = async ({ request }) => {
     try {
         const { session } = await authenticate.admin(request);
         const shopData = await findByDomain(session.shop);
+        const shopVideos = await VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop);
+        const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
         // const feeds = await getFeedsByShop(session.shop);
         const feeds = [];
-        return { feeds, session, shopData };
+        return { feeds, session, shopData, muxMetrics };
     } catch (error) {
         console.error("Error fetching feeds:", error);
         return { feeds: [] };
@@ -41,26 +45,37 @@ export const loader = async ({ request }) => {
 };
 
 export default function IndexPage() {
-    const { feeds, shopData } = useLoaderData();
+    const { feeds, shopData, muxMetrics } = useLoaderData();
+    const totalViews = muxMetrics.aggregate.views;
     const navigate = useNavigate();
     const modalRef = useRef(null);
     const [activePopoverId, setActivePopoverId] = useState(null);
 
+    const progressBarValue = getPercentage(totalViews, shopData?.videoViewLimit ?? 0);
+
     const handleChatWithUs = () => {
-       Crisp.chat.open();
+        Crisp.chat.open();
     };
 
     useEffect(() => {
         onCLS(console.log);
         onINP(console.log);
         onLCP(console.log);
-       if (shopData) {
-        initCrisp(shopData);
-       }
+        if (shopData) {
+            initCrisp(shopData);
+        }
     }, []);
 
-    console.log(feeds);
+    function getPercentage(used, total) {
+        if (total === 0) return 0;
+        return Math.round((used / total) * 100);
+    }
 
+
+
+
+    console.log(feeds);
+    console.log(muxMetrics);
     return (
         <Page
             title="Video Cart"
@@ -76,15 +91,16 @@ export default function IndexPage() {
                         <InlineStack align="start" blockAlign="center" gap="400" wrap={false}>
                             <BlockStack gap="100">
                                 <Text as="p" variant="bodyMd" fontWeight="semibold">Plan</Text>
-                                <Badge tone="info">Free</Badge>
+                                <Badge tone="info">{shopData?.appPlan ?? 'Free'}</Badge>
                             </BlockStack>
                             <div style={{ width: '1px', height: 'stretch', backgroundColor: '#e3e3e3' }} />
                             <Box width="100%" >
-                                <InlineStack align="start" blockAlign="center" gap="200" wrap={false}>
+                                <InlineStack align="center" blockAlign="center" inlineAlign="center" gap="200" wrap={false}>
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{totalViews}</Text>
                                     <Box width="100%">
-                                        <ProgressBar progress={0} size="small" tone="critical" />
+                                        <ProgressBar progress={progressBarValue} size="small" tone={progressBarValue >= 80 ? 'critical' : 'highlight'} />
                                     </Box>
-                                    <Text as="p" variant="bodyMd">∞</Text>
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{shopData?.videoViewLimit ?? 0}</Text>
                                 </InlineStack>
                                 <div style={{ paddingTop: '8px' }} />
                                 <Button size="slim" onClick={() => navigate('/app/pricing')}>View Billing</Button>

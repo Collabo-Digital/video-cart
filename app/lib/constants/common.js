@@ -98,15 +98,103 @@ export const WIDGET_TYPES = [
     },
 ];
 
-export const APP_PLANS = [
+export const APP_FREE_PLAN = {
+    id: 1,
+    name: 'Free',
+    value: 'free',
+    price: '0',
+    description: 'For those getting started with shoppable videos.',
+    features: [
+        '500 views per month',
+        '10 video uploads',
+        'Unlimited Impression',
+        'All app features'
+    ],
+};
+
+export const APP_BILLING_PLANS = {
+    Basic: {
+        lineItems: [
+            {
+                amount: 9.99,
+                currencyCode: 'USD',
+                interval: 'EVERY_30_DAYS',
+            },
+        ],
+    },
+    Growth: {
+        lineItems: [
+            {
+                amount: 49.99,
+                currencyCode: 'USD',
+                interval: 'EVERY_30_DAYS',
+            },
+        ],
+    },
+    Advanced: {
+        lineItems: [
+            {
+                amount: 99.99,
+                currencyCode: 'USD',
+                interval: 'EVERY_30_DAYS',
+            },
+        ],
+    },
+};
+
+export const APP_BILLING_PLANS_NAMES = ["Basic", "Growth", "Advanced"];
+
+export const VIDEO_VIEW_LIMITS = {
+    free: 500,
+    basic: 10000,
+    growth: 25000,
+    advanced: 50000,
+};
+export const VIDEO_UPLOAD_LIMITS = {
+    free: 10,
+    basic: 25,
+    growth: 50,
+    advanced: 100,
+};
+
+export const APP_PAID_PLANS = [
+
     {
         id: 1,
-        name: 'Free',
-        value: 'free',
+        name: 'Basic',
+        value: 'basic',
+        price: '9.99',
         description: 'For those getting started with shoppable videos.',
         features: [
-            'Create unlimited widgets',
-            '24/7 Customer Support',
+            '10,000 views per month',
+            '25 video uploads',
+            'Unlimited Impression',
+            'All app features',
+        ],
+    },
+    {
+        id: 2,
+        name: 'Growth',
+        value: 'growth',
+        price: '49.99',
+        description: 'For those getting started with shoppable videos.',
+        features: [
+            '25,000 views per month',
+            '50 video uploads',
+            'Unlimited Impression',
+            'All app features',
+        ],
+    }, {
+        id: 3,
+        name: 'Advanced',
+        value: 'advanced',
+        price: '99.99',
+        description: 'For those getting started with shoppable videos.',
+        features: [
+            '50,000 views per month',
+            '100 video uploads',
+            'Unlimited Impression',
+            'All app features',
         ],
     },
 ];

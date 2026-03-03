@@ -7,6 +7,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./database.server";
 import { doTaskAfterAuth } from "../services/shop/onboarding.service";
+import { APP_BILLING_PLANS } from "../lib/constants/common";
 
 
 const shopify = shopifyApp({
@@ -18,6 +19,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  billing: APP_BILLING_PLANS,
   hooks: {
     afterAuth: async ({ session, admin }) => {
       await doTaskAfterAuth({ session, admin });
@@ -34,6 +36,7 @@ const shopify = shopifyApp({
 export default shopify;
 export const apiVersion = ApiVersion.October25;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
+export const appUrl = shopify.appUrl;
 export const authenticate = shopify.authenticate;
 export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
