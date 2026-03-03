@@ -5,6 +5,7 @@ register(({ analytics, settings }) => {  // ← Add 'settings' parameter here
   console.log('[Video Cart Pixel] Initializing...');
   // console.log('process.env.SHOPIFY_APP_URL glaobla ----->', process.env.SHOPIFY_APP_URL);
   console.log('settings global variable ----->', settings);
+  console.log('https://johnny-cottages-advance-bookmark.trycloudflare.com/ ----->');
 
   // REQUIRED: Subscribe to at least one event
   analytics.subscribe("page_viewed", (event) => {
@@ -90,12 +91,13 @@ register(({ analytics, settings }) => {  // ← Add 'settings' parameter here
     if (videoItems.length > 0) {
       try {
         // Get backend URL from settings or use hardcoded URL
-        const backendUrl = settings?.apiBaseUrl || 'https://your-actual-backend-url.com';
+        const backendUrl = 'https://johnny-cottages-advance-bookmark.trycloudflare.com' || settings?.apiBaseUrl || 'https://your-actual-backend-url.com';
 
         if (!backendUrl || backendUrl === 'https://your-actual-backend-url.com') {
           console.warn('[Video Cart Pixel] Conversion skipped: backend URL not configured.');
           return;
         }
+
 
         console.log('[Video Cart Pixel] Conversion:', videoItems);
 

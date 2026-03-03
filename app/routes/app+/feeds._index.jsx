@@ -15,12 +15,14 @@ import {
   Button,
   InlineStack,
   Banner,
+  Icon,
 } from "@shopify/polaris";
 import {onCLS, onINP, onLCP}  from 'web-vitals'
 import { getFeedsByShop, getFeedById, updateFeed, deleteFeed } from "../../services/feed/feed.service.server";
 import { useLoaderData, useNavigate, useFetcher } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import { EditIcon, PlusIcon, DeleteIcon } from '@shopify/polaris-icons';
+import { VideoFeedsIcon } from "../../components/Icons/VideoFeeds/VideoFeedsIcon";
 
 export const loader = async ({ request }) => {
   try {
@@ -215,6 +217,8 @@ export default function FeedsPage() {
   return (
     <Page
       title="Video Feeds"
+      subtitle="Check out the video feeds and their analytics"
+      titleMetadata={<Icon source={VideoFeedsIcon} />}
       primaryAction={{
         content: "Create Feed",
         icon: PlusIcon,
