@@ -60,6 +60,10 @@ export async function initFeeds() {
       }
       if (!feed.shop) feed.shop = shop;
 
+      const currentPage = window.__video_cart_config__?.store_page || 'other';
+      const feedPage = feed.widgetPage || 'homePage';
+      if (currentPage !== feedPage) continue;
+
       const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;
       const widgetDef = getWidget(widgetType);
       if (!widgetDef?.component) {
