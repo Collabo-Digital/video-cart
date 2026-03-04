@@ -17,7 +17,7 @@ api_version = "2026-04"
   uri = "/webhooks/app/uninstalled"
 
   [[webhooks.subscriptions]]
-  uri = "/webhooks/app/shopify_webhooks"
+  uri = "/webhooks/app/shopify-webhooks"
   compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
 [access_scopes]
