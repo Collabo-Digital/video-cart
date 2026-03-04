@@ -6,6 +6,7 @@
 
 import * as ShopModel from '../../models/shop.server';
 import { ensureWebPixelInstalled } from "../../lib/utils/webPixel";
+import { VIDEO_UPLOAD_LIMITS, VIDEO_VIEW_LIMITS } from '../../lib/constants/common';
 
 /**
  * Handle post-authentication tasks
@@ -89,7 +90,9 @@ export async function doTaskAfterAuth({ session, admin }) {
         // App specific
         isActive: true,
         installedAt: new Date(),
-        appPlan: 'free',
+        appPlan: 'Free',
+        videoViewLimit: VIDEO_VIEW_LIMITS.free,
+        videoUploadLimit: VIDEO_UPLOAD_LIMITS.free,
       });
 
       console.log('Shop saved to database successfully:', {

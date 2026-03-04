@@ -59,6 +59,10 @@ model Shop {
   uninstalledAt DateTime?
   appPlan       String?
   crispObject   Json?
+  videoViewLimit Int?
+  videoViewCount Int?
+  videoUploadLimit Int? 
+  videoViewLimitReached Boolean? @default(false)
 
   // Relations
   feeds               Feed[]

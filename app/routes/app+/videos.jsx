@@ -14,7 +14,8 @@ import {
   Avatar,
   Banner,
   BlockStack,
-} from "@shopify/polaris";
+  Icon,
+  } from "@shopify/polaris";
 import {onCLS, onINP, onLCP}  from 'web-vitals'
 import { useLoaderData, useNavigate, useSearchParams, useSubmit, useActionData } from "react-router";
 import { authenticate } from "../../config/shopify.server";
@@ -24,6 +25,7 @@ import {
   DeleteIcon,ChartVerticalFilledIcon
 } from '@shopify/polaris-icons';
 import { useAppBridge } from "@shopify/app-bridge-react";
+import { VideoLibraryIcon } from "../../components/Icons/VideoLibrary/VideoLibrary";
 
 const PER_PAGE = 10;
 
@@ -220,7 +222,7 @@ export default function VideosPage() {
 
   return (
     <Frame>
-      <Page title="Videos Library">
+      <Page title="Videos Library" subtitle="Check out the uploaded videos" titleMetadata={<Icon source={VideoLibraryIcon}  />}>
         <BlockStack gap="400">
           {actionData?.error && (
             <Banner tone="critical" onDismiss={() => {}}>
