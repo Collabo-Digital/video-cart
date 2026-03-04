@@ -76,7 +76,10 @@ export const loader = async ({ request }) => {
     VideoAnalyticsModel.getListofVideosWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
   ]);
 
-  const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+  let muxMetrics = null;
+  if(shopVideos.length > 0) {
+    muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+  }
 
   const totalImpressions = (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
   const totalVideoViews = videoAgg.videoViews ?? 0;
