@@ -252,6 +252,7 @@ export async function findAllPaginatedWithWidgets(options = {}) {
  * @returns {Promise<Array>} Array of video objects with id and videoPlaybackId
  */
 export async function findVideoIdsAndPlaybackIdsByShop(shopDomain) {
+  console.log("shopDomain form video.server.js -->", shopDomain);
   const videos = await prisma.video.findMany({
     where: { shopDomain },
     select: { id: true, videoPlaybackId: true },
