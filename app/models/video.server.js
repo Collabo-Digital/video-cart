@@ -253,7 +253,7 @@ export async function findAllPaginatedWithWidgets(options = {}) {
  */
 export async function findVideoIdsAndPlaybackIdsByShop(shopDomain) {
   const videos = await prisma.video.findMany({
-    where: { shop: { is: { shopDomain } } },
+    where: { shopDomain },
     select: { id: true, videoPlaybackId: true },
   });
   return videos.map((v) => ({ videoId: v.id, playbackId: v.videoPlaybackId }));
