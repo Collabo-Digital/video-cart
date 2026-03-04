@@ -34,7 +34,10 @@ export const loader = async ({ request }) => {
         const { session } = await authenticate.admin(request);
         const shopData = await findByDomain(session.shop);
         const shopVideos = await VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop);
-        const muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+        let muxMetrics = null;
+        if(shopVideos.length > 0) {
+            muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+        } 
         // const feeds = await getFeedsByShop(session.shop);
         const feeds = [];
         return { feeds, session, shopData, muxMetrics };
@@ -46,7 +49,7 @@ export const loader = async ({ request }) => {
 
 export default function IndexPage() {
     const { feeds, shopData, muxMetrics } = useLoaderData();
-    const totalViews = muxMetrics.aggregate.views;
+    const totalViews = muxMetrics?.aggregate?.views ?? 0;
     const navigate = useNavigate();
     const modalRef = useRef(null);
     const [activePopoverId, setActivePopoverId] = useState(null);
