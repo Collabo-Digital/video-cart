@@ -7,7 +7,7 @@ export const action = async ({ request }) => {
   const { plan } = await request.json();
   const billingCheck = await billing.request({
     plan: plan,
-    isTest: true,
+    isTest: false,
     returnUrl: `https://admin.shopify.com/store/${shop}/apps/${process.env.SHOPIFY_APP_NAME}/app/pricing`,
   });
 

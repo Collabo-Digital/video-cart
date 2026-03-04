@@ -13,7 +13,7 @@ export const loader = async ({ request }) => {
     // Determine active plan from billing check (adjust based on actual billingCheck shape)
     const activeSubscription = billingCheck?.appSubscriptions?.[0];
     const planName = activeSubscription?.name; // e.g. "Basic", "Growth", "Advanced"
-    const appPlanValue = planName || "";
+    const appPlanValue = planName || "Free";
 
     if (appPlanValue && session.shop) {
       await ShopModel.updateByDomain(session.shop, {

@@ -60,8 +60,8 @@ model Shop {
   appPlan       String?
   crispObject   Json?
   videoViewLimit Int?
-  videoViewCount Int? @default(0)
-  videoUploadLimit Int? @default(0)
+  videoViewCount Int?
+  videoUploadLimit Int? 
   videoViewLimitReached Boolean? @default(false)
 
   // Relations
