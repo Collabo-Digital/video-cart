@@ -5,21 +5,24 @@ name = "Video Cart"
 application_url = "https://video-cart.vercel.app/"
 embedded = true
 
-
 [webhooks]
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "https://video-cart.vercel.app/webhooks/app/uninstalled"
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "https://video-cart.vercel.app/webhooks/app/scopes_update"
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/shopify-webhooks"
+  compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_app_proxy,write_products, write_pixels,read_customer_events"
+scopes = "read_customer_events,write_app_proxy,write_pixels"
 
 [auth]
 redirect_urls = [ "https://video-cart.vercel.app/api/auth" ]
@@ -28,6 +31,3 @@ redirect_urls = [ "https://video-cart.vercel.app/api/auth" ]
 url = "https://video-cart.vercel.app/proxy"
 subpath = "video-widget"
 prefix = "apps"
-
-[build]
-automatically_update_urls_on_dev = true

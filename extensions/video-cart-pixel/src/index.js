@@ -91,9 +91,9 @@ register(({ analytics, settings }) => {  // ← Add 'settings' parameter here
     if (videoItems.length > 0) {
       try {
         // Get backend URL from settings or use hardcoded URL
-        const backendUrl = 'https://johnny-cottages-advance-bookmark.trycloudflare.com' || settings?.apiBaseUrl || 'https://your-actual-backend-url.com';
+        const backendUrl = settings?.apiBaseUrl || 'https://video-cart-dev.vercel.app';
 
-        if (!backendUrl || backendUrl === 'https://your-actual-backend-url.com') {
+        if (!backendUrl || backendUrl === 'https://video-cart-dev.vercel.app') {
           console.warn('[Video Cart Pixel] Conversion skipped: backend URL not configured.');
           return;
         }
