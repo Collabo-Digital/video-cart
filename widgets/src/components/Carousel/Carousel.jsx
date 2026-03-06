@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
 import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
-import { getThumbnailPreviewUrl } from '../../shared/mux';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { api } from '../../api';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
 import './carousel.css';
@@ -8,6 +8,7 @@ import { addToCart } from '../../utils/shopifyService';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { Toast } from '../common/Toast/Toast';
 import { TOAST_DURATION_MS_EXPORT as TOAST_DURATION_MS } from '../common/Toast/Toast';
+import { buildDesignStyles } from '../../utils/designStyles';
 
 /** Fire analytics event to DB (app proxy). Fire-and-forget; does not throw. */
 async function trackDbEvent(payload) {
@@ -39,6 +40,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const [toastVisible, setToastVisible] = createSignal(false);
   const [toastMessage, setToastMessage] = createSignal('');
   const [toastType, setToastType] = createSignal('success');
+  const [hoveredCardIndex, setHoveredCardIndex] = createSignal(null);
 
   function showToast(message, type = 'success') {
     setToastMessage(message);
@@ -46,6 +48,17 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     setToastVisible(true);
     setTimeout(() => setToastVisible(false), TOAST_DURATION_MS);
   }
+
+  createEffect(() => {
+  const container = containerRef();
+  const design = settings?.design ?? feed?.settings?.design;
+  const styles = buildDesignStyles(design);
+  if (container && Object.keys(styles).length) {
+    Object.entries(styles).forEach(([key, value]) => {
+      if (value != null) container.style.setProperty(key, value);
+    });
+  }
+});
 
   /** Feed impression: once when carousel container enters viewport (stored in DB) */
   createEffect(() => {
@@ -68,6 +81,11 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     observer.observe(container);
     onCleanup(() => observer.disconnect());
   });
+
+  const autoPlay = () =>
+  feed?.settings?.general?.autoPlay ??
+  settings?.general?.autoPlay ??
+  'always';
 
   const title = () => settings?.translation?.carouselTitle || feed?.name || '';
   const subtitle = () => settings?.translation?.carouselDescription || feed?.description || DEFAULT_SUBTITLE;
@@ -124,7 +142,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
 
   const handleProductClick = async (product, video) => {
 
-    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
+    const behavior = feed?.settings?.general?.buttonBehavior;
     if (feed?.id && video?.id) {
       await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
@@ -158,14 +176,14 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   };
 
   const addToCartButtonLabel = () => feed?.settings?.translation?.addToCartText || 'Check this out';
-  const addToCartButtonColor = () => {
-    const raw = settings?.design?.addToCartButtonColor ?? feed?.settings?.design?.addToCartButtonColor;
+  const buttonBackgroundColor = () => {
+    const raw = settings?.design?.buttonBackgroundColor ?? feed?.settings?.design?.buttonBackgroundColor;
     if (typeof raw !== 'string') return null;
     const trimmed = raw.trim();
     return trimmed ? trimmed : null;
   };
   const addToCartButtonStyle = () => {
-    const color = addToCartButtonColor();
+    const color = buttonBackgroundColor();
     return color ? { 'background-color': color } : undefined;
   };
 
@@ -280,7 +298,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                                       style={addToCartButtonStyle()}
                                       onClick={() => handleProductClick(product, video)}
                                     >
-                                      Shop
+                                      {addToCartButtonLabel()}
                                     </button>
                                   </div>
                                 </div>

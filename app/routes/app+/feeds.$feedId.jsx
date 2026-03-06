@@ -252,10 +252,9 @@ export default function FeedEditorPage() {
     }
 
     const values = watch();
-    console.log("values ----->", values);
     const videosPayload = prepareVideosPayload(uploadedVideos);
     const settingsPayload = values.settings ?? { general: {}, design: {}, translation: {} };
-
+    console.log("settingsPayload ----->", settingsPayload);
     submit(
       {
         feedName: values.feedName,
@@ -395,6 +394,7 @@ export default function FeedEditorPage() {
                   {selected === 1 && (
                     <SettingsTab
                       control={control}
+                      watch={watch}
                       errors={errors}
                       selectedTab={settingsTabSelected}
                       onTabChange={handleSettingsTabChange}

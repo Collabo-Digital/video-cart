@@ -50,14 +50,14 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
   };
 
   const addToCartButtonLabel = () => feed?.settings?.translation?.addToCartText || 'Check this out';
-  const addToCartButtonColor = () => {
-    const raw = settings?.design?.addToCartButtonColor ?? feed?.settings?.design?.addToCartButtonColor;
+  const buttonBackgroundColor = () => {
+    const raw = settings?.design?.buttonBackgroundColor ?? feed?.settings?.design?.buttonBackgroundColor;
     if (typeof raw !== 'string') return null;
     const trimmed = raw.trim();
     return trimmed ? trimmed : null;
   };
   const addToCartButtonStyle = () => {
-    const color = addToCartButtonColor();
+    const color = buttonBackgroundColor();
     return color ? { 'background-color': color } : undefined;
   };
   const getVariantId = (product) => product?.variants?.[0]?.id ?? product?.id;
@@ -76,7 +76,7 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
   const handleProductClick = async (event, video, productHandle) => {
     event.stopPropagation();
     onEvent?.('product_click', { feedId: feed?.id, videoId: video?.id, productId: productHandle, source: 'grid' });
-    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
+    const behavior = feed?.settings?.general?.buttonBehavior;
     if (feed?.id && video?.id) {
       await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
@@ -112,7 +112,7 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
     }
     await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
-    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
+    const behavior = feed?.settings?.general?.buttonBehavior;
     if (behavior === 'addToCart') {
       await addToCart([{
         id: getVariantId(product),
