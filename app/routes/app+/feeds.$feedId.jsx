@@ -10,6 +10,7 @@ import {
   InlineStack,
   Icon,
   EmptyState,
+  Badge,
 } from "@shopify/polaris";
 import {
   UploadIcon, SettingsIcon
@@ -110,9 +111,9 @@ export default function FeedEditorPage() {
   console.log("widgetPage ----->", widgetPage);
 
   const formValues = useMemo(
-  () => getFeedFormDefaultValues(feed, widgetType, widgetPage),
-  [feed, widgetType, widgetPage]
-);
+    () => getFeedFormDefaultValues(feed, widgetType, widgetPage),
+    [feed, widgetType, widgetPage]
+  );
 
   const {
     control,
@@ -385,8 +386,18 @@ export default function FeedEditorPage() {
   return (
     <>
       <Page
-        title={mode === "create" ? "Create Feed" : "Edit Feed"}
-        backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`) }}
+        title={mode === "create" ? "Create Feed" : feed?.feedName ?? "Feed"}
+        subtitle={mode === "create" ? "Launch a new feed for your products" : 'Change settings, products, and layout'}
+        primaryAction={<Badge
+          tone={feed?.isEnabled ? "success" : "critical"}
+          progress="complete"
+          toneAndProgressLabelOverride="Status: Published. Your online store is visible."
+        >
+          {feed?.isEnabled ? "Active" : "Inactive"}
+        </Badge>
+        }
+        titleMetadata={<Badge tone="magic">{feed?.widgetType ?? "Carousel"}</Badge>}
+      // backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`) }}
       >
         <BlockStack gap="400">
           {actionData?.error && (

@@ -5,14 +5,18 @@
  * Accepts shop parameter from query string (provided by Liquid template).
  */
 
-import { getFeedsByShop } from '../../../../services/feed/feed.service.server';
+import { getFeedsByShop, getFeedsWithPaginationAndFilters } from '../../../../services/feed/feed.service.server';
 import { authenticate } from '../../../../config/shopify.server';
 
-export const loader = async ({ request }) => {
+export const action = async ({ request }) => {
   try {
-    await authenticate.public.appProxy(request);
-    const url = new URL(request.url);
-    const shop = url.searchParams.get('shop');
+    // await authenticate.public.appProxy(request);
+    const { session } = await authenticate.admin(request);
+    // const shop = 'athul-kumar.myshopify.com'
+    // const url = new URL(request.url);
+    // const shop = url.searchParams.get('shop');
+    const shop = session.shop;
+    const { filters } = await request.json();
 
     if (!shop) {
       return new Response(
@@ -27,24 +31,25 @@ export const loader = async ({ request }) => {
       );
     }
 
-    const feeds = await getFeedsByShop(shop);
+    // const feeds = await getFeedsByShop(shop);
+    const feedsData = await getFeedsWithPaginationAndFilters(shop, filters);
 
     // Return simplified feed data for selector
-    const feedList = feeds
-      .filter((feed) => feed.isEnabled && !feed.isDeleted)
-      .map((feed) => ({
-        id: feed.id,
-        feedName: feed.feedName,
-        widgetType: feed.widgetType,
-        isEnabled: feed.isEnabled,
-        videoCount: feed.videos?.length || 0,
-        createdAt: feed.createdAt,
-      }));
+    // const feedList = feedsData?.feeds
+    //   .filter((feed) => feed.isEnabled && !feed.isDeleted)
+    //   .map((feed) => ({
+    //     id: feed.id,
+    //     feedName: feed.feedName,
+    //     widgetType: feed.widgetType,
+    //     isEnabled: feed.isEnabled,
+    //     videoCount: feed.videos?.length || 0,
+    //     createdAt: feed.createdAt,
+    //   }));
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: feedList,
+        data: feedsData,
       }),
       {
         status: 200,
