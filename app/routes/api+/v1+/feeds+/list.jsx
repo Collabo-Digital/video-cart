@@ -5,8 +5,8 @@
  * Accepts shop parameter from query string (provided by Liquid template).
  */
 
-import { getFeedsByShop, getFeedsWithPaginationAndFilters } from '../../../../services/feed/feed.service.server';
 import { authenticate } from '../../../../config/shopify.server';
+import {  getFeedsWithPaginationAndFilters } from '../../../../services/feed/feed.service.server';
 
 export const action = async ({ request }) => {
   try {

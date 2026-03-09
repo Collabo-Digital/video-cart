@@ -160,14 +160,15 @@ export async function deleteVideoAndMuxAsset(id) {
 
 /**
  * Count videos with optional filtering
- * @param {Object} filters - Optional filters
+ * @param {string} shopDomain - Shop domain
  * @returns {Promise<number>} Count of videos
  */
-export async function count(filters = {}) {
-  const { status } = filters;
-
+export async function count(shopDomain) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required and must be a string');
+  }
   return prisma.video.count({
-    where: status ? { status } : undefined,
+    where: { shopDomain: shopDomain.trim() },
   });
 }
 
@@ -177,73 +178,175 @@ export async function count(filters = {}) {
  * @param {Object} options - { page?: number, perPage?: number, search?: string }
  * @returns {Promise<{ videos: Array, total: number }>}
  */
-export async function findAllPaginatedWithWidgets(options = {}) {
-  const { search = '', page = 1, perPage = 20, shopDomain } = options;
-  const offset = (Math.max(1, page) - 1) * perPage;
-  const take = Math.min(100, Math.max(1, perPage));
 
-  const searchTrim = typeof search === 'string' ? search.trim() : '';
-  const where = {
-    ...(shopDomain ? { shopDomain } : {}),
-    ...(searchTrim
-      ? {
-        OR: [
-          { title: { contains: searchTrim } },
-          { fileName: { contains: searchTrim } },
-          { fileUploadName: { contains: searchTrim } },
-        ],
-      }
-      : {}),
-  };
+/** Pagination constants for videos */
+const VIDEOS_PAGE_SIZE = 5;
+const MIN_TAKE = 1;
+const MAX_TAKE = 100;
+const VIDEOS_ORDER_DESC = [{ createdAt: 'desc' }, { id: 'asc' }];
+const VIDEOS_ORDER_ASC = [{ createdAt: 'asc' }, { id: 'desc' }];
 
-  const [rows, total] = await Promise.all([
-    prisma.video.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take,
-      skip: offset,
-      select: {
-        id: true,
-        title: true,
-        fileName: true,
-        fileUploadName: true,
-        videoUploadId: true,
-        videoPlaybackId: true,
-        status: true,
-        createdAt: true,
-        feedVideos: {
-          select: {
-            feed: {
-              select: {
-                id: true,
-                widgetId: true,
-                feedName: true,
-              },
-            },
-          },
+const VIDEO_SELECT = {
+  id: true,
+  title: true,
+  fileName: true,
+  fileUploadName: true,
+  videoPlaybackId: true,
+  createdAt: true,
+  feedVideos: {
+    select: {
+      feed: {
+        select: {
+          id: true,
+          widgetId: true,
+          feedName: true,
         },
       },
-    }),
-    prisma.video.count({ where }),
-  ]);
+    },
+  },
+};
 
-  const videos = rows.map((v) => ({
-    id: v.id,
-    videoName: v.title || v.fileName || v.fileUploadName || 'Untitled',
-    fileUploadName: v.fileUploadName ?? undefined,
-    videoUploadId: v.videoUploadId,
-    status: v.status,
-    createdAt: v.createdAt,
-    videoPlaybackId: v.videoPlaybackId,
-    widgets: (v.feedVideos || []).map((fv) => ({
-      id: fv.feed?.id,
-      widgetId: fv.feed?.widgetId,
-      name: fv.feed?.feedName ?? '',
-    })).filter((w) => w.id != null),
-  }));
+/**
+ * Find videos with cursor-based pagination and filters (with feed/widget info)
+ * @param {string} shopDomain - Shop domain (required)
+ * @param {Object} filters - Filters (cursor, direction, take, startDate, endDate, search, status, widgetType, sortSelected)
+ * @returns {Promise<{ videos: Array, nextCursor: string|null, previousCursor: string|null, hasNext: boolean, hasPrevious: boolean }>}
+ */
+export async function findAllPaginatedWithWidgets(shopDomain, filters = {}) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required and must be a string');
+  }
 
-  return { videos, total };
+  const {
+    cursor,
+    direction = 'next',
+    take = VIDEOS_PAGE_SIZE,
+    startDate,
+    endDate,
+    search,
+    status,
+    widgetType,
+    sortSelected,
+  } = filters;
+
+  const safeTake = Math.min(MAX_TAKE, Math.max(MIN_TAKE, Number(take) || VIDEOS_PAGE_SIZE));
+
+  const where = {
+    shopDomain: shopDomain.trim(),
+  };
+
+  // if (startDate != null || endDate != null) {
+  //   const dateFilter = {};
+  //   if (startDate != null) {
+  //     const d = new Date(startDate);
+  //     if (isNaN(d.getTime())) throw new Error('startDate must be a valid date');
+  //     dateFilter.gte = d;
+  //   }
+  //   if (endDate != null) {
+  //     const d = new Date(endDate);
+  //     if (isNaN(d.getTime())) throw new Error('endDate must be a valid date');
+  //     dateFilter.lte = d;
+  //   }
+  //   if (Object.keys(dateFilter).length) {
+  //     where.createdAt = dateFilter;
+  //   }
+  // }
+
+  if (search && typeof search === 'string' && search.trim()) {
+    where.title = { contains: search.trim(), mode: 'insensitive' };
+  }
+
+  if (status && typeof status === 'string' && status.trim()) {
+    where.status = status.trim();
+  }
+
+  if (widgetType && Array.isArray(widgetType) && widgetType.length > 0) {
+    const validTypes = widgetType
+      .filter((t) => typeof t === 'string' && t.trim())
+      .map((t) => t.trim());
+    if (validTypes.length > 0) {
+      where.feedVideos = {
+        some: { feed: { widgetType: { in: validTypes } } },
+      };
+    }
+  }
+
+  let orderBy = VIDEOS_ORDER_DESC;
+  if (sortSelected && Array.isArray(sortSelected) && sortSelected.length > 0) {
+    const first = sortSelected[0];
+    const key = first.key ?? first.field;
+    const dir = (first.direction ?? first.order) === 'asc' ? 'asc' : 'desc';
+    if (key) {
+      orderBy = [{ [key]: dir }, { id: dir === 'desc' ? 'asc' : 'desc' }];
+    }
+  }
+
+  // --- First page (no cursor) ---
+  if (!cursor) {
+    const videosItems = await prisma.video.findMany({
+      where,
+      orderBy,
+      take: safeTake + 1,
+      select: VIDEO_SELECT,
+    });
+    const hasMore = videosItems.length > safeTake;
+    const videos = hasMore ? videosItems.slice(0, safeTake) : videosItems;
+    return {
+      videos,
+      nextCursor: hasMore ? videos[videos.length - 1].id : null,
+      previousCursor: null,
+      hasNext: hasMore,
+      hasPrevious: false,
+    };
+  }
+
+  // --- Next page ---
+  if (direction === 'next') {
+    const videosItems = await prisma.video.findMany({
+      where,
+      orderBy,
+      cursor: { id: cursor },
+      skip: 1,
+      take: safeTake + 1,
+      select: VIDEO_SELECT,
+    });
+    const hasMore = videosItems.length > safeTake;
+    const videos = hasMore ? videosItems.slice(0, safeTake) : videosItems;
+    return {
+      videos,
+      nextCursor: hasMore ? videos[videos.length - 1].id : null,
+      previousCursor: cursor,
+      hasNext: hasMore,
+      hasPrevious: true,
+    };
+  }
+
+  // --- Previous page ---
+  const isDescOrder = Array.isArray(orderBy)
+    ? (orderBy[0]?.createdAt === 'desc' || Object.values(orderBy[0] || {})[0] === 'desc')
+    : false;
+  const prevOrderBy = isDescOrder ? VIDEOS_ORDER_ASC : VIDEOS_ORDER_DESC;
+
+  const videosItems = await prisma.video.findMany({
+    where,
+    orderBy: prevOrderBy,
+    cursor: { id: cursor },
+    take: safeTake + 1,
+    select: VIDEO_SELECT,
+  });
+  const hasMore = videosItems.length > safeTake;
+  const videos = hasMore ? videosItems.slice(0, safeTake) : videosItems;
+  videos.reverse();
+
+  return {
+    videos,
+    nextCursor: cursor,
+    previousCursor: hasMore ? videos[0].id : null,
+    hasNext: true,
+    hasPrevious: hasMore,
+  };
 }
+
 
 
 /**

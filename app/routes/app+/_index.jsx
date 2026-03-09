@@ -83,7 +83,7 @@ export default function IndexPage() {
         <Page
             title="Video Cart"
             subtitle="Video Cart is a tool that helps you manage your video cart."
-            titleMetadata={<Badge tone="info">1.0.0</Badge>}
+            titleMetadata={<Badge tone="magic">1.0.0</Badge>}
             compactTitle
             primaryAction={<Button variant="tertiary" icon={NotificationIcon} size="slim">What's new</Button>}
         >

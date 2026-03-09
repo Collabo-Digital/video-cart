@@ -26,6 +26,7 @@ import { authenticate } from "../../config/shopify.server";
 import { EditIcon, PlusIcon, DeleteIcon } from "@shopify/polaris-icons";
 import { VideoFeedsIcon } from "../../components/Icons/VideoFeeds/VideoFeedsIcon";
 import { useDebouncedCallback } from "use-debounce";
+import * as FeedModel from "../../models/feed.server";
 
 
 const WIDGET_TYPE_OPTIONS = [
@@ -80,7 +81,8 @@ export const loader = async ({ request }) => {
   try {
     const { session } = await authenticate.admin(request);
     const feedsData = await getFeedsWithPaginationAndFilters(session.shop, {});
-    return { feedsData: feedsData ?? {} };
+    const totalFeeds = await FeedModel.count(session.shop);
+    return { feedsData: feedsData ?? {}, totalFeeds };
   } catch (error) {
     console.error("Error fetching feeds:", error);
     return { feedsData: { feeds: [] } };
@@ -119,14 +121,15 @@ export const action = async ({ request }) => {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function FeedsPage() {
-  const { feedsData } = useLoaderData();
+  const { feedsData, totalFeeds } = useLoaderData();
   const navigate = useNavigate();
   const fetcher = useFetcher();
+  console.log("totalFeeds ----->", totalFeeds);
 
   const [feeds, setFeeds] = useState(feedsData?.feeds ?? []);
   const [nextCursor, setNextCursor] = useState(feedsData?.nextCursor ?? null);
   const [previousCursor, setPreviousCursor] = useState(feedsData?.previousCursor ?? null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [queryValue, setQueryValue] = useState("");
   const [statusFilter, setStatusFilter] = useState([]);
@@ -376,7 +379,7 @@ export default function FeedsPage() {
         )}
 
         <Card padding="none">
-          <IndexFilters
+          {totalFeeds > 0 && <IndexFilters
             sortOptions={SORT_OPTIONS}
             sortSelected={sortSelected}
             onSort={handleFeedsSorting}
@@ -396,7 +399,7 @@ export default function FeedsPage() {
             }}
             mode={mode}
             setMode={setMode}
-          />
+          />}
           <IndexTable
             resourceName={{ singular: "feed", plural: "feeds" }}
             itemCount={feeds?.length ?? 0}
