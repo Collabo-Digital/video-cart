@@ -1,53 +1,67 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
 import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
-import { getThumbnailPreviewUrl } from '../../shared/mux';
-import { api } from '../../api';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
-import './carousel.css';
-import { addToCart } from '../../utils/shopifyService';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { Toast } from '../common/Toast/Toast';
-import { TOAST_DURATION_MS_EXPORT as TOAST_DURATION_MS } from '../common/Toast/Toast';
+import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../utils/designStyles';
+import { trackDbEvent } from '../../utils/analytics';
+import { useToast } from '../../hooks/useToast';
+import {
+  productsForVideo,
+  productPrice,
+  getAddToCartLabel,
+  getButtonStyle,
+  getProductHandle,
+} from '../../utils/widgetHelpers';
+import { createProductClickHandler } from '../../utils/productClickHandler';
+import { THUMB_CARD, CARD_WIDTH, CARD_GAP, PRODUCT_ITEM_GAP } from '../../core/constant';
+import { LABEL_WATCH, EMPTY_VIDEOS } from '../../constants/strings';
+import './carousel.css';
+import LeftToggleIcon from '../../assets/Icons/LeftToggleIcon';
+import RightToggleIcon from '../../assets/Icons/RightToggleIcon';
 
-/** Fire analytics event to DB (app proxy). Fire-and-forget; does not throw. */
-async function trackDbEvent(payload) {
-  if (!payload?.feedId || !payload?.eventType) return;
-  try {
-    await api.analytics.recordEvent(payload);
-  } catch (err) {
-    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
-      console.error('Analytics event failed:', err);
-    }
-  }
-}
-
-const CARD_WIDTH = 280;
-const CARD_GAP = 16;
 const SCROLL_AMOUNT = CARD_WIDTH + CARD_GAP;
-/* One product visible at a time, full width of card */
-const PRODUCT_ITEM_WIDTH = CARD_WIDTH; /* 280px = full width */
-const PRODUCT_ITEM_GAP = 8;
-const PRODUCT_SCROLL_AMOUNT = PRODUCT_ITEM_WIDTH + PRODUCT_ITEM_GAP;
-
+const PRODUCT_SCROLL_AMOUNT = CARD_WIDTH + PRODUCT_ITEM_GAP;
 const DEFAULT_SUBTITLE = '';
 
 export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const [trackRef, setTrackRef] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
-  /** When set, show full-screen story-like overlay for that video index; null = carousel only */
   const [expandedIndex, setExpandedIndex] = createSignal(null);
-  const [toastVisible, setToastVisible] = createSignal(false);
-  const [toastMessage, setToastMessage] = createSignal('');
-  const [toastType, setToastType] = createSignal('success');
+  const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
-  function showToast(message, type = 'success') {
-    setToastMessage(message);
-    setToastType(type);
-    setToastVisible(true);
-    setTimeout(() => setToastVisible(false), TOAST_DURATION_MS);
-  }
+  const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
+  const addToCartButtonLabel = () => getAddToCartLabel(feed);
+  const addToCartButtonStyle = () => getButtonStyle(feed, settings);
+  const handleProductClick = createProductClickHandler({
+    feed,
+    settings,
+    onEvent,
+    showToast,
+    source: 'carousel',
+  });
 
-  /** Feed impression: once when carousel container enters viewport (stored in DB) */
+  const design = settings?.design ?? feed?.settings?.design;
+  const uniqueClass = getUniqueClassIdentifier(design);
+  const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
+
+
+  createEffect(() => {
+    const container = containerRef();
+    const design = settings?.design ?? feed?.settings?.design;
+    const styles = buildDesignStyles(design);
+    if (container && Object.keys(styles).length) {
+      Object.entries(styles).forEach(([key, value]) => {
+        if (value != null) container.style.setProperty(key, value);
+      });
+    }
+
+    if (container) {
+      injectCustomCss(container, design);
+    }
+  });
+
   createEffect(() => {
     const container = containerRef();
     if (!container || !feed?.id) return;
@@ -69,19 +83,8 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     onCleanup(() => observer.disconnect());
   });
 
-  const title = () => settings?.translation?.carouselTitle || feed?.name || '';
-  const subtitle = () => settings?.translation?.carouselDescription || feed?.description || DEFAULT_SUBTITLE;
-  /** Products per video: [[product, ...], []] — index i = products for videos[i] */
-  const productsForVideo = (video) => video?.productsTagged ?? [];
-
-  /** Display price from first variant (Shopify price string e.g. "50.00") */
-  const productPrice = (product) => {
-    const priceVal = product?.variants?.[0]?.price;
-    if (priceVal == null || priceVal === '') return null;
-    const num = typeof priceVal === 'string' ? parseFloat(priceVal, 10) : Number(priceVal);
-    if (Number.isNaN(num)) return null;
-    return { raw: priceVal, formatted: `$ ${num.toFixed(num % 1 === 0 ? 0 : 2)}` };
-  };
+  const title = () => settings?.translation?.widgetHeading || feed?.name || '';
+  const subtitle = () => settings?.translation?.widgetDescription || feed?.description || DEFAULT_SUBTITLE;
 
   const scrollTrack = (direction) => {
     const el = trackRef();
@@ -100,7 +103,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     strip.scrollBy({ left: amount, behavior: 'smooth' });
   };
 
-  const handleCardClick = (_video, index) => {
+  const handleCardClick = (e, _video, index) => {
     setExpandedIndex(index);
   };
 
@@ -111,66 +114,22 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
       await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
     }
-    const first = video?.productsTagged?.[0];
-    if (!first) return;
-    const productId = typeof first === 'object' ? (first.handle || first.id) : first;
-    onEvent?.('product_click', { feedId: feed?.id, productId });
-    if (productId) window.location.href = `/products/${productId}`;
+    const handle = getProductHandle(video?.productsTagged?.[0]);
+    if (!handle) return;
+    onEvent?.('product_click', { feedId: feed?.id, productId: handle });
+    window.location.href = `/products/${handle}`;
   };
 
-  /** Variant id for cart: first variant or product id. */
-  const getVariantId = (product) => product?.variants?.[0]?.id ?? product?.id;
-
-
-  const handleProductClick = async (product, video) => {
-
-    const behavior = feed?.settings?.general?.addToCartButtonBehavior;
-    if (feed?.id && video?.id) {
-      await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
-      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
-    }
-    if (behavior === 'addToCart') {
-      addToCart([{
-        id: getVariantId(product),
-        quantity: 1,
-        properties: {
-          _video_id: video?.id,
-          _widget_id: feed?.id,
-          timestamp: Date.now(),
-          source: 'video-cart-carousel',
-        },
-      }]).then(async (response) => {
-        // if (response.status === 200) {
-        console.log("Product is added to cart");
-        showToast('Added to cart', 'success');
-        await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });
-        await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
-        // }
-      }).catch((error) => {
-        console.error('Error adding product to cart:', error);
-        showToast('Could not add to cart', 'error');
-      });
-    } else {
-      if (product?.handle) window.location.href = `/products/${product.handle}`;
-    }
-    
-    onEvent?.('product_click', { feedId: feed?.id, productId: product?.handle });
+  const handleCardMouseEnter = (index) => {
+    if (autoplay() === 'onHover') setHoveredIndex(index);
   };
 
-  const addToCartButtonLabel = () => feed?.settings?.translation?.addToCartText || 'Check this out';
-  const addToCartButtonColor = () => {
-    const raw = settings?.design?.addToCartButtonColor ?? feed?.settings?.design?.addToCartButtonColor;
-    if (typeof raw !== 'string') return null;
-    const trimmed = raw.trim();
-    return trimmed ? trimmed : null;
-  };
-  const addToCartButtonStyle = () => {
-    const color = addToCartButtonColor();
-    return color ? { 'background-color': color } : undefined;
+  const handleCardMouseLeave = () => {
+    if (autoplay() === 'onHover') setHoveredIndex(null);
   };
 
   return (
-    <div className="video-carousel-container" ref={setContainerRef}>
+    <div className={`video-carousel-container ${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
       <VideoOverlayPlayer
         videos={videos}
         expandedIndex={expandedIndex}
@@ -198,7 +157,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
         }}
       />
 
-      {/* Header: title, subtitle, nav arrows on the right */}
       <header className="video-carousel-header">
         <div className="video-carousel-header-text">
           <h2 className="video-carousel-title">{title()}</h2>
@@ -212,7 +170,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
               aria-label="Previous"
               onClick={() => scrollTrack('prev')}
             >
-              ‹
+              <LeftToggleIcon />
             </button>
             <button
               type="button"
@@ -220,33 +178,47 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
               aria-label="Next"
               onClick={() => scrollTrack('next')}
             >
-              ›
+              <RightToggleIcon />
             </button>
           </nav>
         </Show>
       </header>
 
-      {/* Horizontal card track */}
       <Show when={videos?.length > 0}>
         <div className="video-carousel-track-wrap">
           <div className="video-carousel-track" ref={setTrackRef} role="list">
             <For each={videos}>
               {(video, index) => {
-                const thumbUrl = () => getThumbnailPreviewUrl(video.playbackId, 560, 748);
-                const meta = () => {
-                  const count = video?.productsTagged?.length ?? 0;
-                  return count > 0 ? `${count} product${count !== 1 ? 's' : ''}` : 'Watch';
+                const staticThumbUrl = () => getThumbnailUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+                const animatedThumbUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+                const isOnHoverMode = () => autoplay() === 'onHover';
+                const isHovered = () => hoveredIndex() === index();
+                const thumbUrl = () => {
+                  if (isOnHoverMode()) return isHovered() ? animatedThumbUrl() : staticThumbUrl();
+                  if (autoplay() === 'never') return staticThumbUrl();
+                  return animatedThumbUrl();
                 };
+
                 return (
-                  <article className="video-carousel-card" role="listitem">
+                  <article className="video-carousel-card" role="listitem"
+                    onMouseEnter={() => handleCardMouseEnter(index())}
+                    onMouseLeave={handleCardMouseLeave}
+                  >
                     <button
                       type="button"
                       className="video-carousel-card-button"
-                      onClick={() => handleCardClick(video, index())}
-                      aria-label={`${video.title || `Video ${index() + 1}`}, ${meta()}`}
+                      onClick={(e) => {
+                        const isInteractiveClick = e.target.closest('.video-carousel-card-product-button, .video-carousel-products-btn');
+                        if (isInteractiveClick) return;
+                        handleCardClick(e, video, index())
+                      }}
+                      aria-label={`${video.title || `Video ${index() + 1}`}, ${LABEL_WATCH}`}
                     >
                       <span className="video-carousel-card-image-wrap">
-                        <Show when={thumbUrl()} fallback={<span style="display:block;width:100%;height:100%;background:#e5e7eb" />}>
+                        <Show
+                          when={thumbUrl()}
+                          fallback={<span className="video-carousel-card-image-fallback" />}
+                        >
                           <img
                             className="video-carousel-card-image"
                             src={thumbUrl()}
@@ -255,55 +227,55 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                           />
                         </Show>
                       </span>
-                      <span className="video-carousel-card-overlay">
-                        <div className={`video-carousel-card-products${productsForVideo(video).length > 1 ? ' has-nav' : ''}`}>
-                          <Show when={productsForVideo(video).length > 1}>
-                            <button
-                              type="button"
-                              className="video-carousel-products-btn video-carousel-products-btn-prev"
-                              aria-label="Previous products"
-                              onClick={(e) => scrollProducts(e, 'prev')}
-                            >
-                              ‹
-                            </button>
-                          </Show>
-                          <div className="video-carousel-card-products-inner">
-                            <For each={productsForVideo(video)}>
-                              {(product) => (
-                                <div className="video-carousel-card-product">
-                                  <img src={product.image} alt={product.title} loading="lazy" />
-                                  <div className="video-carousel-card-product-info">
-                                    <span className="video-carousel-card-product-title">{product.title}</span>
-                                    <button
-                                      type="button"
-                                      className="video-carousel-card-product-button"
-                                      style={addToCartButtonStyle()}
-                                      onClick={() => handleProductClick(product, video)}
-                                    >
-                                      Shop
-                                    </button>
+                      <Show when={productsForVideo(video).length > 0}>
+                        <span className="video-carousel-card-overlay">
+                          <div className={`video-carousel-card-products${productsForVideo(video).length > 1 ? ' has-nav' : ''}`}>
+                            <Show when={productsForVideo(video).length > 1}>
+                              <button
+                                type="button"
+                                className="video-carousel-products-btn video-carousel-products-btn-prev"
+                                aria-label="Previous products"
+                                onClick={(e) => scrollProducts(e, 'prev')}
+                              >
+                                <LeftToggleIcon />
+                              </button>
+                            </Show>
+                            <div className="video-carousel-card-products-inner">
+                              <For each={productsForVideo(video)}>
+                                {(product) => (
+                                  <div className="video-carousel-card-product">
+                                    <img src={product.image} alt={product.title} loading="lazy" />
+                                    <div className="video-carousel-card-product-info">
+                                      <span className="video-carousel-card-product-title">{product.title}</span>
+                                      <button
+                                        type="button"
+                                        className="video-carousel-card-product-button"
+                                        style={addToCartButtonStyle()}
+                                        onClick={() => handleProductClick(product, video)}
+                                      >
+                                        {addToCartButtonLabel()}
+                                      </button>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                            </For>
+                                )}
+                              </For>
+                            </div>
+                            <Show when={productsForVideo(video).length > 1}>
+                              <button
+                                type="button"
+                                className="video-carousel-products-btn video-carousel-products-btn-next"
+                                aria-label="Next products"
+                                onClick={(e) => scrollProducts(e, 'next')}
+                              >
+                                <RightToggleIcon />
+                              </button>
+                            </Show>
                           </div>
-                          <Show when={productsForVideo(video).length > 1}>
-                            <button
-                              type="button"
-                              className="video-carousel-products-btn video-carousel-products-btn-next"
-                              aria-label="Next products"
-                              onClick={(e) => scrollProducts(e, 'next')}
-                            >
-                              ›
-                            </button>
-                          </Show>
-                        </div>
-                        {/* <span className="video-carousel-card-name">{video.title || `Video ${index() + 1}`}</span>
-                        <span className="video-carousel-card-meta">{meta()}</span> */}
-                      </span>
+                        </span>
+                      </Show>
                     </button>
                     <a
-                      href={video?.productsTagged?.[0] ? `/products/${typeof video.productsTagged[0] === 'object' ? video.productsTagged[0].handle || video.productsTagged[0].id : video.productsTagged[0]}` : '#'}
+                      href={getProductHandle(video?.productsTagged?.[0]) ? `/products/${getProductHandle(video.productsTagged[0])}` : '#'}
                       className="video-carousel-card-link"
                       aria-label="View product"
                       onClick={(e) => handleCardLinkClick(e, video)}
@@ -317,7 +289,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
       </Show>
 
       <Show when={!videos?.length}>
-        <p style="padding: 2rem; text-align: center; color: #6d7175;">No videos available in this feed.</p>
+        <p className="video-carousel-empty">{EMPTY_VIDEOS}</p>
       </Show>
 
       <Toast

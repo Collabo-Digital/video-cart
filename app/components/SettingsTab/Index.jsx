@@ -1,4 +1,4 @@
-import { Box, BlockStack, Tabs, Icon, InlineStack, Card } from "@shopify/polaris";
+import { Box, BlockStack, Tabs, Icon, InlineStack } from "@shopify/polaris";
 import {
     AppsIcon, PaintBrushFlatIcon, TextIcon
 
@@ -42,26 +42,28 @@ const SETTINGS_TABS = [
  * Settings tab content: sub-tabs General, Design, Translation with their panels.
  * Parent manages selected index and passes control/errors from react-hook-form.
  */
-export function SettingsTab({ control, errors, selectedTab, onTabChange }) {
+export function SettingsTab({ control, watch, errors, selectedTab, onTabChange }) {
     return (
         <Box padding="400">
             <BlockStack gap="400">
-                <Box  borderRadius="200"  background="bg-fill-secondary">
-                {/* <Card padding="0" background="bg-surface-secondary"> */}
-                <Tabs
-                    tabs={SETTINGS_TABS}
-                    selected={selectedTab}
-                    onSelect={onTabChange}
-                    fitted
-                />
+                <Box borderRadius="200" background="bg-fill-secondary">
+                    {/* <Card padding="0" background="bg-surface-secondary"> */}
+
+                    <Tabs
+                        tabs={SETTINGS_TABS}
+                        selected={selectedTab}
+                        onSelect={onTabChange}
+                        fitted
+                    />
+
                 </Box>
                 {/* </Card> */}
                 {selectedTab === 0 && (
-                    <GeneralSettings control={control} errors={errors} />
+                    <GeneralSettings control={control} watch={watch} errors={errors} />
                 )}
-                {selectedTab === 1 && <DesignSettings control={control} errors={errors} />}
+                {selectedTab === 1 && <DesignSettings control={control} watch={watch} errors={errors} />}
                 {selectedTab === 2 && (
-                    <TranslationSettings control={control} />
+                    <TranslationSettings control={control} watch={watch} errors={errors} />
                 )}
             </BlockStack>
         </Box>
@@ -70,6 +72,7 @@ export function SettingsTab({ control, errors, selectedTab, onTabChange }) {
 
 SettingsTab.propTypes = {
     control: PropTypes.object.isRequired,
+    watch: PropTypes.func.isRequired,
     errors: PropTypes.object,
     selectedTab: PropTypes.number.isRequired,
     onTabChange: PropTypes.func.isRequired,

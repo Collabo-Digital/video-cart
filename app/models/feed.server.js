@@ -220,3 +220,166 @@ export async function findFeedVideosByVideoId(videoId, shopDomain) {
     orderBy: { addedAt: 'desc' },
   });
 }
+
+/** Default and limits for pagination */
+const FEEDS_PAGE_SIZE = 5;
+const MIN_TAKE = 1;
+const MAX_TAKE = 100;
+const ORDER_DESC = [{ createdAt: 'desc' }, { id: 'asc' }];
+const ORDER_ASC = [{ createdAt: 'asc' }, { id: 'desc' }];
+
+/**
+ * Get feeds with cursor-based pagination and filters
+ * @param {string} shopDomain - Shop domain (required)
+ * @param {Object} filters - Filters (cursor, direction, take, startDate, endDate, search?)
+ * @returns {Promise<{ feeds: Array, nextCursor: string|null, previousCursor: string|null, hasNext: boolean, hasPrevious: boolean }>}
+ */
+export async function getFeedsWithPaginationAndFilters(shopDomain, filters = {}) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required and must be a string');
+  }
+
+  console.log("filters form the core controller ----->", filters);
+
+  const {
+    cursor,
+    direction = 'next',
+    take = FEEDS_PAGE_SIZE,
+    startDate,
+    endDate,
+    search,
+    status,
+    widgetType,
+    sortSelected,
+  } = filters;
+
+  const safeTake = Math.min(MAX_TAKE, Math.max(MIN_TAKE, Number(take) || FEEDS_PAGE_SIZE));
+
+  const where = {
+    shopDomain: shopDomain.trim(),
+    isDeleted: false,
+  };
+
+  if (startDate != null || endDate != null) {
+    const dateFilter = {};
+    if (startDate != null) {
+      const d = new Date(startDate);
+      if (isNaN(d.getTime())) throw new Error('startDate must be a valid date');
+      dateFilter.gte = d;
+    }
+    if (endDate != null) {
+      const d = new Date(endDate);
+      if (isNaN(d.getTime())) throw new Error('endDate must be a valid date');
+      dateFilter.lte = d;
+    }
+    if (Object.keys(dateFilter).length) {
+      where.createdAt = dateFilter;
+    }
+  }
+
+  if (search && typeof search === 'string' && search.trim()) {
+    where.feedName = { contains: search.trim(), mode: 'insensitive' };
+  }
+
+  if (status && typeof status[0] === 'string' && status[0].trim()) {
+    where.isEnabled = status[0] === 'active';
+  }
+
+  if (widgetType && Array.isArray(widgetType) && widgetType.length > 0) {
+    const validTypes = widgetType
+      .filter((t) => typeof t === 'string' && t.trim())
+      .map((t) => t.trim());
+    if (validTypes.length > 0) {
+      where.widgetType = { in: validTypes };
+    }
+  }
+
+  let orderBy = ORDER_DESC;
+  if (sortSelected && Array.isArray(sortSelected) && sortSelected.length > 0) {
+    const first = sortSelected[0];
+    const key = first.key ?? first.field;
+    const dir = (first.direction ?? first.order) === "asc" ? "asc" : "desc";
+    if (key) {
+      orderBy = [{ [key]: dir }, { id: dir === "desc" ? "asc" : "desc" }];
+    }
+  }
+
+
+  const include = {
+
+  };
+
+  // --- First page (no cursor) ---
+  if (!cursor) {
+    const feedsItems = await prisma.feed.findMany({
+      where,
+      orderBy,
+      take: safeTake + 1,
+      include,
+    });
+    const hasMore = feedsItems.length > safeTake;
+    const feeds = hasMore ? feedsItems.slice(0, safeTake) : feedsItems;
+    return {
+      feeds,
+      nextCursor: hasMore ? feeds[feeds.length - 1].id : null,
+      previousCursor: null,
+      hasNext: hasMore,
+      hasPrevious: false,
+    };
+  }
+
+  // --- Next page ---
+  if (direction === 'next') {
+    const feedsItems = await prisma.feed.findMany({
+      where,
+      orderBy,
+      cursor: { id: cursor },
+      skip: 1,
+      take: safeTake + 1,
+      include,
+    });
+    const hasMore = feedsItems.length > safeTake;
+    const feeds = hasMore ? feedsItems.slice(0, safeTake) : feedsItems;
+    return {
+      feeds,
+      nextCursor: hasMore ? feeds[feeds.length - 1].id : null,
+      previousCursor: cursor,
+      // previousCursor: feeds[0]?.id ?? cursor,
+      hasNext: hasMore,
+      hasPrevious: true,
+    };
+  }
+
+  // --- Previous page ---
+  // const feedsItems = await prisma.feed.findMany({
+  //   where,
+  //   orderBy,
+  //   cursor: { id: cursor },
+  //   skip: 1,
+  //   take: safeTake + 1,
+  //   include,
+  // });
+  const isDescOrder = Array.isArray(orderBy)
+    ? (orderBy[0]?.createdAt === 'desc' || Object.values(orderBy[0] || {})[0] === 'desc')
+    : false;
+  const prevOrderBy = isDescOrder ? ORDER_ASC : ORDER_DESC;
+  const feedsItems = await prisma.feed.findMany({
+    where,
+    orderBy: prevOrderBy,
+    cursor: { id: cursor },
+    take: safeTake + 1,
+    include,
+  });
+
+  const hasMore = feedsItems.length > safeTake;
+  const feeds = hasMore ? feedsItems.slice(0, safeTake) : feedsItems;
+  feeds.reverse();
+
+  return {
+    feeds,
+    nextCursor: cursor,
+    previousCursor: hasMore ? feeds[0].id : null,
+    hasNext: true,
+    hasPrevious: hasMore,
+  };
+}
