@@ -2,7 +2,7 @@ import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import viteCompression from 'vite-plugin-compression';
-import purgecss from 'vite-plugin-purgecss';
+// import purgecss from 'vite-plugin-purgecss';
 
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
@@ -51,64 +51,18 @@ export default defineConfig({
       allow: ["app", "node_modules"],
     },
   },
-  plugins: [reactRouter(), tsconfigPaths(), purgecss({
-    content: [
-      './app/**/*.{js,jsx,ts,tsx}',
-      './app/**/*.html',
-    ],
-    safelist: {
-      // Safelist Polaris classes - they use dynamic class names
-      standard: [
-        /^Polaris/,
-        /^p[0-9]/,
-        /^m[0-9]/,
-        /^w[0-9]/,
-        /^h[0-9]/,
-        /^flex/,
-        /^grid/,
-        /^hidden/,
-        /^block/,
-        /^inline/,
-        /^relative/,
-        /^absolute/,
-        /^fixed/,
-        /^sticky/,
-        /^z-[0-9]/,
-        /^opacity-/,
-        /^bg-/,
-        /^text-/,
-        /^border-/,
-        /^rounded-/,
-        /^shadow-/,
-        /^hover:/,
-        /^focus:/,
-        /^active:/,
-        /^transition/,
-        /^transform/,
-        /^scale-/,
-        /^rotate-/,
-        /^translate-/,
-      ],
-      // Keep all classes that contain these patterns (Polaris uses data attributes)
-      deep: [/\[data-polaris/],
-      // Keep all keyframes
-      greedy: [/^@keyframes/, /^@media/],
-    },
-    // Fonts and other assets
-    fontFace: true,
-    keyframes: true,
-  }), viteCompression({ algorithm: 'brotliCompress' })],
+  plugins: [reactRouter(), tsconfigPaths(), viteCompression({ algorithm: 'brotliCompress' })],
   build: {
     assetsInlineLimit: 0,
     target: 'esnext',
     minify: 'terser',
     terserOptions: {
-      compress: {
-        drop_debugger: true,
-        dead_code: true,
-        unused: true,
-        passes: 3,
-      },
+      // compress: {
+      //   drop_debugger: true,
+      //   dead_code: true,
+      //   unused: true,
+      //   passes: 3,
+      // },
     },
     rollupOptions: {
       output: {
@@ -125,11 +79,11 @@ export default defineConfig({
           return `assets/[name]-[hash].[ext]`
         }
       },
-      treeshake: {
-        moduleSideEffects: false,
-        propertyReadSideEffects: false,
-        tryCatchDeoptimization: false
-      }
+      // treeshake: {
+      //   moduleSideEffects: false,
+      //   propertyReadSideEffects: false,
+      //   tryCatchDeoptimization: false
+      // }
     }
   },
   optimizeDeps: {

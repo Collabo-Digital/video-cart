@@ -4,18 +4,23 @@
  */
 const DEFAULT_SETTINGS = {
     general: {
-        addToCartButtonBehavior: "addToCart",
-
-        // future: showPrice: true, maxProducts: 4, ...
+        buttonBehavior: "addToCart",
+        autoPlay: "always",
+        visibleOnDesktop: true,
+        visibleOnMobile: true,
+        videosPerRow: 4,
     },
     design: {
-        // future: theme: "light", cardStyle: "minimal", ...
+        cardCornerRadius: 20,
+        videoGap: 20,
+        titleAlignment: "start",
+        buttonBackgroundColor: "#000080",
+        buttonTextColor: "#ffffff",
     },
     translation: {
-        carouselTitle: "Check out these products",
-        carouselDescription: "These products are available for purchase",
+        widgetHeading: "Check out these products",
+        widgetDescription: "These products are available for purchase",
         addToCartText: "Shop Now",
-        // future: viewAllText: "View all", ...
     },
 };
 

@@ -10,11 +10,12 @@ import {
   InlineStack,
   Icon,
   EmptyState,
+  Badge,
 } from "@shopify/polaris";
 import {
   UploadIcon, SettingsIcon
 } from '@shopify/polaris-icons';
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { SaveBar } from "@shopify/app-bridge-react";
@@ -109,13 +110,19 @@ export default function FeedEditorPage() {
   console.log("widgetType ----->", widgetType);
   console.log("widgetPage ----->", widgetPage);
 
+  const formValues = useMemo(
+    () => getFeedFormDefaultValues(feed, widgetType, widgetPage),
+    [feed, widgetType, widgetPage]
+  );
+
   const {
     control,
     watch,
     reset,
     formState: { errors, isDirty },
   } = useForm({
-    defaultValues: getFeedFormDefaultValues(feed, widgetType, widgetPage),
+    // defaultValues: getFeedFormDefaultValues(feed, widgetType, widgetPage),
+    values: formValues
   });
 
   const widgetTab = [
@@ -198,6 +205,7 @@ export default function FeedEditorPage() {
     (newVideo) => {
       if (isDuplicateVideoInWidget(newVideo, uploadedVideos)) {
         setError("This video is already in the widget. Duplicates are not allowed.");
+        // shopify.toast.show("This video is already in the widget. Duplicates are not allowed.");
         return;
       }
       setError(null);
@@ -246,16 +254,19 @@ export default function FeedEditorPage() {
   }, []);
 
   const handleSave = useCallback(() => {
-    if (!uploadedVideos.length) {
+    console.log("formValues ----->", formValues);
+    console.log("uploadedVideos ----->", uploadedVideos);
+    if (!uploadedVideos || uploadedVideos.length <= 0) {
       setError("Upload at least one video");
+      shopify.toast.show("Upload at least one video", { isError: true });
+      console.log("error ----->", error);
       return;
     }
 
     const values = watch();
-    console.log("values ----->", values);
     const videosPayload = prepareVideosPayload(uploadedVideos);
     const settingsPayload = values.settings ?? { general: {}, design: {}, translation: {} };
-
+    console.log("settingsPayload ----->", settingsPayload);
     submit(
       {
         feedName: values.feedName,
@@ -267,6 +278,7 @@ export default function FeedEditorPage() {
       },
       { method: "post" }
     );
+    shopify.toast.show("Feed saved successfully", { isSuccess: true });
 
     // Hide save bar after successful save
     if (shopify?.saveBar) {
@@ -374,8 +386,18 @@ export default function FeedEditorPage() {
   return (
     <>
       <Page
-        title={mode === "create" ? "Create Feed" : "Edit Feed"}
-        backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`) }}
+        title={mode === "create" ? "Create Feed" : feed?.feedName ?? "Feed"}
+        subtitle={mode === "create" ? "Launch a new feed for your products" : 'Change settings, products, and layout'}
+        primaryAction={<Badge
+          tone={feed?.isEnabled ? "success" : "critical"}
+          progress="complete"
+          toneAndProgressLabelOverride="Status: Published. Your online store is visible."
+        >
+          {feed?.isEnabled ? "Active" : "Inactive"}
+        </Badge>
+        }
+        titleMetadata={<Badge tone="magic">{feed?.widgetType ?? "Carousel"}</Badge>}
+      // backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`) }}
       >
         <BlockStack gap="400">
           {actionData?.error && (
@@ -395,6 +417,7 @@ export default function FeedEditorPage() {
                   {selected === 1 && (
                     <SettingsTab
                       control={control}
+                      watch={watch}
                       errors={errors}
                       selectedTab={settingsTabSelected}
                       onTabChange={handleSettingsTabChange}
