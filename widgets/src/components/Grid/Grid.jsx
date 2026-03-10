@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
 import { For, Show, createSignal, createEffect } from 'solid-js';
-import { getThumbnailPreviewUrl } from '../../shared/mux';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './grid.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
@@ -24,6 +24,7 @@ const DEFAULT_SUBTITLE = '';
 export function VideoGrid({ feed, videos, settings, onEvent }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
+  const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
   const addToCartButtonLabel = () => getAddToCartLabel(feed);
@@ -37,6 +38,7 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
   });
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
+  const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
 
 
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
@@ -68,6 +70,14 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
 
   const handleVideoClick = (video, index) => {
     setExpandedIndex(index);
+  };
+
+  const handleCardMouseEnter = (index) => {
+    if (autoplay() === 'onHover') setHoveredIndex(index);
+  };
+
+  const handleCardMouseLeave = () => {
+    if (autoplay() === 'onHover') setHoveredIndex(null);
   };
 
   return (
@@ -112,11 +122,22 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
         <div className="video-grid-list" role="list">
           <For each={videos}>
             {(video, index) => {
-              const thumbUrl = () => getThumbnailPreviewUrl(video?.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+              const staticThumbUrl = () => getThumbnailUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+              const animatedThumbUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+              const isOnHoverMode = () => autoplay() === 'onHover';
+              const isHovered = () => hoveredIndex() === index();
+              const thumbUrl = () => {
+                if (isOnHoverMode()) return isHovered() ? animatedThumbUrl() : staticThumbUrl();
+                if (autoplay() === 'never') return staticThumbUrl();
+                return animatedThumbUrl();
+              };
               const productHandle = () => getProductHandle(video?.productsTagged?.[0]);
 
               return (
-                <article className="video-grid-card" role="listitem">
+                <article className="video-grid-card" role="listitem"
+                  onMouseEnter={() => handleCardMouseEnter(index())}
+                  onMouseLeave={handleCardMouseLeave}
+                >
                   <button
                     type="button"
                     className="video-grid-card-button"

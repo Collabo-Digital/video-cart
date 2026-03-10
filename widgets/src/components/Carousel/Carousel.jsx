@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
 import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
-import { getThumbnailPreviewUrl } from '../../shared/mux';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { Toast } from '../common/Toast/Toast';
@@ -29,6 +29,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   const [trackRef, setTrackRef] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
   const [expandedIndex, setExpandedIndex] = createSignal(null);
+  const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
   const addToCartButtonLabel = () => getAddToCartLabel(feed);
@@ -43,6 +44,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
 
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
+  const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
 
 
   createEffect(() => {
@@ -54,7 +56,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
         if (value != null) container.style.setProperty(key, value);
       });
     }
-    
+
     if (container) {
       injectCustomCss(container, design);
     }
@@ -118,6 +120,14 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     window.location.href = `/products/${handle}`;
   };
 
+  const handleCardMouseEnter = (index) => {
+    if (autoplay() === 'onHover') setHoveredIndex(index);
+  };
+
+  const handleCardMouseLeave = () => {
+    if (autoplay() === 'onHover') setHoveredIndex(null);
+  };
+
   return (
     <div className={`video-carousel-container ${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
       <VideoOverlayPlayer
@@ -179,13 +189,21 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
           <div className="video-carousel-track" ref={setTrackRef} role="list">
             <For each={videos}>
               {(video, index) => {
-                const thumbUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
-                const meta = () => {
-                  const count = video?.productsTagged?.length ?? 0;
-                  return count > 0 ? `${count} product${count !== 1 ? 's' : ''}` : LABEL_WATCH;
+                const staticThumbUrl = () => getThumbnailUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+                const animatedThumbUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
+                const isOnHoverMode = () => autoplay() === 'onHover';
+                const isHovered = () => hoveredIndex() === index();
+                const thumbUrl = () => {
+                  if (isOnHoverMode()) return isHovered() ? animatedThumbUrl() : staticThumbUrl();
+                  if (autoplay() === 'never') return staticThumbUrl();
+                  return animatedThumbUrl();
                 };
+
                 return (
-                  <article className="video-carousel-card" role="listitem">
+                  <article className="video-carousel-card" role="listitem"
+                    onMouseEnter={() => handleCardMouseEnter(index())}
+                    onMouseLeave={handleCardMouseLeave}
+                  >
                     <button
                       type="button"
                       className="video-carousel-card-button"
@@ -194,7 +212,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                         if (isInteractiveClick) return;
                         handleCardClick(e, video, index())
                       }}
-                      aria-label={`${video.title || `Video ${index() + 1}`}, ${meta()}`}
+                      aria-label={`${video.title || `Video ${index() + 1}`}, ${LABEL_WATCH}`}
                     >
                       <span className="video-carousel-card-image-wrap">
                         <Show

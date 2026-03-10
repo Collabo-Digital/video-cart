@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
 import { For, Show, createSignal, createEffect } from 'solid-js';
-import { getThumbnailPreviewUrl } from '../../shared/mux';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './stories.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
@@ -22,6 +22,7 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
   const [activeIndex, setActiveIndex] = createSignal(0);
   const [containerRef, setContainerRef] = createSignal(null);
   const [expandedIndex, setExpandedIndex] = createSignal(null);
+  const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
   const addToCartButtonLabel = () => getAddToCartLabel(feed);
@@ -35,7 +36,7 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
   });
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
-
+  const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
   const title = () => settings?.translation?.widgetHeading || feed?.name || DEFAULT_TITLE_STORIES;
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || '';
 
@@ -61,6 +62,14 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
     }
     await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_CLICK });
+  };
+
+  const handleStoryMouseEnter = (index) => {
+    if (autoplay() === 'onHover') setHoveredIndex(index);
+  };
+
+  const handleStoryMouseLeave = () => {
+    if (autoplay() === 'onHover') setHoveredIndex(null);
   };
 
   return (
@@ -112,7 +121,15 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
         <div className="video-stories-list" role="list" aria-label="Video stories">
           <For each={videos}>
             {(video, index) => {
-              const thumbUrl = () => getThumbnailPreviewUrl(video?.playbackId, THUMB_STORIES.width, THUMB_STORIES.height);
+              const staticThumbUrl = () => getThumbnailUrl(video.playbackId, THUMB_STORIES.width, THUMB_STORIES.height);
+              const animatedThumbUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_STORIES.width, THUMB_STORIES.height);
+              const isOnHoverMode = () => autoplay() === 'onHover';
+              const isHovered = () => hoveredIndex() === index();
+              const thumbUrl = () => {
+                if (isOnHoverMode()) return isHovered() ? animatedThumbUrl() : staticThumbUrl();
+                if (autoplay() === 'never') return staticThumbUrl();
+                return animatedThumbUrl();
+              };
               const isActive = () => activeIndex() === index();
 
               return (
@@ -121,6 +138,8 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
                   className={`video-story ${isActive() ? 'is-active' : ''}`}
                   onClick={() => openStory(video, index())}
                   aria-label={video?.title || `Story ${index() + 1}`}
+                  onMouseEnter={() => handleStoryMouseEnter(index())}
+                  onMouseLeave={handleStoryMouseLeave}
                 >
                   <span className="video-story-ring">
                     <Show when={thumbUrl()} fallback={<span className="video-story-thumb video-story-thumb-fallback" />}>

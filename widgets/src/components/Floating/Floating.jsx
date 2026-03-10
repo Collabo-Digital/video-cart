@@ -1,6 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
 import { Show, createSignal, createEffect } from 'solid-js';
-import { getThumbnailPreviewUrl } from '../../shared/mux';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './floating.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
@@ -21,6 +21,7 @@ import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '..
 export function VideoFloating({ feed, videos, settings, onEvent }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
+  const [hoveredIndex, setHoveredIndex] = createSignal(null);
   const firstVideo = () => (Array.isArray(videos) && videos.length ? videos[0] : null);
 
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
@@ -39,7 +40,7 @@ export function VideoFloating({ feed, videos, settings, onEvent }) {
 
 
   const title = () => settings?.translation?.floatingTitle || feed?.name || DEFAULT_TITLE_WATCH;
-
+  const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
   const subtitle = () => {
     const count = videos?.length || 0;
     return `${count} video${count === 1 ? '' : 's'} available`;
@@ -60,9 +61,14 @@ export function VideoFloating({ feed, videos, settings, onEvent }) {
     }
   });
 
-  const thumb = () => {
-    const playbackId = firstVideo()?.playbackId;
-    return playbackId ? getThumbnailPreviewUrl(playbackId, THUMB_FLOATING.width, THUMB_FLOATING.height) : null;
+  const staticThumbUrl = () => getThumbnailUrl(firstVideo()?.playbackId, THUMB_FLOATING.width, THUMB_FLOATING.height);
+  const animatedThumbUrl = () => getThumbnailPreviewUrl(firstVideo()?.playbackId, THUMB_FLOATING.width, THUMB_FLOATING.height);
+  const isOnHoverMode = () => autoplay() === 'onHover';
+  const isHovered = () => hoveredIndex() === 0;
+  const thumbUrl = () => {
+    if (isOnHoverMode()) return isHovered() ? animatedThumbUrl() : staticThumbUrl();
+    if (autoplay() === 'never') return staticThumbUrl();
+    return animatedThumbUrl();
   };
 
   const openVideo = async () => {
@@ -75,6 +81,13 @@ export function VideoFloating({ feed, videos, settings, onEvent }) {
     await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_CLICK });
   };
 
+  const handleFloatingMouseEnter = () => {
+    if (autoplay() === 'onHover') setHoveredIndex(0);
+  };
+
+  const handleFloatingMouseLeave = () => {
+    if (autoplay() === 'onHover') setHoveredIndex(null);
+  };
   return (
     <div className={`video-floating ${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
       <VideoOverlayPlayer
@@ -115,13 +128,15 @@ export function VideoFloating({ feed, videos, settings, onEvent }) {
           onClick={openVideo}
           className="video-floating-button"
           aria-label="Open featured video"
+          onMouseEnter={handleFloatingMouseEnter}
+          onMouseLeave={handleFloatingMouseLeave}
         >
           <div className="video-floating-thumb-wrap">
             <Show
-              when={thumb()}
+              when={thumbUrl()}
               fallback={<div className="video-floating-thumb video-floating-thumb-fallback" aria-hidden="true" />}
             >
-              <img className="video-floating-thumb" src={thumb()} alt="" loading="lazy" />
+              <img className="video-floating-thumb" src={thumbUrl()} alt="" loading="lazy" />
             </Show>
           </div>
         </button>
