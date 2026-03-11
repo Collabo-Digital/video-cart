@@ -20,6 +20,47 @@ function registerStorefrontWidgets() {
   registerWidget({ type: 'grid', component: VideoGrid });
 }
 
+let _previewDispose = null;
+
+export function renderPreviewWidget(mountEl, payload) {
+  registerStorefrontWidgets(); // safe to call multiple times
+
+  const { feed, settings, videos } = payload || {};
+  if (!feed || !mountEl) return;
+
+  const widgetType = feed.widgetType || 'carousel';
+  const widgetDef = getWidget(widgetType);
+  if (!widgetDef?.component) {
+    mountEl.innerHTML = `<p style="color:#b91c1c;">Unknown widget type: ${widgetType}</p>`;
+    return;
+  }
+
+  if (_previewDispose) {
+    _previewDispose();
+    _previewDispose = null;
+  }
+
+  mountEl.innerHTML = '';
+
+  _previewDispose = render(
+    () => widgetDef.component({
+      feed,
+      videos: videos || feed.videos || [],
+      settings: settings || feed.settings || {},
+      isPreview: true,
+    }),
+    mountEl
+  );
+}
+
+// Expose on window for the preview HTML page to call
+if (typeof window !== 'undefined') {
+  window.__video_cart_preview__ = {
+    renderPreviewWidget,
+  };
+}
+
+
 export async function initFeeds() {
   registerStorefrontWidgets();
 
@@ -81,6 +122,7 @@ export async function initFeeds() {
         mountEl
       );
       container.dataset.videoCartInitialized = 'true';
+
     } catch (err) {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console?.error === 'function') {
         console.error('Video feed error:', err);
