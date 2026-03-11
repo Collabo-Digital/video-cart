@@ -18,7 +18,7 @@ import { THUMB_STORIES } from '../../core/constant';
 import { DEFAULT_TITLE_STORIES, EMPTY_STORIES } from '../../constants/strings';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../utils/designStyles';
 
-export function VideoStories({ feed, videos, settings, onEvent }) {
+export function VideoStories({ feed, videos, settings, onEvent, isPreview }) {
   const [activeIndex, setActiveIndex] = createSignal(0);
   const [containerRef, setContainerRef] = createSignal(null);
   const [expandedIndex, setExpandedIndex] = createSignal(null);
@@ -33,6 +33,7 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
     onEvent,
     showToast,
     source: 'stories',
+    isPreview,
   });
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
@@ -56,6 +57,7 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
   });
 
   const openStory = async (video, index) => {
+    if (isPreview) return;
     setExpandedIndex(index);
     setActiveIndex(index);
     if (feed?.id && video?.id) {
@@ -91,12 +93,12 @@ export function VideoStories({ feed, videos, settings, onEvent }) {
             index,
             source: 'stories',
           });
-          if (feed?.id && video?.id) {
+          if (feed?.id && video?.id && !isPreview) {
             await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
-          if (!feed?.id || !video?.id) return;
+          if (!feed?.id || !video?.id || isPreview) return;
           await trackDbEvent({
             feedId: feed.id,
             videoId: video.id,

@@ -21,10 +21,12 @@ const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
  * @param {Function} opts.showToast
  * @param {'carousel'|'grid'|'floating'|'stories'} opts.source
  */
-export function createProductClickHandler({ feed, settings, onEvent, showToast, source }) {
+export function createProductClickHandler({ feed, settings, onEvent, showToast, source, isPreview }) {
+    if (isPreview) return;
     const cartSource = WIDGET_SOURCES[source] || WIDGET_SOURCES.carousel;
 
     return async function handleProductClick(product, video) {
+        if (isPreview) return;
         const productHandle = typeof product === 'object' ? getProductHandle(product) : product;
         onEvent?.('product_click', {
             feedId: feed?.id,
@@ -32,11 +34,6 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
             productId: productHandle,
             source,
         });
-
-        if (feed?.id && video?.id) {
-            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
-        }
 
         const behavior = feed?.settings?.general?.buttonBehavior;
 
@@ -67,6 +64,11 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
                     showToast(TOAST_ADD_FAILED, 'error');
                 });
             return;
+        }
+
+        if (feed?.id && video?.id) {
+            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
         }
 
         const handle = typeof product === 'object' ? getProductHandle(product) : product;

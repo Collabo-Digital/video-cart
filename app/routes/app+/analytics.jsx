@@ -215,6 +215,8 @@ const METRIC_CHOICES = [
 export default function AnalyticsPage() {
   const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null, feedsData, videosData } = useLoaderData() ?? {};
 
+  console.log("Analytics Page ---------->", analytics);
+
   const [feeds, setFeeds] = useState(feedsData.feedsWithAnalytics);
   const [feedsHasMore, setFeedsHasMore] = useState(feedsData?.nextCursor ?? false);
   const [feedsPreviousCursor, setFeedsPreviousCursor] = useState(feedsData?.previousCursor ?? null);
