@@ -25,7 +25,7 @@ const SCROLL_AMOUNT = CARD_WIDTH + CARD_GAP;
 const PRODUCT_SCROLL_AMOUNT = CARD_WIDTH + PRODUCT_ITEM_GAP;
 const DEFAULT_SUBTITLE = '';
 
-export function VideoCarousel({ feed, videos, settings, onEvent }) {
+export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
   const [trackRef, setTrackRef] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
   const [expandedIndex, setExpandedIndex] = createSignal(null);
@@ -40,6 +40,7 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
     onEvent,
     showToast,
     source: 'carousel',
+    isPreview,
   });
 
   const design = settings?.design ?? feed?.settings?.design;
@@ -64,13 +65,13 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
 
   createEffect(() => {
     const container = containerRef();
-    if (!container || !feed?.id) return;
+    if (!container || !feed?.id || isPreview) return;
     let sent = false;
     const observer = new IntersectionObserver(
       async (entries) => {
         if (sent) return;
         for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0 ) {
             sent = true;
             await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_IMPRESSION });
             break;
@@ -104,12 +105,14 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
   };
 
   const handleCardClick = (e, _video, index) => {
+    if (isPreview) return;
     setExpandedIndex(index);
   };
 
   const handleCardLinkClick = async (e, video) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isPreview) return;
     if (feed?.id && video?.id) {
       await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
       await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
@@ -141,12 +144,12 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
         handleProductClick={handleProductClick}
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });
-          if (feed?.id && video?.id) {
+          if (feed?.id && video?.id && !isPreview) {
             await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
-          if (!feed?.id || !video?.id) return;
+          if (!feed?.id || !video?.id || isPreview) return;
           await trackDbEvent({
             feedId: feed.id,
             videoId: video.id,
@@ -274,12 +277,12 @@ export function VideoCarousel({ feed, videos, settings, onEvent }) {
                         </span>
                       </Show>
                     </button>
-                    <a
+                    {/* <a
                       href={getProductHandle(video?.productsTagged?.[0]) ? `/products/${getProductHandle(video.productsTagged[0])}` : '#'}
                       className="video-carousel-card-link"
                       aria-label="View product"
                       onClick={(e) => handleCardLinkClick(e, video)}
-                    />
+                    /> */}
                   </article>
                 );
               }}

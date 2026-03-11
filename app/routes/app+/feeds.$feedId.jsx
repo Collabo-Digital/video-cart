@@ -11,11 +11,13 @@ import {
   Icon,
   EmptyState,
   Badge,
+  Button,
 } from "@shopify/polaris";
 import {
-  UploadIcon, SettingsIcon
+  UploadIcon, SettingsIcon,
+  ViewIcon
 } from '@shopify/polaris-icons';
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { SaveBar } from "@shopify/app-bridge-react";
@@ -28,6 +30,7 @@ import { redirect, useLoaderData, useNavigation, useSubmit, useActionData, useNa
 import { SettingsTab } from "../../components/SettingsTab/Index";
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 import { getFeedFormDefaultValues } from "../../lib/constants/settings";
+import WidgetPreview from "../../components/WidgetPreview/WidgetPreview";
 
 export const loader = async ({ params, request }) => {
   try {
@@ -106,6 +109,7 @@ export default function FeedEditorPage() {
   const [hasVideoChanges, setHasVideoChanges] = useState(false);
   const [selected, setSelected] = useState(0);
   const [settingsTabSelected, setSettingsTabSelected] = useState(0);
+  const previewModalRef = useRef(null);
 
   console.log("widgetType ----->", widgetType);
   console.log("widgetPage ----->", widgetPage);
@@ -388,13 +392,24 @@ export default function FeedEditorPage() {
       <Page
         title={mode === "create" ? "Create Feed" : feed?.feedName ?? "Feed"}
         subtitle={mode === "create" ? "Launch a new feed for your products" : 'Change settings, products, and layout'}
-        primaryAction={<Badge
-          tone={feed?.isEnabled ? "success" : "critical"}
-          progress="complete"
-          toneAndProgressLabelOverride="Status: Published. Your online store is visible."
-        >
-          {feed?.isEnabled ? "Active" : "Inactive"}
-        </Badge>
+        primaryAction={
+          <>
+            <InlineStack gap="200">
+              <Badge
+                tone={feed?.isEnabled ? "success" : "critical"}
+                progress="complete"
+                toneAndProgressLabelOverride="Status: Published. Your online store is visible."
+              >
+                {feed?.isEnabled ? "Active" : "Inactive"}
+              </Badge>
+              <Button
+                variant="primary"
+                icon={ViewIcon}
+                onClick={() => previewModalRef.current?.showOverlay?.()}
+              disabled={!feed?.id}
+              >Preview</Button>
+            </InlineStack>
+          </>
         }
         titleMetadata={<Badge tone="magic">{feed?.widgetType ?? "Carousel"}</Badge>}
       // backAction={{ content: "Feeds", onAction: () => navigate(`/app/feeds?shop=${shop}`) }}
@@ -436,6 +451,22 @@ export default function FeedEditorPage() {
           </InlineGrid>
         </BlockStack>
       </Page>
+
+      <s-modal
+        ref={previewModalRef}
+        id="feed-preview-modal"
+        heading="Feed Preview"
+        size="large"
+        padding="none"
+      >
+        <div style={{ padding: 16 }}>
+          {/* put your preview UI here (iframe / widget preview / etc.) */}
+          <WidgetPreview
+            watch={watch}
+            feed={feed}
+          />
+        </div>
+      </s-modal>
 
       <SaveBar id="feed-save-bar" discardConfirmation>
         <button

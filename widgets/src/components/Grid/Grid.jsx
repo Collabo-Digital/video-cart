@@ -21,7 +21,7 @@ import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '..
 
 const DEFAULT_SUBTITLE = '';
 
-export function VideoGrid({ feed, videos, settings, onEvent }) {
+export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
@@ -35,6 +35,7 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
     onEvent,
     showToast,
     source: 'grid',
+    isPreview,
   });
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
@@ -63,12 +64,14 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
   const handleCardLinkClick = (e, video) => {
     e.preventDefault();
     e.stopPropagation();
+    if (isPreview) return;
     const first = video?.productsTagged?.[0];
     const product = first ? (typeof first === 'object' ? first : { handle: first }) : null;
     if (product) handleProductClick(product, video);
   };
 
   const handleVideoClick = (video, index) => {
+    if (isPreview) return;
     setExpandedIndex(index);
   };
 
@@ -93,12 +96,12 @@ export function VideoGrid({ feed, videos, settings, onEvent }) {
         handleProductClick={handleProductClick}
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video?.id, index, source: 'grid' });
-          if (feed?.id && video?.id) {
+          if (feed?.id && video?.id && !isPreview) {
             await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
-          if (!feed?.id || !video?.id) return;
+          if (!feed?.id || !video?.id || isPreview) return;
           await trackDbEvent({
             feedId: feed.id,
             videoId: video.id,

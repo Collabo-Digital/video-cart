@@ -18,7 +18,7 @@ import { THUMB_FLOATING } from '../../core/constant';
 import { DEFAULT_TITLE_WATCH, EMPTY_VIDEOS_SHORT } from '../../constants/strings';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../utils/designStyles';
 
-export function VideoFloating({ feed, videos, settings, onEvent }) {
+export function VideoFloating({ feed, videos, settings, onEvent, isPreview }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
@@ -33,6 +33,7 @@ export function VideoFloating({ feed, videos, settings, onEvent }) {
     onEvent,
     showToast,
     source: 'floating',
+    isPreview,
   });
 
   const design = settings?.design ?? feed?.settings?.design;
@@ -72,6 +73,7 @@ export function VideoFloating({ feed, videos, settings, onEvent }) {
   };
 
   const openVideo = async () => {
+    if (isPreview) return;
     const video = firstVideo();
     if (!video) return;
     setExpandedIndex(0);
