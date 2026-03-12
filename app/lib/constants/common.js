@@ -164,7 +164,7 @@ export const APP_PAID_PLANS = [
         name: 'Basic',
         value: 'basic',
         price: '9.99',
-        description: 'For those getting started with shoppable videos.',
+        description: 'Ideal for small stores using shoppable videos.',
         features: [
             '10,000 views per month',
             '25 video uploads',
@@ -177,7 +177,7 @@ export const APP_PAID_PLANS = [
         name: 'Growth',
         value: 'growth',
         price: '49.99',
-        description: 'For those getting started with shoppable videos.',
+        description: 'Scale your video content as your store grows.',
         features: [
             '25,000 views per month',
             '50 video uploads',
@@ -189,7 +189,7 @@ export const APP_PAID_PLANS = [
         name: 'Advanced',
         value: 'advanced',
         price: '99.99',
-        description: 'For those getting started with shoppable videos.',
+        description: 'Built for high-traffic stores using video at scale.',
         features: [
             '50,000 views per month',
             '100 video uploads',
