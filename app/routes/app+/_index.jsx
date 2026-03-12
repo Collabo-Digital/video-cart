@@ -35,9 +35,9 @@ export const loader = async ({ request }) => {
         const shopData = await findByDomain(session.shop);
         const shopVideos = await VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop);
         let muxMetrics = null;
-        if(shopVideos.length > 0) {
+        if (shopVideos.length > 0) {
             muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
-        } 
+        }
         // const feeds = await getFeedsByShop(session.shop);
         const feeds = [];
         return { feeds, session, shopData, muxMetrics };
@@ -53,12 +53,25 @@ export default function IndexPage() {
     const navigate = useNavigate();
     const modalRef = useRef(null);
     const [activePopoverId, setActivePopoverId] = useState(null);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const openPreview = () => {
+        setIsPreviewOpen(true);
+        modalRef.current?.showOverlay?.();
+    };
 
     const progressBarValue = getPercentage(totalViews, shopData?.videoViewLimit ?? 0);
 
     const handleChatWithUs = () => {
         Crisp.chat.open();
     };
+
+    useEffect(() => {
+        const el = modalRef.current;
+        if (!el) return;
+        const handleAfterHide = () => setIsPreviewOpen(false);
+        el.addEventListener("afterhide", handleAfterHide);
+        return () => el.removeEventListener("afterhide", handleAfterHide);
+    }, []);
 
     useEffect(() => {
         onCLS(console.log);
@@ -120,7 +133,7 @@ export default function IndexPage() {
                     <VideoThumbnail
                         videoLength={80}
                         thumbnailUrl="https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850"
-                        onClick={() => modalRef.current?.showOverlay?.()}
+                        onClick={openPreview}
                     />
                 </MediaCard>
 
@@ -271,7 +284,7 @@ export default function IndexPage() {
                                     </InlineStack>
                                     <Text as="p" variant="bodyMd">Learn quickly with short, easy-to-follow video tutorials.</Text>
                                     <InlineStack>
-                                        <Button size="slim">Watch tutorials</Button>
+                                        <Button disabled size="slim">Available soon</Button>
                                     </InlineStack>
                                 </BlockStack>
                             </Box>
@@ -285,7 +298,7 @@ export default function IndexPage() {
                                     </InlineStack>
                                     <Text as="p" variant="bodyMd">Find answers fast with our detailed guides and documentation.</Text>
                                     <InlineStack>
-                                        <Button size="slim">Read documentation</Button>
+                                        <Button disabled size="slim">Available soon</Button>
                                     </InlineStack>
                                 </BlockStack>
                             </Box>
@@ -307,22 +320,9 @@ export default function IndexPage() {
                 size="large"
                 padding="none"
             >
-                <div style={{ position: 'relative', paddingTop: '56.25%', background: '#000' }}>
-                    <iframe
-                        title="YouTube video"
-                        src="https://www.youtube.com/embed/YOUR_VIDEO_ID?autoplay=1"
-                        style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            height: '100%',
-                            border: 'none',
-                        }}
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                    />
-                </div>
+                {isPreviewOpen ? (
+                    <div style={{ position: "relative", paddingBottom: "48.1283422459893%", height: 0 }}><iframe title="Shoppable video preview" src="https://www.loom.com/embed/7718a14c87f04d84ac4c1d88045bf91f" frameBorder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}></iframe></div>
+                ) : null}
                 <s-button
                     slot="secondary-actions"
                     variant="secondary"
