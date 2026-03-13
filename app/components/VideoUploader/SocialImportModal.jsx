@@ -28,7 +28,7 @@ const MODAL_IDS = {
   [SOCIAL_SOURCE.TIKTOK]: "social-import-tiktok",
 };
 
-export default function SocialImportModal({ source, open, onClose, onImported }) {
+export default function SocialImportModal({ source, open, onClose, onImported, remaining = 0 }) {
   const sourceLabel = source === SOCIAL_SOURCE.INSTAGRAM ? "Instagram" : "TikTok";
   const modalRef = useRef(null);
   const { resolveUrls, importByUrl, loading, error, setError } = useSocialImport(source);
@@ -102,10 +102,20 @@ export default function SocialImportModal({ source, open, onClose, onImported })
       setError("Select at least one video");
       return;
     }
+
+    const toImport = items.filter((i) => selected.has(i.id));
+
+    if (toImport.length > remaining) {
+      setError(
+        `You can only import ${remaining} more video${remaining === 1 ? '' : 's'}. ` +
+        `Please deselect ${toImport.length - remaining} video${toImport.length - remaining === 1 ? '' : 's'}.`
+      );
+      return;
+    }
+
     setImporting(true);
     setError(null);
     try {
-      const toImport = items.filter((i) => selected.has(i.id));
       for (const item of toImport) {
         const data = await importByUrl(item.postUrl);
         onImported?.(data);
@@ -113,11 +123,15 @@ export default function SocialImportModal({ source, open, onClose, onImported })
       modalRef.current?.hideOverlay?.();
       onClose?.();
     } catch (e) {
-      setError(e.message || "Import failed");
+      if (e.message?.includes('UPLOAD_LIMIT_REACHED')) {
+        setError('Upload limit reached. Please upgrade your plan.');
+      } else {
+        setError(e.message || "Import failed");
+      }
     } finally {
       setImporting(false);
     }
-  }, [selected, items, importByUrl, onImported, onClose, setError]);
+  }, [selected, items, remaining, importByUrl, onImported, onClose, setError]);
 
   const modalId = MODAL_IDS[source];
   const isImportDisabled = importing || selected.size === 0 || items.length === 0;
@@ -130,6 +144,13 @@ export default function SocialImportModal({ source, open, onClose, onImported })
       size="large"
     >
       <BlockStack gap="400">
+        {remaining < Infinity && remaining <= 5 && (
+          <Banner tone="warning">
+            <Text variant="bodySm">
+              You can import up to {remaining} more video{remaining === 1 ? '' : 's'} on your current plan.
+            </Text>
+          </Banner>
+        )}
         {/* <Tabs tabs={TABS} selected={selectedTab} onSelect={setSelectedTab} /> */}
         <Banner tone="info">
           <Text variant="bodySm">

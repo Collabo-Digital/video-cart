@@ -43,7 +43,9 @@ async function importUrl(source, url) {
   });
   const json = await res.json();
   if (!res.ok || !json.success) {
-    throw new Error(json.error || 'Failed to import');
+    const err = new Error(json.error || 'Failed to import');
+    err.code = json.code;
+    throw err;
   }
   return json.data;
 }

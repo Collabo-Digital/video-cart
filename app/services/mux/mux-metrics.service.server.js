@@ -4,37 +4,59 @@
  * Fetches overall data metrics from Mux Data API (views, watch time, QoE, etc.)
  * using @mux/mux-node. Requires MUX_TOKEN_ID and MUX_TOKEN_SECRET.
  *
- * Exposes:
- * - Full overall metrics for one playback ID
- * - Grouped metrics by video ids (multiple videos)
- * - Single video metrics (one video id)
+ * All public functions accept an optional `dateWindow` ({ startDate, endDate })
+ * as the last parameter. When provided, Mux data is fetched for that exact window.
+ * When omitted, falls back to "last N days from now" (default 30).
+ *
+ * Usage:
+ *   Index page  → pass { startDate: resetDate - 30d, endDate: now }
+ *   Analytics   → omit dateWindow (uses "last N days") or pass your own range
  */
 
 import mux from '../../config/mux.server';
 
-/** Mux metric IDs we fetch for "everything" overall data */
 const OVERALL_METRIC_IDS = [
-  'views',                      // total_views, total_watch_time, total_playing_time
-  'playing_time',               // sum watch time (seconds)
-  'viewer_experience_score',    // 0-100 QoE
+  'views',
+  'playing_time',
+  'viewer_experience_score',
   'playback_failure_percentage',
   'rebuffer_percentage',
 ];
 
+// ─── Timeframe helpers ───────────────────────────────────────────────
+
 /**
- * Build timeframe array for Mux API (last N days as epoch [start, end]).
- * @param {number} days - Number of days (e.g. 30)
- * @returns {[number, number]} [startEpoch, endEpoch]
+ * Convert two Date objects to Mux epoch timeframe.
+ * @param {Date|string} startDate
+ * @param {Date|string} endDate
+ * @returns {[number, number]}
  */
-function getTimeframeEpoch(days = 30) {
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(start.getDate() - Math.max(1, days));
-  return [Math.floor(start.getTime() / 1000), Math.floor(end.getTime() / 1000)];
+function toEpochPair(startDate, endDate) {
+  const s = startDate instanceof Date ? startDate : new Date(startDate);
+  const e = endDate instanceof Date ? endDate : new Date(endDate);
+  return [Math.floor(s.getTime() / 1000), Math.floor(e.getTime() / 1000)];
 }
 
 /**
- * Normalized overall data metrics shape (everything we expose per video/playback).
+ * Single place that decides the Mux timeframe.
+ *
+ * @param {{ startDate: Date, endDate: Date } | null} dateWindow - Explicit window (e.g. reset cycle)
+ * @param {number} daysFallback - "Last N days from now" when dateWindow is null
+ * @returns {[number, number]} [startEpoch, endEpoch]
+ */
+function resolveTimeframe(dateWindow = null, daysFallback = 30) {
+  if (dateWindow?.startDate != null && dateWindow?.endDate != null) {
+    return toEpochPair(dateWindow.startDate, dateWindow.endDate);
+  }
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - Math.max(1, daysFallback));
+  return [Math.floor(start.getTime() / 1000), Math.floor(end.getTime() / 1000)];
+}
+
+// ─── Low-level Mux call ──────────────────────────────────────────────
+
+/**
  * @typedef {{
  *   views: number,
  *   totalWatchTimeSeconds: number,
@@ -45,13 +67,6 @@ function getTimeframeEpoch(days = 30) {
  * }} MuxOverallDataMetrics
  */
 
-/**
- * Fetch one metric's overall value from Mux (no throw).
- * @param {string} metricId - Mux metric ID
- * @param {number[]} timeframe - [startEpoch, endEpoch]
- * @param {string[]} filters - e.g. ['playback_id:xxx']
- * @returns {Promise<{ value?: number, total_views?: number, total_watch_time?: number, total_playing_time?: number } | null>}
- */
 async function fetchOneOverall(metricId, timeframe, filters) {
   try {
     const res = await mux.data.metrics.getOverallValues(metricId, {
@@ -65,34 +80,13 @@ async function fetchOneOverall(metricId, timeframe, filters) {
   }
 }
 
-/**
- * Build normalized metrics object from raw Mux responses for one playback ID.
- * Fetches all OVERALL_METRIC_IDS and merges into one MuxOverallDataMetrics object.
- *
- * @param {string} playbackId - Mux playback ID
- * @param {number} [days=30] - Last N days
- * @returns {Promise<MuxOverallDataMetrics | null>}
- */
-export async function getOverallDataMetricsForPlaybackId(playbackId, days = 30) {
-  if (!playbackId || typeof playbackId !== 'string') return null;
+// ─── Build normalized metrics from raw Mux rows ─────────────────────
 
-  const [startEpoch, endEpoch] = getTimeframeEpoch(days);
-  const timeframe = [startEpoch, endEpoch];
-  const filters = [`playback_id:${playbackId}`];
+function buildMetricsFromResults(results) {
+  const [viewsRow, playingTimeRow, viewerExpRow, failureRow, rebufferRow] = results;
 
-  const results = await Promise.all(
-    OVERALL_METRIC_IDS.map((id) => fetchOneOverall(id, timeframe, filters))
-  );
+  const views = Number(viewsRow?.total_views ?? viewsRow?.value ?? 0) || 0;
 
-  const viewsRow = results[0];
-  const playingTimeRow = results[1];
-  const viewerExpRow = results[2];
-  const failureRow = results[3];
-  const rebufferRow = results[4];
-
-  const views = Number(
-    viewsRow?.total_views ?? viewsRow?.value ?? 0
-  ) || 0;
   const rawWatchTime = Number(
     viewsRow?.total_watch_time ??
     viewsRow?.total_playing_time ??
@@ -100,43 +94,70 @@ export async function getOverallDataMetricsForPlaybackId(playbackId, days = 30) 
     playingTimeRow?.total_playing_time ??
     0
   ) || 0;
-  // Mux getOverallValues returns watch/playing time in milliseconds
+
   const totalWatchTimeSeconds = rawWatchTime / 1000;
-  const avgWatchTimeSeconds =
-    views > 0 ? totalWatchTimeSeconds / views : null;
-  const viewerExperienceScore =
-    viewerExpRow?.value != null ? Number(viewerExpRow.value) : null;
-  const playbackFailurePercentage =
-    failureRow?.value != null ? Number(failureRow.value) : null;
-  const rebufferPercentage =
-    rebufferRow?.value != null ? Number(rebufferRow.value) : null;
 
   return {
     views,
     totalWatchTimeSeconds,
-    avgWatchTimeSeconds,
-    viewerExperienceScore,
-    playbackFailurePercentage,
-    rebufferPercentage,
+    avgWatchTimeSeconds: views > 0 ? totalWatchTimeSeconds / views : null,
+    viewerExperienceScore:
+      viewerExpRow?.value != null ? Number(viewerExpRow.value) : null,
+    playbackFailurePercentage:
+      failureRow?.value != null ? Number(failureRow.value) : null,
+    rebufferPercentage:
+      rebufferRow?.value != null ? Number(rebufferRow.value) : null,
   };
 }
 
+// ─── Public API ──────────────────────────────────────────────────────
+
 /**
- * Fetch full overall data metrics for multiple playback IDs (one set of Mux calls per playback).
+ * Metrics for a single playback ID.
  *
- * @param {string[]} playbackIds - Mux playback IDs
- * @param {number} [days=30] - Last N days
- * @returns {Promise<Map<string, MuxOverallDataMetrics>>} playbackId -> metrics
+ * @param {string} playbackId
+ * @param {number} [days=30] - Fallback: last N days (ignored when dateWindow is set)
+ * @param {{ startDate: Date, endDate: Date } | null} [dateWindow] - Explicit date range
+ * @returns {Promise<MuxOverallDataMetrics | null>}
  */
-export async function getOverallDataMetricsForPlaybackIds(playbackIds, days = 30) {
+export async function getOverallDataMetricsForPlaybackId(
+  playbackId,
+  days = 30,
+  dateWindow = null,
+) {
+  if (!playbackId || typeof playbackId !== 'string') return null;
+
+  const timeframe = resolveTimeframe(dateWindow, days);
+  const filters = [`playback_id:${playbackId}`];
+
+  const results = await Promise.all(
+    OVERALL_METRIC_IDS.map((id) => fetchOneOverall(id, timeframe, filters)),
+  );
+
+  return buildMetricsFromResults(results);
+}
+
+/**
+ * Metrics for multiple playback IDs.
+ *
+ * @param {string[]} playbackIds
+ * @param {number} [days=30]
+ * @param {{ startDate: Date, endDate: Date } | null} [dateWindow]
+ * @returns {Promise<Map<string, MuxOverallDataMetrics>>}
+ */
+export async function getOverallDataMetricsForPlaybackIds(
+  playbackIds,
+  days = 30,
+  dateWindow = null,
+) {
   const ids = [...new Set(playbackIds)].filter(Boolean);
   if (ids.length === 0) return new Map();
 
   const results = await Promise.all(
     ids.map(async (id) => {
-      const metrics = await getOverallDataMetricsForPlaybackId(id, days);
+      const metrics = await getOverallDataMetricsForPlaybackId(id, days, dateWindow);
       return [id, metrics];
-    })
+    }),
   );
 
   const map = new Map();
@@ -147,20 +168,20 @@ export async function getOverallDataMetricsForPlaybackIds(playbackIds, days = 30
 }
 
 /**
- * Group of data metrics: fetch overall metrics for multiple video ids, keyed by video id.
- * Use when you pass a list of video ids (e.g. all videos in a feed).
+ * Metrics for multiple videos (keyed by videoId), with aggregate totals.
  *
- * @param {{ videoId: string, playbackId: string | null }[]} videos - List of { videoId, playbackId }
- * @param {number} [days=30] - Last N days
- * @returns {Promise<{
- *   byVideoId: Record<string, MuxOverallDataMetrics>,
- *   byPlaybackId: Record<string, MuxOverallDataMetrics>,
- *   aggregate: MuxOverallDataMetrics
- * }>}
+ * @param {{ videoId: string, playbackId: string | null }[]} videos
+ * @param {number} [days=30]
+ * @param {{ startDate: Date, endDate: Date } | null} [dateWindow]
+ * @returns {Promise<{ byVideoId, byPlaybackId, aggregate }>}
  */
-export async function getOverallDataMetricsForVideoIds(videos, days = 30) {
+export async function getOverallDataMetricsForVideoIds(
+  videos,
+  days = 30,
+  dateWindow = null,
+) {
   const playbackIds = videos.map((v) => v.playbackId).filter(Boolean);
-  const byPlaybackIdMap = await getOverallDataMetricsForPlaybackIds(playbackIds, days);
+  const byPlaybackIdMap = await getOverallDataMetricsForPlaybackIds(playbackIds, days, dateWindow);
 
   const byVideoId = {};
   for (const v of videos) {
@@ -204,7 +225,8 @@ export async function getOverallDataMetricsForVideoIds(videos, days = 30) {
       viewerExpCount > 0 ? viewerExpSum / viewerExpCount : null,
     playbackFailurePercentage:
       failureCount > 0 ? failureSum / failureCount : null,
-    rebufferPercentage: rebufferCount > 0 ? rebufferSum / rebufferCount : null,
+    rebufferPercentage:
+      rebufferCount > 0 ? rebufferSum / rebufferCount : null,
   };
 
   const byPlaybackId = Object.fromEntries(byPlaybackIdMap);
@@ -212,19 +234,25 @@ export async function getOverallDataMetricsForVideoIds(videos, days = 30) {
 }
 
 /**
- * Single data metrics: fetch overall metrics for one video id.
- * Use when you pass a single video id.
+ * Metrics for one video by its app videoId.
  *
- * @param {string} videoId - Your app's video id
- * @param {string | null} playbackId - Mux playback ID for that video
- * @param {number} [days=30] - Last N days
+ * @param {string} videoId
+ * @param {string | null} playbackId
+ * @param {number} [days=30]
+ * @param {{ startDate: Date, endDate: Date } | null} [dateWindow]
  * @returns {Promise<MuxOverallDataMetrics | null>}
  */
-export async function getOverallDataMetricsForVideoId(videoId, playbackId, days = 30) {
+export async function getOverallDataMetricsForVideoId(
+  videoId,
+  playbackId,
+  days = 30,
+  dateWindow = null,
+) {
   if (!playbackId) return null;
-  const metrics = await getOverallDataMetricsForPlaybackId(playbackId, days);
-  return metrics;
+  return getOverallDataMetricsForPlaybackId(playbackId, days, dateWindow);
 }
+
+// ─── Deprecated wrappers (kept for backward compat) ──────────────────
 
 /** @deprecated Use getOverallDataMetricsForPlaybackId */
 export async function getMetricsForPlaybackId(playbackId, days = 30) {

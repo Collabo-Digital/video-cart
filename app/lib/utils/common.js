@@ -82,3 +82,14 @@ export function getChartTrend(chartData, key, asPercent = false) {
     }
     return { direction: diff > 0 ? "up" : "down", diff: Math.abs(diff) };
 }
+
+
+
+const RESET_PERIOD_DAYS = 30;
+
+export function getNextResetDate(base) {
+    const from = base ? new Date(base) : new Date();
+    const next = new Date(from);
+    next.setDate(next.getDate() + RESET_PERIOD_DAYS);
+    return next;
+}

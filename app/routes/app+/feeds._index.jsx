@@ -387,9 +387,9 @@ export default function FeedsPage() {
             queryPlaceholder="Search feeds"
             onQueryChange={setQueryValue}
             onQueryClear={() => setQueryValue("")}
-            tabs={TABS}
-            selected={selectedTab}
-            onSelect={setSelectedTab}
+            tabs={[]}
+            // selected={selectedTab}
+            // onSelect={setSelectedTab}
             filters={feedsFilters}
             appliedFilters={appliedFeedFilters}
             onClearAll={() => {
@@ -398,6 +398,7 @@ export default function FeedsPage() {
               setQueryValue("");
             }}
             mode={mode}
+            autoFocusSearchField={false}
             setMode={setMode}
           />}
           <IndexTable
