@@ -25,18 +25,51 @@ import { initCrisp } from "../../lib/utils/intiCrisp";
 import { PlayCircleIcon, QuestionCircleIcon, ChatIcon, NotificationIcon, PlusIcon } from '@shopify/polaris-icons';
 
 import { WIDGET_TYPES } from "../../lib/constants/common";
-import { findByDomain } from "../../models/shop.server";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server";
 import * as VideoModel from "../../models/video.server";
+import * as ShopModel from "../../models/shop.server";
+import { getNextResetDate } from "../../lib/utils/common";
+import useLocalStorage from "../../lib/hooks/useLocalStorage";
+
+function getPercentage(used, total) {
+    if (total === 0) return 0;
+    return Math.round((used / total) * 100);
+}
+
 
 export const loader = async ({ request }) => {
     try {
         const { session } = await authenticate.admin(request);
-        const shopData = await findByDomain(session.shop);
+        let shopData = await ShopModel.findByDomain(session.shop);
+
+        const now = new Date();
+        const limits = shopData.planLimits || {};
+
+        if (!limits?.resetDate || limits?.resetDate <= now) {
+            limits.videoViewCount = 0;
+            limits.videoViewLimitReached = false;
+            limits.resetDate = getNextResetDate(now).toISOString();
+            shopData = await ShopModel.updateByDomain(session.shop, {
+                planLimits: limits,
+            });
+        }
+
+        const resetDate = new Date(shopData.planLimits.resetDate);
+        const cycleStart = new Date(resetDate);
+        cycleStart.setDate(cycleStart.getDate() - 30);
+        const dateWindow = { startDate: cycleStart, endDate: new Date() };
+
         const shopVideos = await VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop);
         let muxMetrics = null;
         if (shopVideos.length > 0) {
-            muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+            muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30, dateWindow);
+        }
+
+        if (muxMetrics?.aggregate?.views >= shopData?.planLimits?.videoViewLimit && !limits?.videoViewLimitReached) {
+            limits.videoViewLimitReached = true;
+            shopData = await ShopModel.updateByDomain(session.shop, {
+                planLimits: limits,
+            });
         }
         // const feeds = await getFeedsByShop(session.shop);
         const feeds = [];
@@ -58,8 +91,9 @@ export default function IndexPage() {
         setIsPreviewOpen(true);
         modalRef.current?.showOverlay?.();
     };
+    const [shopDataLocalStorage, setShopDataLocalStorage] = useLocalStorage('shopData', shopData);
 
-    const progressBarValue = getPercentage(totalViews, shopData?.videoViewLimit ?? 0);
+    const progressBarValue = getPercentage(totalViews, shopData?.planLimits?.videoViewLimit ?? 0);
 
     const handleChatWithUs = () => {
         Crisp.chat.open();
@@ -79,14 +113,10 @@ export default function IndexPage() {
         onLCP(console.log);
         if (shopData) {
             initCrisp(shopData);
+            setShopDataLocalStorage(shopData);
         }
-    }, []);
 
-    function getPercentage(used, total) {
-        if (total === 0) return 0;
-        return Math.round((used / total) * 100);
-    }
-
+    }, [shopData]);
 
 
 
@@ -116,7 +146,7 @@ export default function IndexPage() {
                                     <Box width="100%">
                                         <ProgressBar progress={progressBarValue} size="small" tone={progressBarValue >= 80 ? 'critical' : 'highlight'} />
                                     </Box>
-                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{shopData?.videoViewLimit ?? 0}</Text>
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{shopData?.planLimits?.videoViewLimit ?? 0}</Text>
                                 </InlineStack>
                                 <div style={{ paddingTop: '8px' }} />
                                 <Button size="slim" onClick={() => navigate('/app/pricing')}>View Billing</Button>

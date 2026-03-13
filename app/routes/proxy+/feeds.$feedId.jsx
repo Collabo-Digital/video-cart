@@ -1,47 +1,51 @@
-/**
- * App Proxy - Get Single Feed
- * URL: /proxy/feeds/:feedId (proxied from /apps/video-widget/feeds/:feedId)
- */
-
 import { authenticate } from "../../config/shopify.server";
 import { getFeedById } from "../../services/feed/feed.service.server";
 import * as VideoModel from "../../models/video.server";
+import * as ShopModel from "../../models/shop.server";
 
 export const loader = async ({ request, params }) => {
-  console.log('request of feeds $feedId hitted' );
+  console.log('request of feeds $feedId hitted', request, params);
   try {
+    console.log('before appProxy');
     const { session } = await authenticate.public.appProxy(request);
     console.log('session of feeds $feedId', session);
-    
+    console.log('Check point #1');
     if (!session) {
-      return Response.json({ 
-        success: false, 
-        error: "Unauthorized" 
+      return Response.json({
+        success: false,
+        error: "Unauthorized"
       }, { status: 401 });
     }
-
+    const shopData = await ShopModel.findByDomain(session.shop);
+    const videoViewLimitReached = shopData?.planLimits?.videoViewLimitReached ?? false;
+    if (videoViewLimitReached) {
+      return Response.json({
+        success: false,
+        error: "You have reached your video view limit. Please upgrade your plan.",
+      }, { status: 403 });
+    }
     const feed = await getFeedById(params.feedId, session.shop);
 
     if (!feed) {
-      return Response.json({ 
-        success: false, 
-        error: "Feed not found" 
+      return Response.json({
+        success: false,
+        error: "Feed not found"
       }, { status: 404 });
     }
 
     // Verify feed belongs to this shop
     if (feed.shopDomain !== session.shop) {
-      return Response.json({ 
-        success: false, 
-        error: "Unauthorized access to feed" 
+      return Response.json({
+        success: false,
+        error: "Unauthorized access to feed"
       }, { status: 403 });
     }
 
     // Check if feed is enabled
     if (!feed.isEnabled) {
-      return Response.json({ 
-        success: false, 
-        error: "Feed is disabled" 
+      return Response.json({
+        success: false,
+        error: "Feed is disabled"
       }, { status: 403 });
     }
 
@@ -101,6 +105,7 @@ export const loader = async ({ request, params }) => {
       },
     });
   } catch (error) {
+    console.error('auth appProxy error:', error.constructor?.name, error);
     console.error('Proxy get feed error:', error);
 
     return Response.json({

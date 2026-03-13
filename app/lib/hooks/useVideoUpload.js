@@ -75,6 +75,12 @@ export function useVideoUpload() {
           setIsUploading(false);
           throw new Error(msg);
         }
+        if (data.code === 'UPLOAD_LIMIT_REACHED' || response.status === 403) {
+          const msg = data.error || 'You have reached your video upload limit.';
+          setError(msg);
+          setIsUploading(false);
+          throw new Error(msg);
+        }
         throw new Error(data.error || `Server error: ${response.status}`);
       }
       const uploadUrl = data.data?.url || data.url;
