@@ -77,8 +77,8 @@ export const loader = async ({ request }) => {
   ]);
 
   let muxMetrics = null;
-  if(shopVideos.length > 0) {
-    muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30);
+  if (shopVideos.length > 0) {
+    muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30, { startDate: start, endDate: end });
   }
 
   const totalImpressions = (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);

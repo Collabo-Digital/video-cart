@@ -26,11 +26,14 @@ import { getFeedById, createFeed, updateFeed } from "../../services/feed/feed.se
 import { prepareVideosPayload, isDuplicateVideoInWidget, filterDuplicateVideos } from "../../lib/utils/feed";
 import VideoUploader from "../../components/VideoUploader/VideoUploader";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
-import { redirect, useLoaderData, useNavigation, useSubmit, useActionData, useNavigate } from "react-router";
+import { redirect, useLoaderData, useNavigation, useSubmit, useActionData } from "react-router";
 import { SettingsTab } from "../../components/SettingsTab/Index";
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 import { getFeedFormDefaultValues } from "../../lib/constants/settings";
 import WidgetPreview from "../../components/WidgetPreview/WidgetPreview";
+import useLocalStorage from "../../lib/hooks/useLocalStorage";
+import * as VideoModel from "../../models/video.server";
+import * as ShopModel from "../../models/shop.server";
 
 export const loader = async ({ params, request }) => {
   try {
@@ -38,14 +41,21 @@ export const loader = async ({ params, request }) => {
 
     if (params.feedId === "new") {
       const url = new URL(request.url);
+      const totalVideos = await VideoModel.count(session.shop);
+      const shopData = await ShopModel.findByDomain(session.shop);
+      const uploadLimit = shopData?.planLimits?.videoUploadLimit ?? 0;
+      const remaining = Math.max(0, uploadLimit - totalVideos);
       const widgetPage = url.searchParams.get('widgetPage') || null;
       const widgetType = url.searchParams.get('widgetType') || null;
-
-      return { mode: "create", feed: null, widgetType, widgetPage };
+      return { mode: "create", feed: null, widgetType, widgetPage, remaining };
     }
 
+    const totalVideos = await VideoModel.count(session.shop);
+    const shopData = await ShopModel.findByDomain(session.shop);
+    const uploadLimit = shopData?.planLimits?.videoUploadLimit ?? 0;
+    const remaining = Math.max(0, uploadLimit - totalVideos);
     const feed = await getFeedById(params.feedId, session.shop);
-    return { mode: "edit", feed, shop: session.shop };
+    return { mode: "edit", feed, shop: session.shop, remaining };
   } catch (error) {
     console.error('Feed loader error:', error);
     throw new Response("Feed not found", { status: 404 });
@@ -98,12 +108,12 @@ export const action = async ({ params, request }) => {
 };
 
 export default function FeedEditorPage() {
-  const { mode, feed, shop, widgetType, widgetPage } = useLoaderData();
+  const { mode, feed, widgetType, widgetPage, remaining } = useLoaderData();
+  const [shopData] = useLocalStorage('shopData', null);
   const actionData = useActionData();
   const submit = useSubmit();
   const navigation = useNavigation();
   const shopify = useAppBridge();
-  const navigate = useNavigate();
   const [uploadedVideos, setUploadedVideos] = useState([]);
   const [error, setError] = useState(null);
   const [hasVideoChanges, setHasVideoChanges] = useState(false);
@@ -339,6 +349,8 @@ export default function FeedEditorPage() {
           <VideoUploader
             setUploadedVideo={handleVideoUpload}
             onVideosFromLibrary={handleVideosFromLibrary}
+            shopData={shopData}
+            remaining={remaining}
           />
           {uploadedVideos.length === 0 && (
             <EmptyStateUploads />
@@ -406,7 +418,7 @@ export default function FeedEditorPage() {
                 variant="primary"
                 icon={ViewIcon}
                 onClick={() => previewModalRef.current?.showOverlay?.()}
-              disabled={!feed?.id}
+                disabled={!feed?.id}
               >Preview</Button>
             </InlineStack>
           </>

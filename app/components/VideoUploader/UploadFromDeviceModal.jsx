@@ -16,7 +16,7 @@ import { VIDEO_CONFIG } from "../../lib/constants/video";
 
 const MODAL_ID = "upload-from-device-modal";
 
-export default function UploadFromDeviceModal({ open, onClose, onUploaded }) {
+export default function UploadFromDeviceModal({ open, onClose, onUploaded, remaining = 0 }) {
   const modalRef = useRef(null);
   const [file, setFile] = useState(null);
   const [uploadComplete, setUploadComplete] = useState(false);
@@ -71,7 +71,11 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded }) {
     setUploadComplete(false);
   }, [setError]);
 
-  const handleUpload = useCallback(async () => {
+    const handleUpload = useCallback(async () => {
+    if (remaining <= 0) {
+      setError("You have reached your video upload limit. Please upgrade your plan.");
+      return;
+    }
     if (!file) {
       setError("No file selected");
       return;
@@ -89,7 +93,7 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded }) {
     } catch (_err) {
       // Error is already set by the hook
     }
-  }, [file, uploadVideo, onUploaded, onClose, handleRemoveFile, setError]);
+  }, [file, remaining, uploadVideo, onUploaded, onClose, handleRemoveFile, setError]);
 
   const fileUploadContent = !file && (
     <DropZone.FileUpload actionHint="Accepts video files up to 500MB" />
