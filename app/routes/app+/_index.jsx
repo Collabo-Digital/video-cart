@@ -1,51 +1,52 @@
 import { useEffect, useRef, useState } from "react";
 import {
-    BlockStack,
-    Card,
-    Page,
-    Text,
-    Button,
-    InlineStack,
-    Badge,
-    MediaCard,
-    VideoThumbnail,
-    Box,
-    InlineGrid,
-    Icon,
-    ProgressBar,
-    Popover,
     ActionList,
+    Badge,
+    BlockStack,
+    Box,
+    Button,
+    Card,
+    Icon,
+    InlineGrid,
+    InlineStack,
+    MediaCard,
+    Page,
+    Popover,
+    ProgressBar,
+    Text,
+    VideoThumbnail,
 } from "@shopify/polaris";
+import {
+    NotificationIcon,
+    PlusIcon,
+} from "@shopify/polaris-icons";
 import { Crisp } from "crisp-sdk-web";
-import { onCLS, onINP, onLCP } from 'web-vitals'
-// import { getFeedsByShop } from "../../services/feed/feed.service.server";
+import { onCLS, onINP, onLCP } from "web-vitals";
 import { useLoaderData, useNavigate } from "react-router";
+
 import { authenticate } from "../../config/shopify.server";
-import { initCrisp } from "../../lib/utils/intiCrisp";
-import { PlayCircleIcon, QuestionCircleIcon, ChatIcon, NotificationIcon, PlusIcon } from '@shopify/polaris-icons';
-
 import { WIDGET_TYPES } from "../../lib/constants/common";
-import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server";
-import * as VideoModel from "../../models/video.server";
-import * as ShopModel from "../../models/shop.server";
-import { getNextResetDate } from "../../lib/utils/common";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
-
-function getPercentage(used, total) {
-    if (total === 0) return 0;
-    return Math.round((used / total) * 100);
-}
-
+import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
+import { getNextResetDate, getPercentage } from "../../lib/utils/common";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture";
+import { initCrisp } from "../../lib/utils/intiCrisp";
+import * as ShopModel from "../../models/shop.server";
+import * as VideoModel from "../../models/video.server";
+import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server";
+import { SHOPPABLE_VIDEO_THUMBNAIL, LOOM_PREVIEW_URL, SUPPORT_CARDS } from "../../lib/constants/homePage";
 
 export const loader = async ({ request }) => {
+    const { session } = await authenticate.admin(request);
+
     try {
-        const { session } = await authenticate.admin(request);
         let shopData = await ShopModel.findByDomain(session.shop);
 
         const now = new Date();
-        const limits = shopData.planLimits || {};
+        const limits = shopData.planLimits ?? {};
 
-        if (!limits?.resetDate || limits?.resetDate <= now) {
+        // Reset monthly view counts when the billing cycle rolls over
+        if (!limits.resetDate || limits.resetDate <= now) {
             limits.videoViewCount = 0;
             limits.videoViewLimitReached = false;
             limits.resetDate = getNextResetDate(now).toISOString();
@@ -59,51 +60,296 @@ export const loader = async ({ request }) => {
         cycleStart.setDate(cycleStart.getDate() - 30);
         const dateWindow = { startDate: cycleStart, endDate: new Date() };
 
-        const shopVideos = await VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop);
+        const shopVideos = await VideoModel.findVideoIdsAndPlaybackIdsByShop(
+            session.shop
+        );
+
         let muxMetrics = null;
         if (shopVideos.length > 0) {
-            muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30, dateWindow);
+            muxMetrics = await getOverallDataMetricsForVideoIds(
+                shopVideos,
+                30,
+                dateWindow
+            );
         }
 
-        if (muxMetrics?.aggregate?.views >= shopData?.planLimits?.videoViewLimit && !limits?.videoViewLimitReached) {
+        // Flag if the shop has reached its view limit for this cycle
+        const viewLimitReached =
+            muxMetrics?.aggregate?.views >= shopData?.planLimits?.videoViewLimit;
+
+        if (viewLimitReached && !limits.videoViewLimitReached) {
             limits.videoViewLimitReached = true;
             shopData = await ShopModel.updateByDomain(session.shop, {
                 planLimits: limits,
             });
         }
-        // const feeds = await getFeedsByShop(session.shop);
-        const feeds = [];
-        return { feeds, session, shopData, muxMetrics };
+
+        return apiSuccess({ feeds: [], session, shopData, muxMetrics });
     } catch (error) {
         console.error("Error fetching feeds:", error);
-        return { feeds: [] };
+
+        captureRouteError(error, {
+            route: "app-index",
+            url: request.url,
+            method: request.method,
+            shop: session?.shop ?? "unknown",
+            extras: {
+                requestId: request.id,
+            },
+        });
+
+        return apiError(error, {
+            route: "app-index",
+            layer: "route",
+            code: "FETCH_FEEDS_ERROR",
+            statusCode: 500,
+            requestId: request.id,
+        });
     }
 };
 
+
+function PlanUsageCard({ shopData, totalViews, onBillingClick }) {
+    const viewLimit = shopData?.planLimits?.videoViewLimit ?? 0;
+    const progressValue = getPercentage(totalViews, viewLimit);
+    const progressTone = progressValue >= 80 ? "critical" : "highlight";
+
+    return (
+        <Card>
+            <BlockStack gap="300">
+                <InlineStack align="start" blockAlign="center" gap="400" wrap={false}>
+                    <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                            Plan
+                        </Text>
+                        <Badge tone="info">{shopData?.appPlan ?? "Free"}</Badge>
+                    </BlockStack>
+
+                    <div
+                        style={{ width: "1px", alignSelf: "stretch", backgroundColor: "#e3e3e3" }}
+                        aria-hidden
+                    />
+
+                    <Box width="100%">
+                        <InlineStack
+                            align="center"
+                            blockAlign="center"
+                            gap="200"
+                            wrap={false}
+                        >
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                {totalViews}
+                            </Text>
+                            <Box width="100%">
+                                <ProgressBar
+                                    progress={progressValue}
+                                    size="small"
+                                    tone={progressTone}
+                                />
+                            </Box>
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                {viewLimit}
+                            </Text>
+                        </InlineStack>
+
+                        <Box paddingBlockStart="200">
+                            <Button size="slim" onClick={onBillingClick}>
+                                View Billing
+                            </Button>
+                        </Box>
+                    </Box>
+                </InlineStack>
+            </BlockStack>
+        </Card>
+    );
+}
+
+function WidgetTypeCard({ widgetType, isPopoverOpen, onPopoverToggle, onPopoverClose, onNavigate }) {
+    return (
+        <Box
+            background="bg-surface-secondary"
+            borderRadius="200"
+            borderWidth="0165"
+            borderColor="border"
+        >
+            <Box
+                background="bg-fill-secondary"
+                borderRadius="100"
+                minHeight="120px"
+            >
+                <Box
+                    minWidth="48px"
+                    minHeight="64px"
+                    borderRadius="100"
+                    background="bg-fill-tertiary"
+                >
+                    <img
+                        alt={widgetType.name}
+                        src={widgetType.image}
+                        style={{
+                            display: "block",
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            borderTopLeftRadius: "10px",
+                            borderTopRightRadius: "10px",
+                        }}
+                    />
+                </Box>
+            </Box>
+            <Box padding="300">
+                <BlockStack gap="200">
+                    <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
+                        <InlineStack gap="100" blockAlign="center">
+                            <Icon source={widgetType.icon} tone="subdued" />
+                            <Text as="h2" variant="headingMd" fontWeight="bold">
+                                {widgetType.name}
+                            </Text>
+                        </InlineStack>
+                    </InlineStack>
+
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                        {widgetType.description}
+                    </Text>
+
+                    <InlineStack align="end">
+                        <Popover
+                            active={isPopoverOpen}
+                            autofocusTarget="first-node"
+                            onClose={onPopoverClose}
+                            activator={
+                                <Button
+                                    icon={PlusIcon}
+                                    size="slim"
+                                    onClick={onPopoverToggle}
+                                >
+                                    Create
+                                </Button>
+                            }
+                        >
+                            <ActionList
+                                actionRole="menuitem"
+                                items={widgetType.widgetPageOptions.map((option) => ({
+                                    content: option.content,
+                                    icon: option.icon,
+                                    onAction: () => onNavigate(option.redirectTo),
+                                }))}
+                            />
+                        </Popover>
+                    </InlineStack>
+                </BlockStack>
+            </Box>
+        </Box>
+    );
+}
+
+
+function SupportCard({ onChatClick }) {
+    const borderRadiusByIndex = {
+        0: {
+            borderEndStartRadius: "200",
+            borderStartStartRadius: "200",
+        },
+        2: {
+            borderEndEndRadius: "200",
+            borderStartEndRadius: "200",
+        },
+    };
+
+    return (
+        <Card>
+            <BlockStack gap="200">
+                <InlineStack gap="200">
+                    <Text as="h2" variant="headingMd">
+                        Need help?
+                    </Text>
+                    <Badge tone="info">Free Setup Assistance</Badge>
+                </InlineStack>
+
+                <Text as="p" variant="bodyMd" tone="subdued">
+                    Our team is here to help you get started with Video Cart. We offer
+                    free setup assistance to help you get the most out of our platform.
+                </Text>
+
+                <InlineGrid columns={3}>
+                    {SUPPORT_CARDS.map((card, index) => (
+                        <Box
+                            key={card.id}
+                            padding="300"
+                            background="bg-surface-secondary"
+                            borderWidth="0165"
+                            borderColor="border"
+                            {...(borderRadiusByIndex[index] ?? {})}
+                        >
+                            <BlockStack gap="200">
+                                <InlineStack align="start" blockAlign="start" gap="200">
+                                    <Text as="p" variant="bodyMd" fontWeight="semibold">
+                                        {card.title}
+                                    </Text>
+                                    <InlineStack>
+                                        <Icon source={card.icon} />
+                                    </InlineStack>
+                                </InlineStack>
+
+                                <Text as="p" variant="bodyMd" tone="subdued">
+                                    {card.description}
+                                </Text>
+
+                                <InlineStack>
+                                    <Button
+                                        variant={card.action.available ? "primary" : undefined}
+                                        disabled={!card.action.available}
+                                        size="slim"
+                                        onClick={card.action.available ? onChatClick : undefined}
+                                    >
+                                        {card.action.label}
+                                    </Button>
+                                </InlineStack>
+                            </BlockStack>
+                        </Box>
+                    ))}
+                </InlineGrid>
+            </BlockStack>
+        </Card>
+    );
+}
+
 export default function IndexPage() {
-    const { feeds, shopData, muxMetrics } = useLoaderData();
+    const { data } = useLoaderData();
+    const { shopData, muxMetrics } = data;
+
     const totalViews = muxMetrics?.aggregate?.views ?? 0;
+
     const navigate = useNavigate();
     const modalRef = useRef(null);
+
     const [activePopoverId, setActivePopoverId] = useState(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-    const openPreview = () => {
+
+    const [, setShopDataLocalStorage] = useLocalStorage("shopData", shopData);
+
+    const handleOpenPreview = () => {
         setIsPreviewOpen(true);
         modalRef.current?.showOverlay?.();
     };
-    const [shopDataLocalStorage, setShopDataLocalStorage] = useLocalStorage('shopData', shopData);
-
-    const progressBarValue = getPercentage(totalViews, shopData?.planLimits?.videoViewLimit ?? 0);
 
     const handleChatWithUs = () => {
         Crisp.chat.open();
     };
 
+    const handlePopoverToggle = (id) => {
+        setActivePopoverId((prev) => (prev === id ? null : id));
+    };
+
+    const handlePopoverClose = () => setActivePopoverId(null);
+
     useEffect(() => {
         const el = modalRef.current;
         if (!el) return;
+
         const handleAfterHide = () => setIsPreviewOpen(false);
         el.addEventListener("afterhide", handleAfterHide);
+
         return () => el.removeEventListener("afterhide", handleAfterHide);
     }, []);
 
@@ -111,237 +357,73 @@ export default function IndexPage() {
         onCLS(console.log);
         onINP(console.log);
         onLCP(console.log);
+
         if (shopData) {
             initCrisp(shopData);
             setShopDataLocalStorage(shopData);
         }
+    }, [shopData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    }, [shopData]);
-
-
-
-    console.log(feeds);
-    console.log(muxMetrics);
     return (
         <Page
             title="Video Cart"
-            subtitle="Video Cart is a tool that helps you manage your video cart."
+            subtitle="Manage your shoppable video experiences."
             titleMetadata={<Badge tone="magic">1.0.0</Badge>}
             compactTitle
-            primaryAction={<Button variant="tertiary" icon={NotificationIcon} size="slim">What's new</Button>}
+            primaryAction={
+                <Button variant="tertiary" icon={NotificationIcon} size="slim">
+                    What's new
+                </Button>
+            }
         >
             <BlockStack gap="400">
-
-                <Card>
-                    <BlockStack gap="300">
-                        <InlineStack align="start" blockAlign="center" gap="400" wrap={false}>
-                            <BlockStack gap="100">
-                                <Text as="p" variant="bodyMd" fontWeight="semibold">Plan</Text>
-                                <Badge tone="info">{shopData?.appPlan ?? 'Free'}</Badge>
-                            </BlockStack>
-                            <div style={{ width: '1px', height: 'stretch', backgroundColor: '#e3e3e3' }} />
-                            <Box width="100%" >
-                                <InlineStack align="center" blockAlign="center" inlineAlign="center" gap="200" wrap={false}>
-                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{totalViews}</Text>
-                                    <Box width="100%">
-                                        <ProgressBar progress={progressBarValue} size="small" tone={progressBarValue >= 80 ? 'critical' : 'highlight'} />
-                                    </Box>
-                                    <Text as="p" variant="bodyMd" fontWeight="semibold">{shopData?.planLimits?.videoViewLimit ?? 0}</Text>
-                                </InlineStack>
-                                <div style={{ paddingTop: '8px' }} />
-                                <Button size="slim" onClick={() => navigate('/app/pricing')}>View Billing</Button>
-                            </Box>
-                        </InlineStack>
-                    </BlockStack>
-                </Card>
+                <PlanUsageCard
+                    shopData={shopData}
+                    totalViews={totalViews}
+                    onBillingClick={() => navigate("/app/pricing")}
+                />
 
                 <MediaCard
                     title="Create your first shoppable video"
                     size="small"
-                    description={`Upload a video and tag products to turn your content into an interactive shopping experience. Customers can watch, explore, and buy — all in one place.`}
+                    description="Upload a video and tag products to turn your content into an interactive shopping experience. Customers can watch, explore, and buy — all in one place."
                 >
                     <VideoThumbnail
                         videoLength={80}
-                        thumbnailUrl="https://images.wondershare.com/virbo/article/2024/shoppable-video-1.png?width=1850"
-                        onClick={openPreview}
+                        thumbnailUrl={SHOPPABLE_VIDEO_THUMBNAIL}
+                        onClick={handleOpenPreview}
                     />
                 </MediaCard>
-
-
 
                 <Card>
                     <BlockStack gap="400">
                         <BlockStack gap="100">
-                            <Text as="h2" variant="headingMd">Widget Types</Text>
-                            <Text as="p" variant="bodyMd" tone="subdued">Choose the type of widget you want to use to display your video cart.</Text>
+                            <Text as="h2" variant="headingMd">
+                                Widget Types
+                            </Text>
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                                Choose the type of widget you want to use to display your video
+                                cart.
+                            </Text>
                         </BlockStack>
+
                         <InlineGrid columns={2} gap="200">
-
-
                             {WIDGET_TYPES.map((widgetType) => (
-                                <Box
+                                <WidgetTypeCard
                                     key={widgetType.id}
-                                    background="bg-surface-secondary"
-                                    borderRadius="200"
-                                    borderWidth="0165"
-                                    borderColor="border"
-                                    overflow="hidden"
-                                >
-                                    <Box position="relative" >
-                                        <Box
-                                            background="bg-fill-secondary"
-                                            borderRadius="100"
-                                            minHeight="120px"
-                                            position="relative"
-                                        >
-                                            <BlockStack gap="100">
-
-                                                <Box borderStartStartRadius="200" borderEndStartRadius="200" >
-                                                    <InlineStack gap="100" wrap={false} blockAlign="center">
-                                                        {/* {[
-
-                                                        'https://docs.aspose.com/svg/images/drawing/viewport2_1.png',
-                                                    ].map((src, i) => ( */}
-                                                        <Box
-                                                            minWidth="48px"
-                                                            minHeight="64px"
-                                                            borderRadius="100"
-                                                            overflow="hidden"
-                                                            background="bg-fill-tertiary"
-                                                        >
-                                                            <img
-                                                                alt=""
-                                                                src={widgetType.image}
-                                                                style={{
-                                                                    objectFit: 'cover',
-                                                                    width: '100%',
-                                                                    height: '100%',
-                                                                    display: 'block',
-                                                                    borderTopLeftRadius: '10px',
-                                                                    borderTopRightRadius: '10px',
-                                                                }}
-                                                            />
-                                                        </Box>
-                                                        {/* ))} */}
-                                                    </InlineStack>
-                                                </Box>
-                                            </BlockStack>
-
-                                        </Box>
-                                    </Box>
-
-                                    {/* Content area */}
-                                    <Box padding="300">
-                                        <BlockStack gap="200">
-                                            <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
-                                                <InlineStack gap="100" blockAlign="center">
-                                                    <Icon source={widgetType.icon} tone="subdued" />
-                                                    <Text as="h2" variant="headingMd" fontWeight="bold">
-                                                        {widgetType.name}
-                                                    </Text>
-                                                </InlineStack>
-                                                {/* <Badge tone="subdued">Inactive</Badge> */}
-                                            </InlineStack>
-                                            <Text as="p" variant="bodyMd" tone="subdued">
-                                                {widgetType.description}
-                                            </Text>
-                                            <InlineStack align="end" blockAlign="end">
-                                                <Popover
-                                                    active={activePopoverId === widgetType.id}
-                                                    activator={
-                                                        <Button
-                                                            icon={PlusIcon}
-                                                            size="slim"
-                                                            onClick={() => setActivePopoverId(activePopoverId === widgetType.id ? null : widgetType.id)}
-                                                        >
-                                                            Create
-                                                        </Button>
-                                                    }
-                                                    autofocusTarget="first-node"
-                                                    onClose={() => setActivePopoverId(null)}
-                                                >
-                                                    <ActionList
-                                                        actionRole="menuitem"
-                                                        items={widgetType.widgetPageOptions.map((option) => ({
-                                                            content: option.content,
-                                                            onAction: () => navigate(option.redirectTo),
-                                                            icon: option.icon,
-                                                        }))}
-                                                    />
-                                                </Popover>
-                                            </InlineStack>
-                                        </BlockStack>
-                                    </Box>
-                                </Box>
+                                    widgetType={widgetType}
+                                    isPopoverOpen={activePopoverId === widgetType.id}
+                                    onPopoverToggle={() => handlePopoverToggle(widgetType.id)}
+                                    onPopoverClose={handlePopoverClose}
+                                    onNavigate={navigate}
+                                />
                             ))}
-
-
                         </InlineGrid>
                     </BlockStack>
                 </Card>
 
-                <Card >
-                    <BlockStack gap="200">
-                        <InlineStack gap="200">
-                            <Text as="h2" variant="headingMd">Need help ?</Text>
-                            <Badge tone="info">Free Setup Assistance</Badge>
-                        </InlineStack>
-                        <Text as="p" variant="bodyMd">Our team is here to help you get started with Video Cart. We offer free setup assistance to help you get the most out of our platform.</Text>
-
-
-                        <InlineGrid columns={3}>
-                            <Box padding="300" background="bg-surface-secondary" borderEndStartRadius="200" borderStartStartRadius="200" borderWidth="0165" borderColor="border">
-                                <BlockStack gap="200">
-                                    <InlineStack align="start" blockAlign="start" gap="200">
-                                        <BlockStack gap="100">
-                                            <Icon source={ChatIcon} />
-                                        </BlockStack>
-                                        <Text as="p" variant="bodyMd" fontWeight="semibold">Live Chat</Text>
-                                    </InlineStack>
-                                    <Text as="p" variant="bodyMd">24/7 live chat support to help you instantly whenever you need assistance.</Text>
-                                    <InlineStack>
-                                        <Button variant="primary" size="slim" onClick={() => handleChatWithUs()}>Chat with us</Button>
-                                    </InlineStack>
-                                </BlockStack>
-                            </Box>
-                            <Box padding="300" background="bg-surface-secondary" borderWidth="0165" borderColor="border">
-                                <BlockStack gap="200">
-                                    <InlineStack align="start" blockAlign="start" gap="200">
-                                        <BlockStack gap="100">
-                                            <Icon source={PlayCircleIcon} />
-                                        </BlockStack>
-                                        <Text as="p" variant="bodyMd" fontWeight="semibold">Video Tutorials</Text>
-                                    </InlineStack>
-                                    <Text as="p" variant="bodyMd">Learn quickly with short, easy-to-follow video tutorials.</Text>
-                                    <InlineStack>
-                                        <Button disabled size="slim">Available soon</Button>
-                                    </InlineStack>
-                                </BlockStack>
-                            </Box>
-                            <Box padding="300" background="bg-surface-secondary" borderWidth="0165" borderColor="border" borderEndEndRadius="200" borderStartEndRadius="200">
-                                <BlockStack gap="200">
-                                    <InlineStack align="start" blockAlign="start" gap="200">
-                                        <BlockStack gap="100">
-                                            <Icon source={QuestionCircleIcon} />
-                                        </BlockStack>
-                                        <Text as="p" variant="bodyMd" fontWeight="semibold">Help Center</Text>
-                                    </InlineStack>
-                                    <Text as="p" variant="bodyMd">Find answers fast with our detailed guides and documentation.</Text>
-                                    <InlineStack>
-                                        <Button disabled size="slim">Available soon</Button>
-                                    </InlineStack>
-                                </BlockStack>
-                            </Box>
-
-                        </InlineGrid>
-                    </BlockStack>
-
-                </Card>
-
+                <SupportCard onChatClick={handleChatWithUs} />
             </BlockStack>
-
-
-
 
             <s-modal
                 ref={modalRef}
@@ -350,9 +432,32 @@ export default function IndexPage() {
                 size="large"
                 padding="none"
             >
-                {isPreviewOpen ? (
-                    <div style={{ position: "relative", paddingBottom: "48.1283422459893%", height: 0 }}><iframe title="Shoppable video preview" src="https://www.loom.com/embed/7718a14c87f04d84ac4c1d88045bf91f" frameBorder="0" webkitallowfullscreen mozallowfullscreen allowfullscreen style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}></iframe></div>
-                ) : null}
+                {isPreviewOpen && (
+                    <div
+                        style={{
+                            position: "relative",
+                            paddingBottom: "48.13%",
+                            height: 0,
+                        }}
+                    >
+                        <iframe
+                            title="Shoppable video preview"
+                            src={LOOM_PREVIEW_URL}
+                            frameBorder="0"
+                            webkitallowfullscreen
+                            mozallowfullscreen
+                            allowFullScreen
+                            style={{
+                                position: "absolute",
+                                top: 0,
+                                left: 0,
+                                width: "100%",
+                                height: "100%",
+                            }}
+                        />
+                    </div>
+                )}
+
                 <s-button
                     slot="secondary-actions"
                     variant="secondary"
@@ -362,7 +467,6 @@ export default function IndexPage() {
                     Close
                 </s-button>
             </s-modal>
-
         </Page>
     );
 }

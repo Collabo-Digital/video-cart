@@ -8,6 +8,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import * as VideoModel from '../../../../models/video.server';
+import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PER_PAGE = 20;
@@ -25,48 +26,45 @@ function jsonResponse(data, status = 200) {
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   try {
-    if (!session) {
-      return jsonResponse(
-        { success: false, error: 'Unauthorized' },
-        401
-      );
-    }
-  } catch (err) {
-    return jsonResponse(
-      { success: false, error: 'Unauthorized' },
-      401
+
+    const url = new URL(request.url);
+    const page = Math.max(1, parseInt(url.searchParams.get('page') ?? String(DEFAULT_PAGE), 10));
+    const perPage = Math.min(
+      MAX_PER_PAGE,
+      Math.max(1, parseInt(url.searchParams.get('perPage') ?? String(DEFAULT_PER_PAGE), 10))
     );
-  }
+    const search = url.searchParams.get('search') ?? '';
 
-  const url = new URL(request.url);
-  const page = Math.max(1, parseInt(url.searchParams.get('page') ?? String(DEFAULT_PAGE), 10));
-  const perPage = Math.min(
-    MAX_PER_PAGE,
-    Math.max(1, parseInt(url.searchParams.get('perPage') ?? String(DEFAULT_PER_PAGE), 10))
-  );
-  const search = url.searchParams.get('search') ?? '';
+    const { videos, total } = await VideoModel.findAllPaginatedWithWidgets({
+      page,
+      perPage,
+      search,
+      shopDomain: session.shop,
+    });
 
-  const { videos, total } = await VideoModel.findAllPaginatedWithWidgets({
-    page,
-    perPage,
-    search,
-    shopDomain: session.shop,
-  });
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
 
-  const totalPages = Math.max(1, Math.ceil(total / perPage));
-
-  return jsonResponse({
-    success: true,
-    data: {
-      videos,
-      pagination: {
-        page,
-        perPage,
-        total,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
+    return jsonResponse({
+      success: true,
+      data: {
+        videos,
+        pagination: {
+          page,
+          perPage,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrevious: page > 1,
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    captureRouteError(error, {
+      route: "videos-list",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
+    throw error;
+  }
 };

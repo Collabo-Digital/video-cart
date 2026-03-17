@@ -34,6 +34,7 @@ import WidgetPreview from "../../components/WidgetPreview/WidgetPreview";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
 import * as VideoModel from "../../models/video.server";
 import * as ShopModel from "../../models/shop.server";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.js";
 
 export const loader = async ({ params, request }) => {
   try {
@@ -63,8 +64,8 @@ export const loader = async ({ params, request }) => {
 };
 
 export const action = async ({ params, request }) => {
+  const { session } = await authenticate.admin(request);
   try {
-    const { session } = await authenticate.admin(request);
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
     const parsedVideos = JSON.parse(data.videos || "[]");
@@ -97,6 +98,12 @@ export const action = async ({ params, request }) => {
 
     return redirect(`/app/feeds/${params.feedId}`);
   } catch (error) {
+    captureRouteError(error, {
+      route: "feeds",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     return new Response(
       JSON.stringify({ error: error.message || 'Failed to save feed' }),
       {
@@ -120,9 +127,6 @@ export default function FeedEditorPage() {
   const [selected, setSelected] = useState(0);
   const [settingsTabSelected, setSettingsTabSelected] = useState(0);
   const previewModalRef = useRef(null);
-
-  console.log("widgetType ----->", widgetType);
-  console.log("widgetPage ----->", widgetPage);
 
   const formValues = useMemo(
     () => getFeedFormDefaultValues(feed, widgetType, widgetPage),

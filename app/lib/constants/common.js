@@ -198,3 +198,5 @@ export const APP_PAID_PLANS = [
         ],
     },
 ];
+
+export const API_BASE_ENDPOINT = "/api/v1";

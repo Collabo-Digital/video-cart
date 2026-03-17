@@ -1,18 +1,47 @@
-  import {  authenticate } from "../../../../config/shopify.server";
+import { authenticate } from "../../../../config/shopify.server";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.js";
+import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse";
+
+
+const ROUTE = "pricing-selectSubscription";
+
+
+const getStoreSlug = (shop) => shop.replace(".myshopify.com", "");
+
 
 export const action = async ({ request }) => {
   const { billing, session } = await authenticate.admin(request);
-  let  shop = session.shop;
-  shop = shop.replace(".myshopify.com", "");
-  const { plan } = await request.json();
-  const billingCheck = await billing.request({
-    plan: plan,
-    isTest: false,
-    returnUrl: `https://admin.shopify.com/store/${shop}/apps/${process.env.SHOPIFY_APP_NAME}/app/pricing`,
-  });
 
+  // try {
+    const { plan } = await request.json();
+    const storeSlug = getStoreSlug(session.shop);
 
-  const subscription = billingCheck.appSubscriptions[0];
- 
-  return { subscription };
+    console.log("plan ----->", plan);
+    console.log("storeSlug ----->", storeSlug);
+    console.log("returnUrl ----->", `https://admin.shopify.com/store/${storeSlug}/apps/${process.env.SHOPIFY_APP_NAME}/app/pricing`);
+
+    const billingResponse = await billing.request({
+      plan,
+      isTest: true,
+      returnUrl: `https://admin.shopify.com/store/${storeSlug}/apps/${process.env.SHOPIFY_APP_NAME}/app/pricing`,
+    });
+
+    const subscription = billingResponse.appSubscriptions[0];
+
+    return apiSuccess({ subscription });
+  // } catch (error) {
+  //   captureRouteError(error, {
+  //     route: ROUTE,
+  //     url: request.url,
+  //     method: request.method,
+  //     shop: session?.shop ?? "unknown",
+  //   });
+
+  //   return apiError(error, {
+  //     route: ROUTE,
+  //     code: "SELECT_SUBSCRIPTION_ERROR",
+  //     statusCode: 500,
+  //     requestId: request.id,
+  //   });
+  // }
 };

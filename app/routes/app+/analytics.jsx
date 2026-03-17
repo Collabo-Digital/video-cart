@@ -37,88 +37,99 @@ import Chart from "../../components/Chart/Chart.jsx";
 import SparkLine from "../../components/Chart/SparkLine.jsx";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
 import { parseDateRange, formatRevenue, mergeDailyChartData, getChartTrend } from "../../lib/utils/common.js";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
+  try {
 
-  const { start, end } = parseDateRange(request);
-  const url = new URL(request.url);
-  const ordersCursor = url.searchParams.get("ordersCursor") ?? undefined;
+    const { start, end } = parseDateRange(request);
+    const url = new URL(request.url);
+    const ordersCursor = url.searchParams.get("ordersCursor") ?? undefined;
 
-  // Previous period window (for percent-change comparisons)
-  const rangeMs = end - start;
-  const prevEnd = new Date(start);
-  prevEnd.setDate(prevEnd.getDate() - 1);
-  const prevStart = new Date(prevEnd.getTime() - rangeMs);
+    // Previous period window (for percent-change comparisons)
+    const rangeMs = end - start;
+    const prevEnd = new Date(start);
+    prevEnd.setDate(prevEnd.getDate() - 1);
+    const prevStart = new Date(prevEnd.getTime() - rangeMs);
 
-  const [
-    widgetAgg, videoAgg, shopVideos,
-    orderStats, prevOrderStats,
-    dailyFeed, dailyVideo,
-    ordersPage,
-    feedsData,
-    videosData,
-  ] = await Promise.all([
-    FeedAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
-    VideoAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
-    VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop),
-    VideoCartOrderModel.getOrderStatsByShop(session.shop, { startDate: start, endDate: end }),
-    VideoCartOrderModel.getOrderStatsByShop(session.shop, { startDate: prevStart, endDate: prevEnd }),
-    FeedAnalyticsModel.getDailyByShop(session.shop, { startDate: start, endDate: end }),
-    VideoAnalyticsModel.getDailyByShop(session.shop, { startDate: start, endDate: end }),
-    VideoCartOrderModel.findByShopPaginated(session.shop, {
-      startDate: start,
-      endDate: end,
-      limit: 5,
-      cursor: ordersCursor,
-    }),
-    FeedAnalyticsModel.getListofFeedsWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
-    VideoAnalyticsModel.getListofVideosWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
-  ]);
+    const [
+      widgetAgg, videoAgg, shopVideos,
+      orderStats, prevOrderStats,
+      dailyFeed, dailyVideo,
+      ordersPage,
+      feedsData,
+      videosData,
+    ] = await Promise.all([
+      FeedAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
+      VideoAnalyticsModel.getAggregatedByShop(session.shop, { startDate: start, endDate: end }),
+      VideoModel.findVideoIdsAndPlaybackIdsByShop(session.shop),
+      VideoCartOrderModel.getOrderStatsByShop(session.shop, { startDate: start, endDate: end }),
+      VideoCartOrderModel.getOrderStatsByShop(session.shop, { startDate: prevStart, endDate: prevEnd }),
+      FeedAnalyticsModel.getDailyByShop(session.shop, { startDate: start, endDate: end }),
+      VideoAnalyticsModel.getDailyByShop(session.shop, { startDate: start, endDate: end }),
+      VideoCartOrderModel.findByShopPaginated(session.shop, {
+        startDate: start,
+        endDate: end,
+        limit: 5,
+        cursor: ordersCursor,
+      }),
+      FeedAnalyticsModel.getListofFeedsWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
+      VideoAnalyticsModel.getListofVideosWithAnalytics(session.shop, { take: 5, startDate: start, endDate: end }),
+    ]);
 
-  let muxMetrics = null;
-  if (shopVideos.length > 0) {
-    muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30, { startDate: start, endDate: end });
-  }
+    let muxMetrics = null;
+    if (shopVideos.length > 0) {
+      muxMetrics = await getOverallDataMetricsForVideoIds(shopVideos, 30, { startDate: start, endDate: end });
+    }
 
-  const totalImpressions = (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
-  const totalVideoViews = videoAgg.videoViews ?? 0;
-  const totalAddToCart = (widgetAgg.widgetAddToCart ?? 0) + (videoAgg.videoAddToCart ?? 0);
-  const totalOrders = orderStats.orderCount ?? 0;
-  const totalRevenue = orderStats.totalRevenue ?? 0;
-  const atcRate =
-    totalVideoViews > 0 ? totalAddToCart / totalVideoViews
-      : totalImpressions > 0 ? totalAddToCart / totalImpressions
-        : 0;
+    const totalImpressions = (widgetAgg.widgetImpressions ?? 0) + (videoAgg.videoImpressions ?? 0);
+    const totalVideoViews = videoAgg.videoViews ?? 0;
+    const totalAddToCart = (widgetAgg.widgetAddToCart ?? 0) + (videoAgg.videoAddToCart ?? 0);
+    const totalOrders = orderStats.orderCount ?? 0;
+    const totalRevenue = orderStats.totalRevenue ?? 0;
+    const atcRate =
+      totalVideoViews > 0 ? totalAddToCart / totalVideoViews
+        : totalImpressions > 0 ? totalAddToCart / totalImpressions
+          : 0;
 
-  return {
-    analytics: {
-      totalOrderCount: totalOrders,
-      totalRevenue,
-      atcRate,
-      totalImpressions,
-      totalVideoViews,
-      totalAddToCart,
-      widgetImpressions: widgetAgg.widgetImpressions ?? 0,
-      widgetAddToCart: widgetAgg.widgetAddToCart ?? 0,
-      videoImpressions: videoAgg.videoImpressions ?? 0,
-      videoViews: videoAgg.videoViews ?? 0,
-      videoAddToCart: videoAgg.videoAddToCart ?? 0,
-      muxMetrics,
-      percentChange: {
-        orders: getChartTrend(dailyFeed, "widgetOrders"),
-        revenue: getChartTrend(dailyFeed, "widgetRevenue", true),
-        addToCart: getChartTrend(dailyFeed, "widgetAddToCart"),
-        views: getChartTrend(dailyFeed, "videoViews"),
+    return {
+      analytics: {
+        totalOrderCount: totalOrders,
+        totalRevenue,
+        atcRate,
+        totalImpressions,
+        totalVideoViews,
+        totalAddToCart,
+        widgetImpressions: widgetAgg.widgetImpressions ?? 0,
+        widgetAddToCart: widgetAgg.widgetAddToCart ?? 0,
+        videoImpressions: videoAgg.videoImpressions ?? 0,
+        videoViews: videoAgg.videoViews ?? 0,
+        videoAddToCart: videoAgg.videoAddToCart ?? 0,
+        muxMetrics,
+        percentChange: {
+          orders: getChartTrend(dailyFeed, "widgetOrders"),
+          revenue: getChartTrend(dailyFeed, "widgetRevenue", true),
+          addToCart: getChartTrend(dailyFeed, "widgetAddToCart"),
+          views: getChartTrend(dailyFeed, "videoViews"),
+        },
       },
-    },
-    feedsData,
-    videosData,
-    dateRange: { start: start.toISOString(), end: end.toISOString() },
-    chartData: mergeDailyChartData(dailyFeed, dailyVideo),
-    orders: ordersPage.orders,
-    ordersNextCursor: ordersPage.nextCursor ?? null,
-  };
+      feedsData,
+      videosData,
+      dateRange: { start: start.toISOString(), end: end.toISOString() },
+      chartData: mergeDailyChartData(dailyFeed, dailyVideo),
+      orders: ordersPage.orders,
+      ordersNextCursor: ordersPage.nextCursor ?? null,
+    };
+  } catch (error) {
+    captureRouteError(error, {
+      route: "analytics",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
+    console.error("Error fetching analytics:", error);
+  }
 };
 
 const LineIcon = () => (

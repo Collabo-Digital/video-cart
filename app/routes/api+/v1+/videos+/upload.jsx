@@ -74,6 +74,7 @@ import { authenticate } from '../../../../config/shopify.server';
 import { createUploadUrl } from '../../../../services/video/upload.service';
 import * as ShopModel from '../../../../models/shop.server';
 import * as VideoModel from '../../../../models/video.server';
+import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -90,6 +91,9 @@ export const action = async ({ request }) => {
   }
 
   try {
+    if (!session) {
+      return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    }
     const shopData = await ShopModel.findByDomain(session.shop);
     const uploadLimit = shopData?.planLimits?.videoUploadLimit ?? 0;
     const currentCount = await VideoModel.count(session.shop);
@@ -114,6 +118,12 @@ export const action = async ({ request }) => {
     return jsonResponse({ success: true, data: uploadData, remaining: remaining - 1 });
   } catch (error) {
     console.error('Upload creation error:', error);
+    captureRouteError(error, {
+      route: "videos-upload",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     const status = error.statusCode === 409 ? 409 : 500;
     return jsonResponse({
       success: false,

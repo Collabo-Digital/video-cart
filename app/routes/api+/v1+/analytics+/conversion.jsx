@@ -36,6 +36,7 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
   if (request.method !== "POST") {
     return Response.json({ success: false, error: "Method not allowed" }, { status: 405, headers: JSON_HEADERS });
   }
@@ -49,36 +50,22 @@ export const action = async ({ request }) => {
         { success: false, error: "Invalid JSON body" },
         { status: 400, headers: JSON_HEADERS }
       );
+    } if (!session.shop) {
+      return Response.json({ success: false, error: "Unauthorized" }, { status: 401, headers: JSON_HEADERS });
     }
 
-    const shop = typeof body?.shop === "string" ? body.shop.trim() : null;
     const items = Array.isArray(body?.items) ? body.items : [];
     const orderId = (typeof body?.orderId === "string" ? body.orderId : body?.order_id)?.trim() || null;
     const orderNumber = (typeof body?.orderNumber === "string" ? body.orderNumber : body?.order_number) != null ? String(body.orderNumber ?? body.order_number).trim() || null : null;
     const currency = (typeof body?.currency === "string" ? body.currency : null)?.trim() || null;
 
-    if (!shop) {
-      return Response.json(
-        { success: false, error: "shop is required" },
-        { status: 400, headers: JSON_HEADERS }
-      );
-    }
-
-    const sessionId = `offline_${shop}`;
-    const session = await sessionStorage.loadSession(sessionId);
-    if (!session) {
-      return Response.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401, headers: JSON_HEADERS }
-      );
-    }
 
     if (items.length === 0) {
       return Response.json({ success: true, recorded: 0 }, { status: 200, headers: JSON_HEADERS });
     }
 
-    await upsertOrderWithItems(shop, orderId, orderNumber, items, currency);
-    await recordConversionFromPixel(shop, items);
+    await upsertOrderWithItems(session.shop, orderId, orderNumber, items, currency);
+    await recordConversionFromPixel(session.shop, items);
 
     return Response.json(
       { success: true, recorded: items.length },

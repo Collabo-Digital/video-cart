@@ -8,6 +8,7 @@
 import { authenticate } from '../../../../../config/shopify.server';
 import * as FeedModel from '../../../../../models/feed.server';
 import { getFeedAnalytics } from '../../../../../models/analytics.server';
+import { captureRouteError } from '../../../../../lib/utils/observability/errorCapture.js';
 
 function parseDate(str) {
   if (!str) return null;
@@ -16,8 +17,8 @@ function parseDate(str) {
 }
 
 export const loader = async ({ request, params }) => {
+  const { session } = await authenticate.admin(request);
   try {
-    const { session } = await authenticate.admin(request);
     const { feedId } = params;
     const url = new URL(request.url);
     const startDate = parseDate(url.searchParams.get('startDate'));
@@ -64,6 +65,12 @@ export const loader = async ({ request, params }) => {
       );
     }
     console.error('Analytics feed loader error:', err);
+    captureRouteError(err, {
+      route: "analytics-feeds-getFeedAnalytics",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     return new Response(
       JSON.stringify({ success: false, error: err.message || 'Failed to load analytics' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }

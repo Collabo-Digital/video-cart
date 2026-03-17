@@ -4,7 +4,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".react-router/types/**/*",
-    "app/routes/api+/v1+/video+/upload.jsx"
+    "app/routes/api+/v1+/video+/upload.jsx",
+    "app/routes/app+/_index.jsx"
   ],
   "compilerOptions": {
     "lib": [

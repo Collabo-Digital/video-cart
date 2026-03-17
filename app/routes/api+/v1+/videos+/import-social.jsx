@@ -61,6 +61,7 @@ import { authenticate } from '../../../../config/shopify.server';
 import { importSocialVideo } from '../../../../services/video/social-import.service';
 import * as ShopModel from '../../../../models/shop.server';
 import * as VideoModel from '../../../../models/video.server';
+import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
 
 const VALID_SOURCES = ['instagram', 'tiktok'];
 
@@ -114,6 +115,12 @@ export const action = async ({ request }) => {
     return jsonResponse({ success: true, data, remaining: remaining - 1 });
   } catch (error) {
     console.error('Import social error:', error);
+    captureRouteError(error, {
+      route: "videos-import-social",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     return jsonResponse({
       success: false,
       error: error.message || 'Import failed',

@@ -7,32 +7,15 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import {  getFeedsWithPaginationAndFilters } from '../../../../services/feed/feed.service.server';
+import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
 
 export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
   try {
-    // await authenticate.public.appProxy(request);
-    const { session } = await authenticate.admin(request);
-    // const shop = 'athul-kumar.myshopify.com'
-    // const url = new URL(request.url);
-    // const shop = url.searchParams.get('shop');
-    const shop = session.shop;
+    // await authenticate.public.appProxy(request);`s
     const { filters } = await request.json();
-
-    if (!shop) {
-      return new Response(
-        JSON.stringify({ error: 'Shop parameter is required' }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
-      );
-    }
-
     // const feeds = await getFeedsByShop(shop);
-    const feedsData = await getFeedsWithPaginationAndFilters(shop, filters);
+    const feedsData = await getFeedsWithPaginationAndFilters(session.shop, filters);
 
     // Return simplified feed data for selector
     // const feedList = feedsData?.feeds
@@ -61,7 +44,12 @@ export const action = async ({ request }) => {
     );
   } catch (error) {
     console.error('List feeds error:', error);
-
+    captureRouteError(error, {
+      route: "feeds-list",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     return new Response(
       JSON.stringify({
         success: false,
