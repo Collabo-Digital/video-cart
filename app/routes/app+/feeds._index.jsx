@@ -21,7 +21,7 @@ import { useDebouncedCallback } from "use-debounce";
 
 import { authenticate } from "../../config/shopify.server";
 import { VideoFeedsIcon } from "../../components/Icons/VideoFeeds/VideoFeedsIcon";
-import { captureRouteError } from "../../lib/utils/observability/errorCapture.js";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import * as FeedModel from "../../models/feed.server";
 import {

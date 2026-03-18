@@ -38,5 +38,5 @@ export async function postJson(path, body) {
         throw new Error(message);
     }
 
-    return data.data;
+    return data?.data;
 }

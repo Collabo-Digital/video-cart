@@ -141,3 +141,28 @@ export function getWidgetsFromVideo(video) {
         .map((fv) => ({ id: fv.feed?.id, name: fv.feed?.feedName ?? "" }))
         .filter((w) => w.id);
 }
+
+
+export function normaliseFeedVideo(v) {
+    const video = v.video ?? {};
+    return {
+        id: video.id ?? v.videoId,
+        videoId: v.videoId,
+        playbackId: v.playbackId ?? video.videoPlaybackId,
+        title: video.title,
+        fileName: video.fileName,
+        fileUploadName: video.fileUploadName,
+        duration: video.duration,
+        status: video.status,
+        assetId: video.videoAssetId,
+        uploadId: video.videoUploadId,
+        taggedProducts:
+            v.taggedProducts ??
+            (v.productsTagged ?? []).map((item) =>
+                typeof item === "object" && item !== null
+                    ? { ...item, id: item.id != null ? String(item.id) : "" }
+                    : { id: String(item), title: "", image: null }
+            ),
+        productsTagged: v.productsTagged,
+    };
+}

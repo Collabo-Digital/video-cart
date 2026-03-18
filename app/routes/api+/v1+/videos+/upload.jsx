@@ -74,7 +74,7 @@ import { authenticate } from '../../../../config/shopify.server';
 import { createUploadUrl } from '../../../../services/video/upload.service';
 import * as ShopModel from '../../../../models/shop.server';
 import * as VideoModel from '../../../../models/video.server';
-import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -119,7 +119,7 @@ export const action = async ({ request }) => {
   } catch (error) {
     console.error('Upload creation error:', error);
     captureRouteError(error, {
-      route: "videos-upload",
+      route: "api.v1.videos.upload",
       url: request.url,
       method: request.method,
       shop: session?.shop || 'unknown',

@@ -8,7 +8,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import * as VideoModel from '../../../../models/video.server';
-import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PER_PAGE = 20;
@@ -60,7 +60,7 @@ export const loader = async ({ request }) => {
     });
   } catch (error) {
     captureRouteError(error, {
-      route: "videos-list",
+      route: "api.v1.videos.list",
       url: request.url,
       method: request.method,
       shop: session?.shop || 'unknown',

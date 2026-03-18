@@ -2,7 +2,7 @@
   "name": "video-cart",
   "private": true,
   "scripts": {
-    "build": "tsc instrumentation.server.js --module esnext --outDir . && prisma generate && react-router build",
+    "build": "prisma generate && react-router build",
     "postinstall": "prisma generate",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",

@@ -29,7 +29,7 @@ import { WIDGET_TYPES } from "../../lib/constants/common";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import { getNextResetDate, getPercentage } from "../../lib/utils/common";
-import { captureRouteError } from "../../lib/utils/observability/errorCapture";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 import { initCrisp } from "../../lib/utils/intiCrisp";
 import * as ShopModel from "../../models/shop.server";
 import * as VideoModel from "../../models/video.server";

@@ -1,5 +1,5 @@
 import { authenticate } from "../../../../config/shopify.server";
-import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.js";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse";
 import { APP_BILLING_PLANS_NAMES } from "../../../../lib/constants/common";
 

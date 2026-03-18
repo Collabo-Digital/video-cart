@@ -6,7 +6,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import { resolveSocialUrl } from '../../../../services/video/social-import.service';
-import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 const VALID_SOURCES = ['instagram', 'tiktok'];
 
@@ -50,7 +50,7 @@ export const action = async ({ request }) => {
   } catch (error) {
     console.error('Resolve social error:', error);
     captureRouteError(error, {
-      route: "videos-resolve-social",
+      route: "api.v1.videos.resolve-social",
       url: request.url,
       method: request.method,
       shop: session?.shop || 'unknown',

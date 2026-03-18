@@ -7,7 +7,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import { getUploadStatus } from '../../../../services/video/upload.service';
-import { captureRouteError } from '../../../../lib/utils/observability/errorCapture.js';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 export const loader = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);
@@ -44,7 +44,7 @@ export const loader = async ({ request, params }) => {
   } catch (error) {
     console.error('Upload status error:', error);
     captureRouteError(error, {
-      route: "videos-upload-status",
+      route: "api.v1.videos.upload.$uploadId",
       url: request.url,
       method: request.method,
       shop: session?.shop || 'unknown',

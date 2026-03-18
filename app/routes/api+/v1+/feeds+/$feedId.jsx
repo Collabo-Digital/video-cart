@@ -1,10 +1,3 @@
-/**
- * GET /api/v1/feeds/:feedId
- * 
- * Gets a specific feed by ID with all video data for storefront rendering.
- * This endpoint is public (no auth required) as it's called from the storefront.
- */
-
 import { getFeedById } from '../../../../services/feed/feed.service.server';
 import * as VideoModel from '../../../../models/video.server';
 

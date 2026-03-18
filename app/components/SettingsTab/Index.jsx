@@ -32,7 +32,7 @@ const SETTINGS_TABS = [
         id: "settings-translation", content: (
             <InlineStack gap="200" blockAlign="center">
                 <Icon source={TextIcon} />
-                <span>Translation</span>
+                <span>Content</span>
             </InlineStack>
         ), panelID: "settings-translation-content"
     },

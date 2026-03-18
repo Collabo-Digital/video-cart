@@ -37,7 +37,8 @@ import Chart from "../../components/Chart/Chart.jsx";
 import SparkLine from "../../components/Chart/SparkLine.jsx";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
 import { parseDateRange, formatRevenue, mergeDailyChartData, getChartTrend } from "../../lib/utils/common.js";
-import { captureRouteError } from "../../lib/utils/observability/errorCapture.js";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { apiError, apiSuccess } from "../../lib/utils/apiResponse.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -93,7 +94,7 @@ export const loader = async ({ request }) => {
         : totalImpressions > 0 ? totalAddToCart / totalImpressions
           : 0;
 
-    return {
+    return apiSuccess({
       analytics: {
         totalOrderCount: totalOrders,
         totalRevenue,
@@ -120,7 +121,7 @@ export const loader = async ({ request }) => {
       chartData: mergeDailyChartData(dailyFeed, dailyVideo),
       orders: ordersPage.orders,
       ordersNextCursor: ordersPage.nextCursor ?? null,
-    };
+    });
   } catch (error) {
     captureRouteError(error, {
       route: "analytics",
@@ -128,7 +129,13 @@ export const loader = async ({ request }) => {
       method: request.method,
       shop: session?.shop || 'unknown',
     });
-    console.error("Error fetching analytics:", error);
+    return apiError(error, {
+      route: "analytics",
+      code: "FETCH_ANALYTICS_ERROR",
+      statusCode: 500,
+      requestId: request.id,
+    });
+    // console.error("Error fetching analytics:", error);
   }
 };
 
@@ -224,9 +231,8 @@ const METRIC_CHOICES = [
 ];
 
 export default function AnalyticsPage() {
-  const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null, feedsData, videosData } = useLoaderData() ?? {};
-
-  console.log("Analytics Page ---------->", analytics);
+  const { data } = useLoaderData();
+  const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null, feedsData, videosData } = data ?? {};
 
   const [feeds, setFeeds] = useState(feedsData.feedsWithAnalytics);
   const [feedsHasMore, setFeedsHasMore] = useState(feedsData?.nextCursor ?? false);

@@ -3,6 +3,7 @@ import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import viteCompression from 'vite-plugin-compression';
 // import purgecss from 'vite-plugin-purgecss';
+import { fileURLToPath } from "node:url";
 
 
 // Related: https://github.com/remix-run/remix/issues/2835#issuecomment-1144102176
@@ -38,60 +39,80 @@ if (host === "localhost") {
   };
 }
 
-export default defineConfig({
-  server: {
-    allowedHosts: [host],
-    cors: {
-      preflightContinue: true,
-    },
-    port: Number(process.env.PORT || 3000),
-    hmr: hmrConfig,
-    fs: {
-      // See https://vitejs.dev/config/server-options.html#server-fs-allow for more information
-      allow: ["app", "node_modules"],
-    },
-  },
-  plugins: [reactRouter(), tsconfigPaths(), viteCompression({ algorithm: 'brotliCompress' })],
-  build: {
-    assetsInlineLimit: 0,
-    target: 'esnext',
-    minify: 'terser',
-    terserOptions: {
-      // compress: {
-      //   drop_debugger: true,
-      //   dead_code: true,
-      //   unused: true,
-      //   passes: 3,
-      // },
-    },
-    rollupOptions: {
-      output: {
-        // Organize assets by type
-        assetFileNames: (assetInfo) => {
-          const info = assetInfo.name.split('.')
-          const ext = info[info.length - 1]
-          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
-            return `images/[name]-[hash].[ext]`
-          }
-          if (/woff|woff2|eot|ttf|otf/i.test(ext)) {
-            return `fonts/[name]-[hash].[ext]`
-          }
-          return `assets/[name]-[hash].[ext]`
-        }
+export default defineConfig(({ ssrBuild }) => {
+  const r = (p) => fileURLToPath(new URL(p, import.meta.url));
+
+  return {
+    server: {
+      allowedHosts: true,
+      cors: {
+        preflightContinue: true,
       },
-      // treeshake: {
-      //   moduleSideEffects: false,
-      //   propertyReadSideEffects: false,
-      //   tryCatchDeoptimization: false
-      // }
-    }
-  },
-  optimizeDeps: {
-    include: ["@shopify/app-bridge-react"],
-    exclude: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
-  },
-  ssr: {
-    noExternal: [],
-    external: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
-  },
+      port: Number(process.env.PORT || 3000),
+      hmr: hmrConfig,
+      fs: {
+        // See https://vitejs.dev/config/server-options.html#server-fs-allow for more information
+        allow: ["app", "node_modules"],
+      },
+    },
+    plugins: [reactRouter(), tsconfigPaths(), viteCompression({ algorithm: 'brotliCompress' })],
+    resolve: {
+      alias: [
+        {
+          find: "~/lib/utils/observability/errorCapture",
+          replacement: ssrBuild
+            ? r("./app/lib/utils/observability/errorCapture.server.js")
+            : r("./app/lib/utils/observability/errorCapture.client.js"),
+        },
+        {
+          find: "~/lib/utils/observability/tracing",
+          replacement: ssrBuild
+            ? r("./app/lib/utils/observability/tracing.server.js")
+            : r("./app/lib/utils/observability/tracing.client.js"),
+        },
+      ],
+    },
+    build: {
+      assetsInlineLimit: 0,
+      target: 'esnext',
+      minify: 'terser',
+      terserOptions: {
+        // compress: {
+        //   drop_debugger: true,
+        //   dead_code: true,
+        //   unused: true,
+        //   passes: 3,
+        // },
+      },
+      rollupOptions: {
+        output: {
+          // Organize assets by type
+          assetFileNames: (assetInfo) => {
+            const info = assetInfo.name.split('.')
+            const ext = info[info.length - 1]
+            if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+              return `images/[name]-[hash].[ext]`
+            }
+            if (/woff|woff2|eot|ttf|otf/i.test(ext)) {
+              return `fonts/[name]-[hash].[ext]`
+            }
+            return `assets/[name]-[hash].[ext]`
+          }
+        },
+        // treeshake: {
+        //   moduleSideEffects: false,
+        //   propertyReadSideEffects: false,
+        //   tryCatchDeoptimization: false
+        // }
+      }
+    },
+    optimizeDeps: {
+      include: ["@shopify/app-bridge-react"],
+      exclude: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
+    },
+    ssr: {
+      noExternal: [],
+      external: ["@shopify/polaris-viz", "@shopify/polaris-viz-core"],
+    },
+  };
 });

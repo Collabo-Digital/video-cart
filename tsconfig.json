@@ -5,7 +5,10 @@
     "**/*.tsx",
     ".react-router/types/**/*",
     "app/routes/api+/v1+/video+/upload.jsx",
-    "app/routes/app+/_index.jsx"
+    "app/routes/app+/_index.jsx",
+  ],
+  "exclude": [
+    "instrumentation.server.js"
   ],
   "compilerOptions": {
     "lib": [
@@ -27,6 +30,11 @@
     "moduleResolution": "Bundler",
     "target": "ES2022",
     "baseUrl": ".",
+    "paths": {
+      "~/*": [
+        "app/*"
+      ]
+    },
     "types": [
       "@react-router/node",
       "vite/client",

@@ -7,7 +7,7 @@
  * Validates shop has an offline session (app installed), then records conversion events.
  */
 
-import { sessionStorage } from "../../../../config/shopify.server";
+import { authenticate } from "../../../../config/shopify.server.js";
 import { recordConversionFromPixel } from "../../../../models/analytics.server";
 import { upsertOrderWithItems } from "../../../../models/videoCartOrder.server";
 

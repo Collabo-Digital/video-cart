@@ -26,7 +26,7 @@ import { onCLS, onINP, onLCP } from "web-vitals";
 import { authenticate } from "../../config/shopify.server";
 import { VideoLibraryIcon } from "../../components/Icons/VideoLibrary/VideoLibrary";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
-import { captureRouteError } from "../../lib/utils/observability/errorCapture.js";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import * as VideoModel from "../../models/video.server";
 import { getWidgetsFromVideo, truncateName, buildFiltersPayload, parseSortSelected } from "../../lib/utils/common";
@@ -259,9 +259,9 @@ export default function VideosPage() {
 
   const updateVideoState = (data) => {
     if (!data) return;
-    setVideos(data.videos ?? []);
-    setNextCursor(data.nextCursor ?? null);
-    setPreviousCursor(data.previousCursor ?? null);
+    setVideos(data?.videosData?.videos ?? []);
+    setNextCursor(data?.videosData?.nextCursor ?? null);
+    setPreviousCursor(data?.videosData?.previousCursor ?? null);
     setLoading(false);
   };
 
@@ -327,7 +327,7 @@ export default function VideosPage() {
   const handleCancelDelete = useCallback(() => setPendingDeleteVideo(null), []);
 
   const handleViewAnalytics = useCallback(
-    (id) => navigate(`/app/analytics/vdid_${id}`),
+    () => navigate(`/app/analytics`),
     [navigate]
   );
 

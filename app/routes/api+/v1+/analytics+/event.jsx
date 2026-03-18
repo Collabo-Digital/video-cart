@@ -1,41 +1,39 @@
-/**
- * POST /api/v1/analytics/event
- *
- * Record an analytics event (impression, view, click, purchase).
- * Callable from storefront widget; optional shop param validates feed belongs to shop.
- */
-
+import { authenticate } from '../../../../config/shopify.server.js';
 import { recordEvent, EVENT_TYPES } from '../../../../models/analytics.server';
 import * as FeedModel from '../../../../models/feed.server';
-
-const JSON_HEADERS = {
-  'Content-Type': 'application/json',
-  'Access-Control-Allow-Origin': '*',
-};
+import { apiError, apiSuccess } from '../../../../lib/utils/apiResponse.js';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 export const action = async ({ request }) => {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: JSON_HEADERS,
-    });
+    return apiError(new Error('Method not allowed'), {
+      route: "analytics-event",
+      code: "METHOD_NOT_ALLOWED",
+      statusCode: 405,
+      requestId: request.id,
+    }); 
   }
+  const { session } = await authenticate.admin(request);
 
   try {
     const body = await request.json().catch(() => ({}));
     const { feedId, videoId, eventType, watchTimeSeconds, salesAmount, revenueAmount, orderCount, shop } = body;
 
     if (!feedId || !eventType) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'feedId and eventType are required' }),
-        { status: 400, headers: JSON_HEADERS }
-      );
+      return apiError(new Error('feedId and eventType are required'), {
+        route: "analytics-event",
+        code: "FEED_ID_AND_EVENT_TYPE_REQUIRED",
+        statusCode: 400,
+        requestId: request.id,
+      });
     }
     if (!Object.values(EVENT_TYPES).includes(eventType)) {
-      return new Response(
-        JSON.stringify({ success: false, error: `eventType must be one of: ${Object.values(EVENT_TYPES).join(', ')}` }),
-        { status: 400, headers: JSON_HEADERS }
-      );
+      return apiError(new Error(`eventType must be one of: ${Object.values(EVENT_TYPES).join(', ')}`), {
+        route: "analytics-event",
+        code: "EVENT_TYPE_INVALID",
+        statusCode: 400,
+        requestId: request.id,
+      });
     }
 
     if (shop) {
@@ -44,10 +42,12 @@ export const action = async ({ request }) => {
         const feed = await FeedModel.findById(feedId, shop);
         if (!feed) throw new Error('Feed not found');
       } catch {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Feed not found or access denied' }),
-          { status: 404, headers: JSON_HEADERS }
-        );
+        return apiError(new Error('Feed not found or access denied'), {
+          route: "analytics-event",
+          code: "FEED_NOT_FOUND_OR_ACCESS_DENIED",
+          statusCode: 404,
+          requestId: request.id,
+        });
       }
     }
 
@@ -61,15 +61,24 @@ export const action = async ({ request }) => {
       orderCount: orderCount ?? 1,
     });
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: JSON_HEADERS }
-    );
+    return apiSuccess({ success: true }, {
+      route: "analytics-event",
+      code: "EVENT_RECORDED",
+      statusCode: 200,
+      requestId: request.id,
+    });
   } catch (err) {
-    console.error('Analytics event error:', err);
-    return new Response(
-      JSON.stringify({ success: false, error: err.message || 'Failed to record event' }),
-      { status: 500, headers: JSON_HEADERS }
-    );
+    captureRouteError(err, {
+      route: "analytics-event",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
+    return apiError(err, {
+      route: "analytics-event",
+      code: "FAILED_TO_RECORD_EVENT",
+      statusCode: 500,
+      requestId: request.id,
+    });
   }
 };
