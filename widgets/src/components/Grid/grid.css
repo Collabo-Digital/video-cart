@@ -42,6 +42,7 @@
 .video-grid-card {
 /* flex: 0 0 auto;
   width: 280px; */
+  position: relative;
   border-radius: var(--vdcrt-border-radius, 20px);
   overflow: hidden;
   background: #f3f4f6;
@@ -85,6 +86,13 @@
   gap: 0.5rem;
   background: linear-gradient(to top, rgb(17 24 39 / 80%), rgb(17 24 39 / 0%));
   color: #fff;
+}
+
+.video-grid-card:hover .vd-product-overlay {
+  
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .video-grid-play {

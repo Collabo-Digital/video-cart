@@ -18,6 +18,7 @@ import { createProductClickHandler } from '../../utils/productClickHandler';
 import { THUMB_CARD } from '../../core/constant';
 import { EMPTY_VIDEOS, LABEL_SHOP_PRODUCT } from '../../constants/strings';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../utils/designStyles';
+import { ProductOverlay } from '../common/ProductOverlay/ProductOverlay';
 
 const DEFAULT_SUBTITLE = '';
 
@@ -45,7 +46,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || DEFAULT_SUBTITLE;
 
-   createEffect(() => {
+  createEffect(() => {
     const container = containerRef();
     const design = settings?.design ?? feed?.settings?.design;
     const general = settings?.general ?? feed?.settings?.general;
@@ -55,7 +56,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
         if (value != null) container.style.setProperty(key, value);
       });
     }
-    
+
     if (container) {
       injectCustomCss(container, design);
     }
@@ -152,15 +153,12 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
                     </Show>
                   </button>
 
-                  <Show when={productHandle()}>
-                    <button
-                      type="button"
-                      className="video-grid-product-link"
-                      onClick={(e) => handleCardLinkClick(e, video)}
-                    >
-                      {LABEL_SHOP_PRODUCT}
-                    </button>
-                  </Show>
+                  <ProductOverlay
+                    video={video}
+                    addToCartButtonLabel={addToCartButtonLabel}
+                    addToCartButtonStyle={addToCartButtonStyle}
+                    onProductClick={handleProductClick}
+                  />
                 </article>
               );
             }}
