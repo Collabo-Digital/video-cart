@@ -6,6 +6,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import { resolveSocialUrl } from '../../../../services/video/social-import.service';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 const VALID_SOURCES = ['instagram', 'tiktok'];
 
@@ -17,13 +18,16 @@ function jsonResponse(body, status = 200) {
 }
 
 export const action = async ({ request }) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405);
   }
 
   try {
+    if (!session) {
+      return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    }
     const body = await request.json().catch(() => ({}));
     const { source, url } = body;
 
@@ -45,6 +49,12 @@ export const action = async ({ request }) => {
     return jsonResponse({ success: true, data });
   } catch (error) {
     console.error('Resolve social error:', error);
+    captureRouteError(error, {
+      route: "api.v1.videos.resolve-social",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     return jsonResponse(
       {
         success: false,

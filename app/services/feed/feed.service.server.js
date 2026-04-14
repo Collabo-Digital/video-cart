@@ -53,6 +53,7 @@ export async function getFeedsByShop(shopDomain) {
   return FeedModel.findAll({ shopDomain });
 }
 
+
 /**
  * Get feed by ID with shop validation
  * @param {string} feedId - Feed ID
@@ -76,6 +77,10 @@ export async function getFeedById(feedId, shopDomain) {
   }
 
   return feed;
+}
+
+export async function getFeedsWithPaginationAndFilters(shopDomain, filters = {}) {
+  return FeedModel.getFeedsWithPaginationAndFilters(shopDomain, filters);
 }
 
 /**

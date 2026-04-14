@@ -75,11 +75,36 @@
   padding: 14px 16px;
 }
 
+.video-floating-close {
+  all: unset;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 10;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.video-floating-close:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.video-floating-close svg {
+  width: 14px;
+  height: 14px;
+}
+
 @media (max-width: 640px) {
   .video-floating {
     right: 12px;
     bottom: 12px;
-    width: calc(100vw - 24px);
+    width: calc(100vw - 250px);
     max-width: 360px;
   }
 }

@@ -32,17 +32,19 @@ export const initCrisp = async (shopData) => {
         user_id: shopData.id,
         shop_domain: shopData.shopDomain,
     });
-    const crispToken = await generateCrispTokenClient(shopData.id);
-    console.log("crispToken ----->", crispToken);
-    Crisp.setTokenId(crispToken);
 
-    await fetch('/api/v1/shop/updateShopData', {
-        method: 'POST',
-        body: JSON.stringify({
-            crispObject: {
-                crispTokenId: crispToken,
-            },
-        }),
-    });
-
+    if (shopData?.crispObject?.crispTokenId && shopData?.crispObject?.crispTokenId !== '') {
+        Crisp.setTokenId(shopData.crispObject.crispTokenId);
+    } else {
+        const crispToken = await generateCrispTokenClient(shopData.id);
+        Crisp.setTokenId(crispToken);
+        await fetch('/api/v1/shop/updateShopData', {
+            method: 'POST',
+            body: JSON.stringify({
+                crispObject: {
+                    crispTokenId: crispToken,
+                }
+            }),
+        });
+    }
 };

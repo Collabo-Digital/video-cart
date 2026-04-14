@@ -5,46 +5,34 @@
  * Accepts shop parameter from query string (provided by Liquid template).
  */
 
-import { getFeedsByShop } from '../../../../services/feed/feed.service.server';
 import { authenticate } from '../../../../config/shopify.server';
+import {  getFeedsWithPaginationAndFilters } from '../../../../services/feed/feed.service.server';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
-export const loader = async ({ request }) => {
+export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
   try {
-    await authenticate.public.appProxy(request);
-    const url = new URL(request.url);
-    const shop = url.searchParams.get('shop');
-
-    if (!shop) {
-      return new Response(
-        JSON.stringify({ error: 'Shop parameter is required' }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
-      );
-    }
-
-    const feeds = await getFeedsByShop(shop);
+    // await authenticate.public.appProxy(request);`s
+    const { filters } = await request.json();
+    // const feeds = await getFeedsByShop(shop);
+    const feedsData = await getFeedsWithPaginationAndFilters(session.shop, filters);
 
     // Return simplified feed data for selector
-    const feedList = feeds
-      .filter((feed) => feed.isEnabled && !feed.isDeleted)
-      .map((feed) => ({
-        id: feed.id,
-        feedName: feed.feedName,
-        widgetType: feed.widgetType,
-        isEnabled: feed.isEnabled,
-        videoCount: feed.videos?.length || 0,
-        createdAt: feed.createdAt,
-      }));
+    // const feedList = feedsData?.feeds
+    //   .filter((feed) => feed.isEnabled && !feed.isDeleted)
+    //   .map((feed) => ({
+    //     id: feed.id,
+    //     feedName: feed.feedName,
+    //     widgetType: feed.widgetType,
+    //     isEnabled: feed.isEnabled,
+    //     videoCount: feed.videos?.length || 0,
+    //     createdAt: feed.createdAt,
+    //   }));
 
     return new Response(
       JSON.stringify({
         success: true,
-        data: feedList,
+        data: feedsData,
       }),
       {
         status: 200,
@@ -56,7 +44,12 @@ export const loader = async ({ request }) => {
     );
   } catch (error) {
     console.error('List feeds error:', error);
-
+    captureRouteError(error, {
+      route: "feeds-list",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
     return new Response(
       JSON.stringify({
         success: false,

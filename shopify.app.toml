@@ -2,7 +2,7 @@
 
 client_id = "46a6333228dbe822d3cad6e6ecaaa25c"
 name = "video-cart"
-application_url = "https://sb2sfsl0-3000.inc1.devtunnels.ms/"
+application_url = "https://sb2sfsl0-3000.inc1.devtunnels.ms"
 embedded = true
 
 [webhooks]
@@ -10,11 +10,11 @@ api_version = "2026-04"
 
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
-  uri = "https://sb2sfsl0-3000.inc1.devtunnels.ms/webhooks/app/uninstalled"
+  uri = "/webhooks/app/uninstalled"
 
   [[webhooks.subscriptions]]
   topics = [ "app/scopes_update" ]
-  uri = "https://sb2sfsl0-3000.inc1.devtunnels.ms/webhooks/app/scopes_update"
+  uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes

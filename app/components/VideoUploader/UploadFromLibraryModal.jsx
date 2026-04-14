@@ -146,29 +146,25 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
-  const fetchVideos = useCallback(async (pageNum = 1, searchTerm = "") => {
+  const fetchVideos = useCallback(async (searchTerm = "") => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({
-        page: String(pageNum),
-        perPage: String(PER_PAGE),
+      const res = await fetch(`/api/v1/videos/filter`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filters: { search: searchTerm.trim() } }),
       });
-      if (searchTerm.trim()) params.set("search", searchTerm.trim());
-      const res = await fetch(`/api/v1/videos/list?${params.toString()}`);
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to load library");
+      const payload = await res.json();
+      console.log("data for library videos ----->", payload.data?.videosData);
+      if (payload.success) {
+        setVideos(payload.data?.videosData?.videos ?? []);
+        setTotal(payload.data?.total ?? 0);
+        setLoading(false);
       }
-      const { videos: list, pagination } = json.data;
-      setVideos(list || []);
-      setTotal(pagination?.total ?? 0);
-      setPage(pagination?.page ?? 1);
     } catch (err) {
       console.error("Library fetch error:", err);
-      setVideos([]);
-      setTotal(0);
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -181,7 +177,7 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
       setSearch("");
       setSearchInput("");
       setSelectedIds(new Set());
-      fetchVideos(1, "");
+      fetchVideos("");
     } else {
       el.hideOverlay?.();
     }
@@ -201,13 +197,13 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
   const handleSearchSubmit = useCallback(() => {
     setSearch(searchInput);
     setPage(1);
-    fetchVideos(1, searchInput);
+    fetchVideos(searchInput);
   }, [searchInput, fetchVideos]);
 
   const handlePageChange = useCallback(
     (newPage) => {
       setPage(newPage);
-      fetchVideos(newPage, search);
+      fetchVideos(search);
     },
     [search, fetchVideos]
   );
@@ -279,7 +275,7 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
               setSearchInput("");
               setSearch("");
               setPage(1);
-              fetchVideos(1, "");
+              fetchVideos("");
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSearchSubmit();

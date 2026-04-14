@@ -1,5 +1,3 @@
-/* Carousel — reference style: header, horizontal cards, frosted overlay */
-
 .video-carousel-container {
   position: relative;
   width: 100%;
@@ -12,17 +10,20 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 1.5rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 
 .video-carousel-header-text {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: var(--vdcrt-header-align, start);
 }
 
 .video-carousel-title {
-  font-size: 1.5rem;
+  font-size: 18px;
   font-weight: 700;
   color: #1a1a1a;
   margin: 0 0 0.5rem 0;
@@ -30,7 +31,7 @@
 }
 
 .video-carousel-subtitle {
-  font-size: 0.9375rem;
+  font-size: 12px;
   font-weight: 400;
   color: #6b7280;
   margin: 0;
@@ -47,8 +48,8 @@
 }
 
 .video-carousel-nav-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -57,9 +58,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
-  font-weight: 600;
   transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+
+.video-carousel-nav-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: #000000;
 }
 
 .video-carousel-nav-btn:hover:not(:disabled) {
@@ -73,37 +78,57 @@
 }
 
 /* Horizontal scroll track */
-.video-carousel-track-wrap {
+/* .video-carousel-track-wrap {
   overflow: hidden;
   margin: 0 -0.5rem;
+} */
+
+.video-carousel-track-wrap {
+  overflow: hidden;
+  /* hard clips anything past the edge */
+  width: 100%;
 }
 
-.video-carousel-track {
+
+/* .video-carousel-track {
   display: flex;
-  gap: 1rem;
+  gap: var(--vdcrt-video-gap, 20px);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   padding: 0.5rem;
   scrollbar-width: none;
   -ms-overflow-style: none;
+} */
+
+
+
+
+.video-carousel-track {
+  display: flex;
+  gap: var(--vdcrt-video-gap, 12px);
+  overflow-x: scroll;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 4px 2px 8px;
 }
 
 .video-carousel-track::-webkit-scrollbar {
   display: none;
 }
 
-/* Card: rounded, vertical, image top + frosted overlay bottom */
 .video-carousel-card {
-  flex: 0 0 auto;
-  width: 280px;
-  border-radius: 20px;
+  flex: 0 0 calc((100% - (5 - 1) * 22px) / 5);
+  aspect-ratio: 9 / 16;
+  border-radius: var(--vdcrt-border-radius, 20px);
   overflow: hidden;
-  background: #f3f4f6;
   position: relative;
-  scroll-snap-align: start;
-  aspect-ratio: 3 / 4;
   cursor: pointer;
+  background: #f3f4f6;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -144,22 +169,22 @@
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 1.25rem 1rem 1rem;
-  background: linear-gradient(
+  padding: 6px;
+  /* background: linear-gradient(
     to top,
     rgba(0, 0, 0, 0.85) 0%,
     rgba(0, 0, 0, 0.5) 60%,
     transparent 100%
-  );
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  ); */
+  /* backdrop-filter: blur(8px); */
+  /* -webkit-backdrop-filter: blur(8px); */
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   gap: 0.25rem;
   opacity: 0;
   transform: translateY(12px);
-  pointer-events: none;
+  pointer-events: all;
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
@@ -233,8 +258,8 @@
 .video-carousel-card-products {
   position: relative;
   width: 100%;
-  margin-bottom: 0.5rem;
-  min-height: 4rem;
+  margin-bottom: 14px;
+  min-height: 14px;
 }
 
 .video-carousel-card-products-inner {
@@ -253,15 +278,15 @@
 }
 
 .video-carousel-card-products.has-nav .video-carousel-card-products-inner {
-  padding-left: 34px;
-  padding-right: 34px;
+  /* padding-left: 34px;
+  padding-right: 34px; */
 }
 
 .video-carousel-card-products-inner::-webkit-scrollbar {
   display: none;
 }
 
-.video-carousel-card-product {
+/* .video-carousel-card-product {
   flex: 0 0 280px;
   width: 280px;
   min-width: 280px;
@@ -272,10 +297,31 @@
   align-items: center;
   gap: 12px;
   transition: transform 0.2s ease, opacity 0.2s ease;
+} */
+
+.video-carousel-card-product {
+  flex: 0 0 100%;
+  /* ← was: flex: 0 0 280px — caused the overflow   */
+  width: 100%;
+  /* ← was: width: 280px                             */
+  min-width: 0;
+  /* ← was: min-width: 280px                         */
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  /* room for prev/next arrows on both sides         */
+  transition: opacity 0.2s ease;
+  background: #f3f4f664;
+  border-radius: 10px;
 }
 
+
 .video-carousel-card-product:hover {
-  transform: scale(1.05);
+  /* transform: scale(1.05); */
   opacity: 1;
 }
 
@@ -296,15 +342,22 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.5rem;
+  gap: inherit;
   flex: 1;
   min-width: 0;
 }
 
+.video-carousel-card-product-info-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
 .video-carousel-card-product-title {
-  font-size: 0.875rem;
+  font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.95);
+  color: #000;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -313,16 +366,28 @@
   transition: color 0.2s ease;
 }
 
-.video-carousel-card-product:hover .video-carousel-card-product-title {
-  color: #fff;
+.video-carousel-card-product-price {
+  font-size: 12px;
+  font-weight: 600;
+  color: #000000;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  transition: color 0.2s ease;
 }
 
+/* .video-carousel-card-product:hover .video-carousel-card-product-title {
+  color: #878686;
+} */
+
 .video-carousel-card-product-button {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
+  padding: 5px 10px;
+  font-size: 10px;
   font-weight: 600;
-  color: #1a1a1a;
-  background: #fff;
+  color: var(--vdcrt-button-color, #1a1a1a);
+  background: var(--vdcrt-button-bg, #fff);
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 8px;
   cursor: pointer;
@@ -356,6 +421,12 @@
   line-height: 1;
   z-index: 1;
   transition: background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.video-carousel-card:hover .vd-product-overlay {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 .video-carousel-products-btn:hover {
@@ -420,23 +491,30 @@
   padding: 2rem 1rem;
 }
 
-.video-carousel-overlay-nav {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+.vd-product-overlay-nav {
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: end;
+  gap: 5px;
+  
+}
+
+.vd-overlay-nav-btn {
+
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: #fff;
-  font-size: 2rem;
-  font-weight: 600;
-  line-height: 1;
-  cursor: pointer;
+  width: 25px;
+  height: 25px;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s, border-color 0.2s;
-  z-index: 2;
+  background: #0000004a;
+  cursor: pointer;
+}
+
+.vd-overlay-nav-btn svg {
+  fill: #fff;
 }
 
 .video-carousel-overlay-nav:hover {
@@ -464,10 +542,11 @@
 .video-carousel-overlay-video-wrap {
   position: relative;
   width: 100%;
-  border-radius: 16px;
+  border-radius: var(--vdcrt-border-radius, 16px);
   overflow: hidden;
   background: #000;
-  aspect-ratio: 3 / 4;
+  /* aspect-ratio: 3 / 4; */
+  aspect-ratio: 9 / 16;
   max-height: 85vh;
 }
 
@@ -493,7 +572,7 @@
 }
 
 .video-carousel-overlay-products-title {
-  font-size: 1rem;
+  font-size: 18px;
   font-weight: 700;
   color: #fff;
   margin: 0 0 0.5rem 0;
@@ -530,7 +609,7 @@
 }
 
 .video-carousel-overlay-product-title {
-  font-size: 0.875rem;
+  font-size: 12px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.95);
   line-height: 1.3;
@@ -546,10 +625,10 @@
   padding: 0.5rem 1rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #fff;
-  background: #1a1a1a;
+  color: var(--vdcrt-button-color, #fff);
+  background: var(--vdcrt-button-bg, #1a1a1a);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--vdcrt-border-radius, 8px);
   text-decoration: none;
   cursor: pointer;
   transition: background 0.2s;
@@ -751,9 +830,9 @@
   padding: 0.5rem 0.875rem;
   font-size: 0.8125rem;
   font-weight: 600;
-  color: #fff;
-  background: rgba(26, 26, 26, 0.85);
-  border-radius: 8px;
+  color: var(--vdcrt-button-color, #fff);
+  background: var(--vdcrt-button-bg, rgba(26, 26, 26, 0.85));
+  border-radius: var(--vdcrt-border-radius, 8px);
   text-decoration: none;
   transition: background 0.2s;
 }
@@ -771,6 +850,10 @@
 @media (max-width: 768px) {
   .video-carousel-overlay:not(.video-carousel-overlay-reels) {
     flex-direction: column;
+  }
+
+  .video-carousel-card {
+    flex: 0 0 calc((100% - (2 - 1) * 20px) / 2);
   }
 
   .video-carousel-overlay-body {
