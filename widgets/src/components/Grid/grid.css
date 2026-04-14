@@ -1,6 +1,5 @@
 .video-grid-container {
   width: 100%;
-  max-width: 1200px;
   margin: 0 auto;
   padding: 1rem;
 }
@@ -26,12 +25,24 @@
   font-size: 12px;
 }
 
-.video-grid-list {
+/* .video-grid-list {
   display: grid;
   grid-template-columns: repeat(var(--vdcrt-columns, 2), var(--vdcrt-video-width, 200px));
   gap: var(--vdcrt-video-gap, 20px);
   justify-content: center;
+} */
+
+.video-grid-list {
+  display: grid;
+  gap: var(--vdcrt-video-gap, 20px);
+  grid-template-columns: repeat(var(--vdcrt-columns, 2), 1fr);
+  max-width: calc(
+    var(--vdcrt-columns, 2) * 270px + 
+    (var(--vdcrt-columns, 2) - 1) * var(--vdcrt-video-gap, 20px)
+  );
+  margin: 0 auto;
 }
+
 
 /* .video-grid-card {
   overflow: hidden;
@@ -39,18 +50,20 @@
   border-radius: var(--vdcrt-border-radius, 20px);
   background: #fff;
 } */
+
 .video-grid-card {
-/* flex: 0 0 auto;
-  width: 280px; */
   position: relative;
   border-radius: var(--vdcrt-border-radius, 20px);
   overflow: hidden;
-  background: #f3f4f6;
-  /* position: relative; */
-  /* scroll-snap-align: start; */
-  /* aspect-ratio: 3 / 4; */
+  background: transparent;
   cursor: pointer;
+  aspect-ratio: 9 / 16;  /* ← move aspect ratio here so the card itself is always 9:16 */
   transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.video-grid-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
 }
 
 .video-grid-card-button {
@@ -140,6 +153,7 @@
   }
 
   .video-grid-list {
-    grid-template-columns: repeat(var(--vdcrt-columns, 2), 1fr);
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
   }
 }

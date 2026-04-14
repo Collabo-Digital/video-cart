@@ -25,39 +25,28 @@ import RightToggleIcon from '../../assets/Icons/RightToggleIcon';
 
 import './carousel.css';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_SUBTITLE = '';
 
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
 
-  // ── Refs ────────────────────────────────────────────────────────────────────
   const [trackRef, setTrackRef] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
 
-  // ── UI state ────────────────────────────────────────────────────────────────
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
-  // ── Reactive scroll index ────────────────────────────────────────────────────
-  // Must be a signal — reading scrollLeft directly in isPrevDisabled/isNextDisabled
-  // is NOT reactive in SolidJS. The scroll listener pushes it into a signal
-  // so the nav buttons re-render automatically when the user scrolls.
   const [currentIndex, setCurrentIndex] = createSignal(0);
 
-  // ── Toast ───────────────────────────────────────────────────────────────────
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
 
-  // ── Derived settings ────────────────────────────────────────────────────────
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
   const autoplay = () => settings?.general?.autoPlay ?? feed?.settings?.general?.autoPlay;
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || DEFAULT_SUBTITLE;
 
-  // ── Button helpers ──────────────────────────────────────────────────────────
   const addToCartButtonLabel = () => getAddToCartLabel(feed);
   const addToCartButtonStyle = () => getButtonStyle(feed, settings);
 
@@ -70,7 +59,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     isPreview,
   });
 
-  // ── Apply design styles + custom CSS ────────────────────────────────────────
   createEffect(() => {
     const container = containerRef();
     const activeDesign = settings?.design ?? feed?.settings?.design;
@@ -85,7 +73,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     if (container) injectCustomCss(container, activeDesign);
   });
 
-  // ── Widget impression tracking ───────────────────────────────────────────────
   createEffect(() => {
     const container = containerRef();
     if (!container || !feed?.id || isPreview) return;
@@ -110,9 +97,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     onCleanup(() => observer.disconnect());
   });
 
-  // ── Sync currentIndex with scroll position ───────────────────────────────────
-  // Fires on every scroll event and updates the reactive signal.
-  // This is what makes isPrevDisabled / isNextDisabled update correctly.
   createEffect(() => {
     const el = trackRef();
     if (!el) return;
@@ -129,9 +113,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     onCleanup(() => el.removeEventListener('scroll', onScroll));
   });
 
-  // ── Scroll helpers ───────────────────────────────────────────────────────────
-
-  /** Smoothly scrolls the track so `index` is the first visible card. */
   const scrollToCard = (index) => {
     const el = trackRef();
     const card = el?.querySelector('.video-carousel-card');
@@ -139,7 +120,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     el.scrollTo({ left: index * (card.offsetWidth + CARD_GAP), behavior: 'smooth' });
   };
 
-  /** Moves one card forward or backward. */
   const handleNav = (direction) => {
     const total = videos?.length ?? 0;
     const current = currentIndex();
@@ -149,11 +129,9 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     scrollToCard(next);
   };
 
-  // ── Nav disabled state — reactive via currentIndex() signal ─────────────────
   const isPrevDisabled = () => currentIndex() <= 0;
   const isNextDisabled = () => currentIndex() >= (videos?.length ?? 0) - 1;
 
-  // ── Product strip scroll ─────────────────────────────────────────────────────
   const scrollProducts = (e, direction) => {
     e.preventDefault();
     e.stopPropagation();
@@ -167,7 +145,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     });
   };
 
-  // ── Card interaction handlers ────────────────────────────────────────────────
   const handleCardClick = (e, _video, index) => {
     if (isPreview) return;
     setExpandedIndex(index);
@@ -181,7 +158,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     if (autoplay() === 'onHover') setHoveredIndex(null);
   };
 
-  // ── Thumbnail URL resolver ────────────────────────────────────────────────────
   const getThumbUrl = (video, index) => {
     const staticUrl = () => getThumbnailUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
     const animatedUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
@@ -192,14 +168,12 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
     return animatedUrl();
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div
       className={`video-carousel-container${uniqueClass ? ` ${uniqueClass}` : ''}`}
       ref={setContainerRef}
     >
 
-      {/* Overlay player — opens when a card is clicked */}
       <VideoOverlayPlayer
         videos={videos}
         expandedIndex={expandedIndex}
@@ -222,7 +196,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
         }}
       />
 
-      {/* Header — title + nav arrows */}
       <header className="video-carousel-header">
         <div className="video-carousel-header-text">
           <h2 className="video-carousel-title">{title()}</h2>
@@ -253,7 +226,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
         </Show>
       </header>
 
-      {/* Carousel track */}
       <Show when={videos?.length > 0}>
         <div className="video-carousel-track-wrap">
           <div className="video-carousel-track" ref={setTrackRef} role="list">
@@ -277,7 +249,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
                     }}
                   >
 
-                    {/* Thumbnail */}
                     <span className="video-carousel-card-image-wrap">
                       <Show
                         when={getThumbUrl(video, index())}
@@ -292,7 +263,6 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
                       </Show>
                     </span>
 
-                    {/* Product overlay — only if products are tagged */}
                     <ProductOverlay
                       video={video}
                       addToCartButtonLabel={addToCartButtonLabel}
@@ -308,12 +278,10 @@ export function VideoCarousel({ feed, videos, settings, onEvent, isPreview }) {
         </div>
       </Show>
 
-      {/* Empty state */}
       <Show when={!videos?.length}>
         <p className="video-carousel-empty">{EMPTY_VIDEOS}</p>
       </Show>
 
-      {/* Toast notification */}
       <Toast
         visible={toastVisible()}
         message={toastMessage()}
