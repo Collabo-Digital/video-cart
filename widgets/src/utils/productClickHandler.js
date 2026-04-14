@@ -8,6 +8,7 @@ import {
 } from './widgetHelpers';
 import { TOAST_ADDED, TOAST_ADD_FAILED } from '../constants/strings';
 import { WIDGET_SOURCES } from '../core/constant';
+import { setStorageItem, getStorageItem } from './storage';
 
 const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
 
@@ -42,15 +43,33 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
             await addToCart([{
                 id: getVariantId(productObj),
                 quantity: 1,
-                properties: {
-                    _video_id: video?.id,
-                    _widget_id: feed?.id,
-                    timestamp: Date.now(),
-                    source: cartSource,
-                },
             }])
                 .then(async () => {
                     // if (isAddToCartSuccess(response)) {
+                    const existing = getStorageItem('atc_products', []);
+                    const newEntry = {
+                        product_id: productObj.id,
+                        video_id: video?.id,
+                        widget_id: feed?.id,
+                        source: cartSource,
+                        timestamp: Date.now(),
+                    };
+
+                    const idx = existing.findIndex(
+                        (item) =>
+                            item.product_id === productObj.id &&
+                            item.video_id === video?.id &&
+                            item.widget_id === feed?.id
+                    );
+
+                    if (idx !== -1) {
+                        existing[idx].quantity = (existing[idx].quantity || 1) + 1;
+                        existing[idx].timestamp = Date.now();
+                    } else {
+                        existing.push({ ...newEntry, quantity: 1 });
+                    }
+
+                    setStorageItem('atc_products', existing);
                     showToast(TOAST_ADDED, 'success');
                     if (feed?.id) {
                         await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });

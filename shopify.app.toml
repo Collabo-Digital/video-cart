@@ -2,7 +2,7 @@
 
 client_id = "46a6333228dbe822d3cad6e6ecaaa25c"
 name = "video-cart"
-application_url = "https://sb2sfsl0-3000.inc1.devtunnels.ms/"
+application_url = "https://sb2sfsl0-3000.inc1.devtunnels.ms"
 embedded = true
 
 [webhooks]

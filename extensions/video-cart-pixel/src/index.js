@@ -1,6 +1,6 @@
 import { register } from "@shopify/web-pixels-extension";
 
-register(({ analytics, settings }) => {  // ← Add 'settings' parameter here
+register(({ analytics, browser, settings }) => {  // ← Add 'settings' parameter here
 
   console.log('[Video Cart Pixel] Initializing...');
   // console.log('process.env.SHOPIFY_APP_URL glaobla ----->', process.env.SHOPIFY_APP_URL);
@@ -53,75 +53,68 @@ register(({ analytics, settings }) => {  // ← Add 'settings' parameter here
   //   }
   // });
 
-  analytics.subscribe("checkout_completed", async (event) => {
+
+  analytics.subscribe("checkout_completed", (event) => {
     const checkout = event.data.checkout;
-    console.log('checkout ----->', checkout);
 
-    // FIX: Use 'attributes' instead of 'properties' for line items
-    const videoItems = checkout.lineItems
-      .map(item => {
-        const encodedTracking = item.properties?.find(
-          attr => attr.key === '_tracking'
-        )?.value;
+    Promise.all([
+      browser.localStorage.getItem('vdcrt_atc_products'),
+    ]).then(([storedData]) => {
+      if (!storedData) return;
 
-        if (encodedTracking) {
-          try {
-            const decoded = atob(encodedTracking);
-            const trackingData = JSON.parse(decoded);
+      const atcProducts = JSON.parse(storedData);
+      if (!atcProducts || atcProducts.length === 0) return;
+
+      const videoItems = checkout.lineItems
+        .map(item => {
+          const productId = item.variant?.product?.id;
+          const matched = atcProducts.find(
+            (atc) => String(atc.product_id) === String(productId)
+          );
+
+          if (matched) {
             return {
-              ...trackingData,
-              product_id: item.variant.product.id,
-              variant_id: item.variant.id,
-              quantity: item.quantity,
-              line_total: parseFloat(item.finalLinePrice.amount)
+              video_id: matched.video_id,
+              widget_id: matched.widget_id,
+              source: matched.source,
+              quantity: matched.quantity || item.quantity,
+              product_id: productId,
+              variant_id: item.variant?.id,
+              line_total: parseFloat(item.finalLinePrice.amount),
             };
-          } catch (e) {
-            console.error('[Video Cart Pixel] Decode error:', e);
-            return null;
           }
-        }
-        return null;
+          return null;
+        })
+        .filter(Boolean);
+
+      if (videoItems.length === 0) return;
+
+      const backendUrl = settings?.apiBaseUrl || 'https://video-cart.vercel.app';
+      if (!backendUrl) return;
+
+      fetch(`${backendUrl}/api/v1/analytics/conversion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shop: event.context.document.location.hostname,
+          order_id: checkout.order?.id,
+          order_number: checkout.order?.orderNumber,
+          items: videoItems,
+          total_revenue: videoItems.reduce((sum, item) => sum + item.line_total, 0),
+          timestamp: Date.now(),
+        }),
+        keepalive: true,
       })
-      .filter(item => item !== null);
-
-    console.log('videoItems ----->', videoItems);
-    // console.log('process.env.SHOPIFY_APP_URL ----->', process.env.SHOPIFY_APP_URL);
-    console.log('settings ----->', settings);
-
-    if (videoItems.length > 0) {
-      try {
-        // Get backend URL from settings or use hardcoded URL
-        const backendUrl = settings?.apiBaseUrl || 'https://video-cart-dev.vercel.app';
-
-        if (!backendUrl || backendUrl === 'https://video-cart-dev.vercel.app') {
-          console.warn('[Video Cart Pixel] Conversion skipped: backend URL not configured.');
-          return;
-        }
-
-
-        console.log('[Video Cart Pixel] Conversion:', videoItems);
-
-        const url = `${backendUrl}/api/v1/analytics/conversion`;
-
-        await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            shop: event.context.document.location.hostname,
-            order_id: checkout.order?.id,
-            order_number: checkout.order?.orderNumber,
-            items: videoItems,
-            total_revenue: videoItems.reduce((sum, item) => sum + item.line_total, 0),
-            timestamp: Date.now()
-          }),
+        .then(() => {
+          console.log('[Video Cart Pixel] Conversion sent successfully');
+        })
+        .catch((e) => {
+          console.error('[Video Cart Pixel] Conversion error:', e);
+        })
+        .finally(() => {
+          browser.localStorage.removeItem('vdcrt_atc_products');
         });
-
-        console.log('[Video Cart Pixel] Conversion sent successfully');
-
-      } catch (e) {
-        console.error('[Video Cart Pixel] Conversion error:', e);
-      }
-    }
+    });
   });
 
   console.log('[Video Cart Pixel] Ready');

@@ -2,8 +2,8 @@
 export const MOBILE_BREAKPOINT = 768;
 
 // Carousel dimensions (px)
-export const CARD_WIDTH = 280;
-export const CARD_GAP = 16;
+export const CARD_WIDTH = 250;
+export const CARD_GAP = 20;
 export const PRODUCT_ITEM_GAP = 8;
 
 // Thumbnail dimensions for Mux getThumbnailPreviewUrl(width, height)
