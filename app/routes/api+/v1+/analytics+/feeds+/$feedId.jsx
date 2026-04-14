@@ -1,13 +1,8 @@
-/**
- * GET /api/v1/analytics/feeds/:feedId
- *
- * Returns aggregated feed analytics and per-video breakdown for a date range.
- * Query: startDate, endDate (ISO date strings). Admin auth required.
- */
-
 import { authenticate } from '../../../../../config/shopify.server';
 import * as FeedModel from '../../../../../models/feed.server';
 import { getFeedAnalytics } from '../../../../../models/analytics.server';
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { apiError, apiSuccess } from '../../../../../lib/utils/apiResponse.js';
 
 function parseDate(str) {
   if (!str) return null;
@@ -16,57 +11,88 @@ function parseDate(str) {
 }
 
 export const loader = async ({ request, params }) => {
+  const { session } = await authenticate.admin(request);
   try {
-    const { session } = await authenticate.admin(request);
     const { feedId } = params;
     const url = new URL(request.url);
     const startDate = parseDate(url.searchParams.get('startDate'));
     const endDate = parseDate(url.searchParams.get('endDate'));
 
     if (!feedId) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Feed ID is required' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiError(new Error('Feed ID is required'), {
+        route: "analytics-feeds-getFeedAnalytics",
+        code: "FEED_ID_REQUIRED",
+        statusCode: 400,
+        requestId: request.id,
+      });
     }
 
-    if (!session.shop) throw new Error('Shop domain is required');
+    if (!session.shop) {
+      return apiError(new Error('Shop domain is required'), {
+        route: "analytics-feeds-getFeedAnalytics",
+        code: "SHOP_DOMAIN_REQUIRED",
+        statusCode: 400,
+        requestId: request.id,
+      });
+    }
     const feed = await FeedModel.findById(feedId, session.shop);
-    if (!feed) throw new Error('Feed not found');
+    if (!feed) {
+      return apiError(new Error('Feed not found'), {
+        route: "analytics-feeds-getFeedAnalytics",
+        code: "FEED_NOT_FOUND",
+        statusCode: 404,
+        requestId: request.id,
+      });
+    }
 
     const start = startDate || (() => { const d = new Date(); d.setDate(1); return d; })();
     const end = endDate || new Date();
     if (end < start) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'endDate must be >= startDate' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      );
+      return apiError(new Error('endDate must be >= startDate'), {
+        route: "analytics-feeds-getFeedAnalytics",
+        code: "END_DATE_MUST_BE_GREATER_THAN_START_DATE",
+        statusCode: 400,
+        requestId: request.id,
+      });
     }
 
     const { widget, videos, atcRate } = await getFeedAnalytics(feedId, start, end);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: {
-          widget,
-          atcRate,
-          videos,
-        },
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } }
-    );
+    return apiSuccess({
+      widget,
+      atcRate,
+      videos,
+    }, {
+      route: "analytics-feeds-getFeedAnalytics",
+      requestId: request.id,
+    });
   } catch (err) {
     if (err.message === 'Feed not found') {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Feed not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      );
+      captureRouteError(err, {
+        route: "api.v1.analytics.feeds.getFeedAnalytics",
+        url: request.url,
+        method: request.method,
+        shop: session?.shop || 'unknown',
+      });
+
+      return apiError(new Error('Feed not found'), {
+        route: "analytics-feeds-getFeedAnalytics",
+        code: "FEED_NOT_FOUND",
+        statusCode: 404,
+        requestId: request.id,
+      });
     }
-    console.error('Analytics feed loader error:', err);
-    return new Response(
-      JSON.stringify({ success: false, error: err.message || 'Failed to load analytics' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    captureRouteError(err, {
+      route: "api.v1.analytics.feeds.getFeedAnalytics",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop || 'unknown',
+    });
+
+    return apiError(err, {
+      route: "api.v1.analytics.feeds.getFeedAnalytics",
+      code: "FAILED_TO_LOAD_ANALYTICS",
+      statusCode: 500,
+      requestId: request.id,
+    });
   }
 };

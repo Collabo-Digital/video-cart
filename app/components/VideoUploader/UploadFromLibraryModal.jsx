@@ -156,11 +156,11 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
         },
         body: JSON.stringify({ filters: { search: searchTerm.trim() } }),
       });
-      const data = await res.json();
-      console.log("data for library videos ----->", data.data.videos);
-      if (data) {
-        setVideos(data.data.videos ?? []);
-        setTotal(data.data.total ?? 0);
+      const payload = await res.json();
+      console.log("data for library videos ----->", payload.data?.videosData);
+      if (payload.success) {
+        setVideos(payload.data?.videosData?.videos ?? []);
+        setTotal(payload.data?.total ?? 0);
         setLoading(false);
       }
     } catch (err) {

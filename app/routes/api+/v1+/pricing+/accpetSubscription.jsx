@@ -1,31 +1,53 @@
-import { APP_BILLING_PLANS_NAMES, VIDEO_UPLOAD_LIMITS, VIDEO_VIEW_LIMITS } from "../../../../lib/constants/common";
 import { authenticate } from "../../../../config/shopify.server";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse";
+import {
+  APP_BILLING_PLANS_NAMES,
+  VIDEO_UPLOAD_LIMITS,
+  VIDEO_VIEW_LIMITS,
+} from "../../../../lib/constants/common";
 import * as ShopModel from "../../../../models/shop.server";
 
 
+const ROUTE = "pricing-acceptSubscription";
+
+
 export const loader = async ({ request }) => {
+  const { billing, session } = await authenticate.admin(request);
+
   try {
-    const { billing, session } = await authenticate.admin(request);
     const billingCheck = await billing.check({
       plans: APP_BILLING_PLANS_NAMES,
     });
 
-    // Determine active plan from billing check (adjust based on actual billingCheck shape)
-    const activeSubscription = billingCheck?.appSubscriptions?.[0];
-    const planName = activeSubscription?.name; // e.g. "Basic", "Growth", "Advanced"
-    const appPlanValue = planName || "Free";
+    // Resolve the active plan name, defaulting to Free if no subscription found
+    const planName = billingCheck?.appSubscriptions?.[0]?.name ?? "Free";
 
-    if (appPlanValue && session.shop) {
-      await ShopModel.updateByDomain(session.shop, {
-        appPlan: appPlanValue,
-        videoViewLimit: VIDEO_VIEW_LIMITS[appPlanValue.toLowerCase()],
-        videoUploadLimit: VIDEO_UPLOAD_LIMITS[appPlanValue.toLowerCase()],
-      });
-    }
+    await ShopModel.updateByDomain(session.shop, {
+      appPlan: planName,
+      planLimits: {
+        videoViewLimit: VIDEO_VIEW_LIMITS[planName.toLowerCase()],
+        videoUploadLimit: VIDEO_UPLOAD_LIMITS[planName.toLowerCase()],
+      },
+    });
 
-    return { billingCheck };
+    return apiSuccess(
+      { billingCheck },
+      { route: ROUTE, code: "ACCEPT_SUBSCRIPTION_SUCCESS" }
+    );
   } catch (error) {
-    console.error("Error accepting subscription----->", error);
-    throw error; // or return { error: error.message } with appropriate status
+    captureRouteError(error, {
+      route: ROUTE,
+      url: request.url,
+      method: request.method,
+      shop: session?.shop ?? "unknown",
+    });
+
+    return apiError(error, {
+      route: ROUTE,
+      code: "ACCEPT_SUBSCRIPTION_ERROR",
+      statusCode: 500,
+      requestId: request.id,
+    });
   }
 };

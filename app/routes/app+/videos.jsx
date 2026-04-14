@@ -1,126 +1,248 @@
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
-  Page,
-  IndexTable,
-  Text,
-  Badge,
-  EmptyState,
-  useIndexResourceState,
-  IndexFilters,
-  Card,
-  useSetIndexFiltersMode,
-  Button,
-  InlineStack,
   Avatar,
+  Badge,
   Banner,
   BlockStack,
+  Button,
+  Card,
+  EmptyState,
   Icon,
+  IndexFilters,
+  IndexTable,
+  InlineStack,
+  Page,
+  Text,
   Tooltip,
+  useIndexResourceState,
+  useSetIndexFiltersMode,
 } from "@shopify/polaris";
-import { onCLS, onINP, onLCP } from "web-vitals";
-import {
-  useLoaderData,
-  useNavigate,
-  useActionData,
-  useFetcher,
-} from "react-router";
-import { authenticate } from "../../config/shopify.server";
-import * as VideoModel from "../../models/video.server";
-import { useState, useCallback, useEffect, useRef } from "react";
-import { DeleteIcon, ChartVerticalFilledIcon } from "@shopify/polaris-icons";
+import { ChartVerticalFilledIcon, DeleteIcon } from "@shopify/polaris-icons";
+import { useActionData, useFetcher, useLoaderData, useNavigate } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
-import { VideoLibraryIcon } from "../../components/Icons/VideoLibrary/VideoLibrary";
 import { useDebouncedCallback } from "use-debounce";
+import { onCLS, onINP, onLCP } from "web-vitals";
+
+import { authenticate } from "../../config/shopify.server";
+import { VideoLibraryIcon } from "../../components/Icons/VideoLibrary/VideoLibrary";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
+import * as VideoModel from "../../models/video.server";
+import { getWidgetsFromVideo, truncateName, buildFiltersPayload, parseSortSelected } from "../../lib/utils/common";
+import { PER_PAGE, BADGE_LIMIT, DEBOUNCE_MS, TABLE_HEADINGS, SORT_OPTIONS, EMPTY_STATE_IMAGE } from "../../lib/constants/video";
+import { fetchVideos } from "../../lib/utils/api/videosApi";
 
-const PER_PAGE = 5;
-const BADGE_LIMIT = 2;
-const DEBOUNCE_MS = 500;
-
-function getWidgetsFromVideo(video) {
-  return (video?.feedVideos ?? [])
-    .map((fv) => ({ id: fv.feed?.id, name: fv.feed?.feedName ?? "" }))
-    .filter((w) => w.id);
-}
-
-const truncateName = (name, maxLen = 14) =>
-  name.length > maxLen ? `${name.slice(0, maxLen)}…` : name;
-
-function buildFiltersPayload({ queryValue, cursor, direction, sortSelected }) {
-  const payload = {};
-  const search = queryValue?.trim() || undefined;
-  if (search) payload.search = search;
-  if (cursor) {
-    payload.cursor = cursor;
-    payload.direction = direction ?? "next";
-  }
-  if (sortSelected?.length) payload.sortSelected = sortSelected;
-  return payload;
-}
-
-async function fetchVideosApi(filtersPayload = {}) {
-  const response = await fetch("/api/v1/videos/filter", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filters: filtersPayload }),
-  });
-  const data = await response.json();
-  return data.success ? data.data : null;
-}
 
 export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+
+  if (!session) return apiError({ error: "Unauthorized" }, { status: 401 });
+
   try {
-    const { session } = await authenticate.admin(request);
-    if (!session) return { videosData: { videos: [], total: 0 } };
-    const videosData = await VideoModel.findAllPaginatedWithWidgets(
-      session.shop,
-      { take: PER_PAGE },
-    );
-    const totalVideos = await VideoModel.count(session.shop);
-    return { videosData, totalVideos };
+    const [videosData, totalVideos] = await Promise.all([
+      VideoModel.findAllPaginatedWithWidgets(session.shop, { take: PER_PAGE }),
+      VideoModel.count(session.shop),
+    ]);
+
+    return apiSuccess({ videosData, totalVideos });
   } catch (error) {
     console.error("Error fetching videos:", error);
-    return { videosData: { videos: [], total: 0 } };
+
+    captureRouteError(error, {
+      route: "videos",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop ?? "unknown",
+    });
+
+    return apiError(error, {
+      route: "videos",
+      code: "FETCH_VIDEOS_ERROR",
+      statusCode: 500,
+      requestId: request.id,
+    });
   }
 };
 
+
 export const action = async ({ request }) => {
   if (request.method !== "POST") return null;
-  await authenticate.admin(request);
+
+  const { session } = await authenticate.admin(request);
   const formData = await request.formData();
   const intent = formData.get("intent");
   const videoId = formData.get("videoId");
 
-  if (intent !== "delete" || !videoId) return { error: "Invalid request" };
+  if (intent !== "delete" || !videoId) {
+    return apiError({ error: "Invalid request" }, { status: 400, route: "videos", code: "INVALID_REQUEST" });
+  }
 
   try {
     await VideoModel.deleteVideoAndMuxAsset(videoId);
-    return { ok: true };
-  } catch (err) {
-    console.error("Delete video error:", err);
-    return { error: err.message || "Failed to delete video" };
+    return apiSuccess({ ok: true });
+  } catch (error) {
+    console.error("Delete video error:", error);
+
+    captureRouteError(error, {
+      route: "videos",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop ?? "unknown",
+    });
+
+    return apiError(error, {
+      route: "videos",
+      code: "DELETE_VIDEO_ERROR",
+      statusCode: 500,
+      requestId: request.id,
+    });
   }
 };
 
+
+function UploadQuotaBadge({ totalVideos, uploadLimit }) {
+  return (
+    <Tooltip content="Total videos uploaded">
+      <Badge tone="attention">
+        <Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">
+          {totalVideos}/{uploadLimit}
+        </Text>
+      </Badge>
+    </Tooltip>
+  );
+}
+
+
+function DeleteConfirmationBanner({ video, onConfirm, onDismiss }) {
+  if (!video) return null;
+
+  return (
+    <Banner
+      title="Delete video?"
+      tone="critical"
+      onDismiss={onDismiss}
+      action={{ content: "Delete", destructive: true, onAction: onConfirm }}
+      secondaryAction={{ content: "Cancel", onAction: onDismiss }}
+    >
+      <p>
+        Delete &quot;{video.videoName}&quot;? This will remove it from the
+        library, from Mux, and from any feeds that use it. This cannot be
+        undone.
+      </p>
+    </Banner>
+  );
+}
+
+function VideoRow({ video, index, selectedResources, onDeleteClick, onViewAnalytics }) {
+  const allWidgets = getWidgetsFromVideo(video);
+  const visibleWidgets = allWidgets.slice(0, BADGE_LIMIT);
+  const hiddenCount = allWidgets.length - BADGE_LIMIT;
+  const hiddenWidgetNames = allWidgets
+    .slice(BADGE_LIMIT)
+    .map((w) => w.name)
+    .join(", ");
+
+  return (
+    <IndexTable.Row
+      id={video.id}
+      key={video.id}
+      position={index}
+      selected={selectedResources.includes(video.id)}
+    >
+      <IndexTable.Cell>
+        <Avatar
+          source={`https://image.mux.com/${video.videoPlaybackId}/thumbnail.webp`}
+          initials={video.title?.slice(0, 2) ?? "??"}
+        />
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="semibold" as="span">
+          {video.fileName}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text as="span" numeric>
+          {allWidgets.length}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        {allWidgets.length > 0 ? (
+          <InlineStack gap="100" blockAlign="center" wrap={false}>
+            {visibleWidgets.map((w) => (
+              <Tooltip key={w.id} content={w.name}>
+                <Badge tone="info">{truncateName(w.name)}</Badge>
+              </Tooltip>
+            ))}
+            {hiddenCount > 0 && (
+              <Tooltip content={hiddenWidgetNames}>
+                <Badge tone="info">+{hiddenCount} more</Badge>
+              </Tooltip>
+            )}
+          </InlineStack>
+        ) : (
+          <Text as="span" tone="subdued" variant="bodySm">
+            —
+          </Text>
+        )}
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text as="span" variant="bodySm" tone="subdued">
+          {video.createdAt
+            ? new Date(video.createdAt).toLocaleDateString()
+            : "—"}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <InlineStack gap="200">
+          <Tooltip content="View analytics">
+            <Button
+              tone="info"
+              icon={ChartVerticalFilledIcon}
+              accessibilityLabel="View analytics"
+              onClick={() => onViewAnalytics(video.id)}
+            />
+          </Tooltip>
+          <Tooltip content="Delete video">
+            <Button
+              tone="critical"
+              icon={DeleteIcon}
+              accessibilityLabel="Delete video"
+              onClick={() => onDeleteClick(video)}
+            />
+          </Tooltip>
+        </InlineStack>
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  );
+}
+
+
 export default function VideosPage() {
-  const { videosData, totalVideos } = useLoaderData();
-  const appBridge = useAppBridge();
+  const { data } = useLoaderData();
+  const { videosData, totalVideos } = data;
   const actionData = useActionData();
+  const appBridge = useAppBridge();
   const navigate = useNavigate();
   const fetcher = useFetcher();
 
-  const [shopData] = useLocalStorage('shopData', null);
-  const [loading, setLoading] = useState(false);
+  const [shopData] = useLocalStorage("shopData", null);
+
   const [videos, setVideos] = useState(videosData?.videos ?? []);
   const [nextCursor, setNextCursor] = useState(videosData?.nextCursor ?? null);
-  const [previousCursor, setPreviousCursor] = useState(
-    videosData?.previousCursor ?? null,
-  );
+  const [previousCursor, setPreviousCursor] = useState(videosData?.previousCursor ?? null);
+  const [loading, setLoading] = useState(false);
+
   const [queryValue, setQueryValue] = useState("");
   const [sortSelected, setSortSelected] = useState(["createdAt desc"]);
-  const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
   const { mode, setMode } = useSetIndexFiltersMode("FILTERING");
 
+  const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
+
   const isFirstRender = useRef(true);
+
+  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(videos);
 
   useEffect(() => {
     onCLS(console.log);
@@ -134,17 +256,20 @@ export default function VideosPage() {
     setPreviousCursor(videosData?.previousCursor ?? null);
   }, [videosData]);
 
+
+  const updateVideoState = (data) => {
+    if (!data) return;
+    setVideos(data?.videosData?.videos ?? []);
+    setNextCursor(data?.videosData?.nextCursor ?? null);
+    setPreviousCursor(data?.videosData?.previousCursor ?? null);
+    setLoading(false);
+  };
+
+
   const applyFilters = useDebouncedCallback((filters) => {
     setLoading(true);
     const payload = buildFiltersPayload(filters);
-    fetchVideosApi(payload).then((data) => {
-      if (data) {
-        setVideos(data.videos ?? []);
-        setNextCursor(data.nextCursor ?? null);
-        setPreviousCursor(data.previousCursor ?? null);
-      }
-      setLoading(false);
-    });
+    fetchVideos(payload).then(updateVideoState);
   }, DEBOUNCE_MS);
 
   useEffect(() => {
@@ -152,59 +277,37 @@ export default function VideosPage() {
       isFirstRender.current = false;
       return;
     }
-    const sortStr = sortSelected?.[0];
-    const sortPayload = sortStr
-      ? (() => {
-          const [key, dir] = sortStr.split(" ");
-          return [{ key, direction: dir }];
-        })()
-      : undefined;
-    applyFilters({ queryValue, sortSelected: sortPayload });
-  }, [queryValue, sortSelected]);
+    applyFilters({
+      queryValue,
+      sortSelected: parseSortSelected(sortSelected),
+    });
+  }, [queryValue, sortSelected]); // eslint-disable-line react-hooks/exhaustive-deps
+
 
   const handlePaginate = useCallback(
     async (cursor, direction) => {
-      console.log("handlePaginate Hitted ----->");
       setLoading(true);
-      const sortStr = sortSelected?.[0];
-      const sortPayload = sortStr
-        ? (() => {
-            const [key, dir] = sortStr.split(" ");
-            return [{ key, direction: dir }];
-          })()
-        : undefined;
       const payload = buildFiltersPayload({
         queryValue,
         cursor,
         direction,
-        sortSelected: sortPayload,
+        sortSelected: parseSortSelected(sortSelected),
       });
-      console.log("payload ----->", payload);
-      const data = await fetchVideosApi(payload);
-      console.log("data from the videos api ----->", data);
-      if (data) {
-        setVideos(data.videos ?? []);
-        setNextCursor(data.nextCursor ?? null);
-        setPreviousCursor(data.previousCursor ?? null);
-      }
-      setLoading(false);
+      const data = await fetchVideos(payload);
+      updateVideoState(data);
     },
-    [queryValue, sortSelected],
+    [queryValue, sortSelected]
   );
 
-  const handleVideosSorting = useCallback(
+  const handleSort = useCallback(
     (value) => {
       setSortSelected(value);
-      const sortStr = value?.[0];
-      const sortPayload = sortStr
-        ? (() => {
-            const [key, dir] = sortStr.split(" ");
-            return [{ key, direction: dir }];
-          })()
-        : undefined;
-      applyFilters({ queryValue, sortSelected: sortPayload });
+      applyFilters({
+        queryValue,
+        sortSelected: parseSortSelected(value),
+      });
     },
-    [queryValue],
+    [queryValue] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const handleDeleteClick = useCallback((video) => {
@@ -215,7 +318,7 @@ export default function VideosPage() {
     if (!pendingDeleteVideo) return;
     fetcher.submit(
       { intent: "delete", videoId: pendingDeleteVideo.id },
-      { method: "POST" },
+      { method: "POST" }
     );
     setPendingDeleteVideo(null);
     appBridge.toast.show("Video deleted successfully");
@@ -224,114 +327,23 @@ export default function VideosPage() {
   const handleCancelDelete = useCallback(() => setPendingDeleteVideo(null), []);
 
   const handleViewAnalytics = useCallback(
-    (id) => {
-      navigate(`/app/analytics/vdid_${id}`);
-    },
-    [navigate],
+    () => navigate(`/app/analytics`),
+    [navigate]
   );
 
-  const resourceName = { singular: "video", plural: "videos" };
-  const { selectedResources, allResourcesSelected, handleSelectionChange } =
-    useIndexResourceState(videos);
 
-  const sortOptions = [
-    { label: "Date", value: "createdAt desc", directionLabel: "Newest first" },
-    { label: "Date", value: "createdAt asc", directionLabel: "Oldest first" },
-  ];
+  const paginationProps =
+    nextCursor || previousCursor
+      ? {
+        pagination: {
+          hasNext: !!nextCursor,
+          onNext: () => handlePaginate(nextCursor, "next"),
+          hasPrevious: !!previousCursor,
+          onPrevious: () => handlePaginate(previousCursor, "prev"),
+        },
+      }
+      : {};
 
-  const rowMarkup = videos.map((video, index) => {
-    const allWidgets = getWidgetsFromVideo(video);
-    const visibleWidgets = allWidgets.slice(0, BADGE_LIMIT);
-    const hiddenCount = allWidgets.length - BADGE_LIMIT;
-    const hiddenWidgetNames = allWidgets
-      .slice(BADGE_LIMIT)
-      .map((w) => w.name)
-      .join(", ");
-
-    return (
-      <IndexTable.Row
-        id={video.id}
-        key={video.id}
-        selected={selectedResources.includes(video.id)}
-        position={index}
-      >
-        {/* Thumbnail */}
-        <IndexTable.Cell>
-          <Avatar
-            source={`https://image.mux.com/${video.videoPlaybackId}/thumbnail.webp`}
-            initials={video.title?.slice(0, 2) ?? "??"}
-          />
-        </IndexTable.Cell>
-
-        {/* Video name */}
-        <IndexTable.Cell>
-          <Text variant="bodyMd" fontWeight="semibold" as="span">
-            {video.fileName}
-          </Text>
-        </IndexTable.Cell>
-
-        {/* Feed count */}
-        <IndexTable.Cell>
-          <Text as="span" numeric>
-            {allWidgets.length}
-          </Text>
-        </IndexTable.Cell>
-
-        {/* Feed badges */}
-        <IndexTable.Cell>
-          {allWidgets.length > 0 ? (
-            <InlineStack gap="100" blockAlign="center" wrap={false}>
-              {visibleWidgets.map((w) => (
-                <Tooltip key={w.id} content={w.name}>
-                  <Badge tone="info">{truncateName(w.name)}</Badge>
-                </Tooltip>
-              ))}
-              {hiddenCount > 0 && (
-                <Tooltip content={hiddenWidgetNames}>
-                  <Badge tone="info">+{hiddenCount} more</Badge>
-                </Tooltip>
-              )}
-            </InlineStack>
-          ) : (
-            <Text as="span" tone="subdued" variant="bodySm">
-              —
-            </Text>
-          )}
-        </IndexTable.Cell>
-
-        {/* Created date */}
-        <IndexTable.Cell>
-          <Text as="span" variant="bodySm" tone="subdued">
-            {video.createdAt
-              ? new Date(video.createdAt).toLocaleDateString()
-              : "—"}
-          </Text>
-        </IndexTable.Cell>
-
-        {/* Actions */}
-        <IndexTable.Cell>
-          <InlineStack gap="200">
-            <Tooltip content="View analytics">
-              <Button
-                tone="info"
-                icon={ChartVerticalFilledIcon}
-                onClick={() => handleViewAnalytics(video.id)}
-                accessibilityLabel="View analytics"
-              />
-            </Tooltip>
-            <Tooltip content="Delete video">
-              <Button
-                tone="critical"
-                icon={DeleteIcon}
-                onClick={() => handleDeleteClick(video)}
-                accessibilityLabel="Delete video"
-              />
-            </Tooltip>
-          </InlineStack>
-        </IndexTable.Cell>
-      </IndexTable.Row>
-    );
-  });
 
   return (
     <Page
@@ -339,58 +351,38 @@ export default function VideosPage() {
       subtitle="Check out the uploaded videos"
       titleMetadata={<Icon source={VideoLibraryIcon} />}
       primaryAction={
-        <Tooltip content="Total videos uploaded">
-        <Badge tone="attention">
-          <Text as="span" variant="bodySm" fontWeight="semibold" tone="subdued">
-            {totalVideos}/{shopData?.planLimits?.videoUploadLimit ?? 0}
-          </Text>
-        </Badge>
-        </Tooltip>
+        <UploadQuotaBadge
+          totalVideos={totalVideos}
+          uploadLimit={shopData?.planLimits?.videoUploadLimit ?? 0}
+        />
       }
     >
       <BlockStack gap="400">
         {actionData?.error && (
-          <Banner tone="critical" onDismiss={() => {}}>
+          <Banner tone="critical" onDismiss={() => { }}>
             {actionData.error}
           </Banner>
         )}
 
-        {pendingDeleteVideo && (
-          <Banner
-            title="Delete video?"
-            tone="critical"
-            onDismiss={handleCancelDelete}
-            action={{
-              content: "Delete",
-              destructive: true,
-              onAction: handleConfirmDelete,
-            }}
-            secondaryAction={{
-              content: "Cancel",
-              onAction: handleCancelDelete,
-            }}
-          >
-            <p>
-              Delete &quot;{pendingDeleteVideo.videoName}&quot;? This will
-              remove it from the library, from Mux, and from any feeds that use
-              it. This cannot be undone.
-            </p>
-          </Banner>
-        )}
+        <DeleteConfirmationBanner
+          video={pendingDeleteVideo}
+          onConfirm={handleConfirmDelete}
+          onDismiss={handleCancelDelete}
+        />
 
         <Card padding="0">
           {totalVideos > 0 && (
             <IndexFilters
-              sortOptions={sortOptions}
+              sortOptions={SORT_OPTIONS}
               sortSelected={sortSelected}
-              onSort={handleVideosSorting}
+              onSort={handleSort}
               queryValue={queryValue}
               queryPlaceholder="Search videos by name"
               onQueryChange={setQueryValue}
               onQueryClear={() => setQueryValue("")}
               tabs={[]}
               selected={0}
-              onSelect={() => {}}
+              onSelect={() => { }}
               filters={[]}
               appliedFilters={[]}
               onClearAll={() => setQueryValue("")}
@@ -403,40 +395,33 @@ export default function VideosPage() {
           {videos.length === 0 && !loading ? (
             <EmptyState
               heading="No videos yet"
-              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+              image={EMPTY_STATE_IMAGE}
             >
-              <p>
-                Upload videos to get started, or try a different search term.
-              </p>
+              <p>Upload videos to get started, or try a different search term.</p>
             </EmptyState>
           ) : (
             <IndexTable
-              resourceName={resourceName}
+              resourceName={{ singular: "video", plural: "videos" }}
               itemCount={videos.length}
               loading={loading}
               selectable={false}
+              headings={TABLE_HEADINGS}
               selectedItemsCount={
                 allResourcesSelected ? "All" : selectedResources.length
               }
               onSelectionChange={handleSelectionChange}
-              headings={[
-                { title: "" },
-                { title: "Video name" },
-                { title: "Feeds" },
-                { title: "Feed names" },
-                { title: "Created" },
-                { title: "Actions" },
-              ]}
-              {...((nextCursor || previousCursor) && {
-                pagination: {
-                  hasNext: !!nextCursor,
-                  onNext: () => handlePaginate(nextCursor, "next"),
-                  hasPrevious: !!previousCursor,
-                  onPrevious: () => handlePaginate(previousCursor, "prev"),
-                },
-              })}
+              {...paginationProps}
             >
-              {rowMarkup}
+              {videos.map((video, index) => (
+                <VideoRow
+                  key={video.id}
+                  video={video}
+                  index={index}
+                  selectedResources={selectedResources}
+                  onDeleteClick={handleDeleteClick}
+                  onViewAnalytics={handleViewAnalytics}
+                />
+              ))}
             </IndexTable>
           )}
         </Card>
