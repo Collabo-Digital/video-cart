@@ -1,162 +1,161 @@
 import {
+  Badge,
   BlockStack,
-  Card,
-  Text,
-  InlineStack,
   Box,
   Button,
-  Badge,
-  ButtonGroup,
+  Card,
   Icon,
-  Divider
-} from '@shopify/polaris';
-import { CheckIcon, StatusActiveIcon } from '@shopify/polaris-icons';
-import { useNavigate } from 'react-router';
+  InlineStack,
+  Text,
+} from "@shopify/polaris";
+import { StatusActiveIcon } from "@shopify/polaris-icons";
+import { selectSubscription, cancelSubscription } from "../../lib/utils/api/pricingApi";
 
-export const PricingCard = ({
-  id,
+function PricingCardHeader({ title, price, featuredText, isFree, onAction }) {
+  return (
+    <BlockStack gap="400" align="center" blockAlign="center" inlineAlign="center">
+      <Text as="h3" variant="headingLg">
+        {title}
+      </Text>
+
+      <Text as="h2" variant="heading2xl">
+        ${price}
+        <Text as="span" variant="bodySm" tone="subdued">
+          /month
+        </Text>
+      </Text>
+
+      <Button
+        fullWidth
+        variant="primary"
+        size="slim"
+        disabled={!!featuredText}
+        onClick={onAction}
+      >
+        {featuredText ? "Selected" : `Choose ${title}`}
+      </Button>
+
+      {isFree && (
+        <Box
+          paddingBlockStart="200"
+          background="bg-surface-secondary"
+          borderRadius="200"
+          paddingInline="200"
+          paddingBlock="100"
+          width="100%"
+        >
+          <Text as="p" variant="bodyMd" fontWeight="semibold" alignment="center">
+            Free forever
+          </Text>
+        </Box>
+      )}
+    </BlockStack>
+  );
+}
+
+function FeatureList({ features }) {
+  return (
+    <BlockStack gap="200">
+      <Text as="p" variant="bodyLg" fontWeight="semibold">
+        Features
+      </Text>
+      {features?.map((feature, index) => (
+        <InlineStack key={index} gap="200" align="start">
+          <InlineStack gap="100" align="start">
+          <Icon source={StatusActiveIcon} tone="success" />
+          </InlineStack>
+          <Text as="p" variant="bodyMd" tone="subdued">
+            {feature}
+          </Text>
+        </InlineStack>
+      ))}
+    </BlockStack>
+  );
+}
+
+
+export function PricingCard({
   title,
   value,
   featuredText,
   description,
   features,
   price,
-  frequency,
-}) => {
-  const navigate = useNavigate();
+}) {
+  const isFree = value === "free";
 
-  const handleSelectSubscription = async (plan) => {
-    const response = await fetch(`/api/v1/pricing/selectSubscription`, {
-      method: 'POST',
-      body: JSON.stringify({ plan: plan }),
-    });
-    const data = await response.json();
-    console.log(data);
-  }
+  const handleSelectPlan = async () => {
+    await selectSubscription(title);
+  };
 
-  const downgradeSubscription = async (plan) => {
-    const response = await fetch(`/api/v1/pricing/cancelSubscription`, {
-      method: 'POST',
-      body: JSON.stringify({ plan: plan }),
-    });
-    const data = await response.json();
-    console.log(data);
-  }
+  const handleCancelPlan = async () => {
+    await cancelSubscription(title);
+  };
+
+  const onAction = isFree ? handleCancelPlan : handleSelectPlan;
 
   return (
-    <div
-      style={{
-        // width: '18rem',
-        // boxShadow: featuredText ? '0px 0px 15px 4px #CDFEE1' : 'none',
-        // borderRadius: '.75rem',
-        position: 'relative',
-        // zIndex: '0'
-      }}
-    >
-      {featuredText ? (
-        <div style={{ position: 'absolute', top: '-8px', right: '15px', zIndex: '100' }}>
-          <Badge size='large' tone='magic'>
+    <div style={{ position: "relative" }}>
+      {featuredText && (
+        <div
+          style={{
+            position: "absolute",
+            top: "-8px",
+            right: "15px",
+            zIndex: 100,
+          }}
+        >
+          <Badge size="large" tone="magic">
             {featuredText}
           </Badge>
         </div>
-      ) : null}
-      {value === 'free' ? (
-        <Card>
-        <InlineStack gap='400' blockAlign='start' inlineAlign='start' align='start'>
-          <Box paddingBlockStart='200' borderInlineEndWidth='050' b borderColor='border-disabled' paddingInlineEnd='600'>
-          <BlockStack gap='400' align='center' blockAlign='center' inlineAlign='center'>
-            <Text as='h3' variant='headingLg'>
-              {title}
-            </Text>
-            <Text as='h2' variant='heading2xl'>
-              ${price}<Text as='span' variant='bodySm' tone='subdued'>/month</Text>
-            </Text>
-            {description ? (
-              <Text as='p' variant='bodySm' tone='subdued'>
-                {description}
-              </Text>
-            ) : null}
-            <Button disabled={featuredText} onClick={() => downgradeSubscription(title)} fullWidth={true} variant="primary" size="slim">{featuredText ? "Selected" : `Choose ${title}`}</Button>
-             <Box paddingBlockStart='200' background='bg-surface-secondary' borderRadius='200' paddingInline='200' paddingBlock='100' width='100%'>
-              <Text as='p' variant='bodyMd' fontWeight='semibold' alignment='center'>Free forever</Text>
-             </Box>
-          </BlockStack>
-
-            </Box>
-          
-
-          <InlineStack blockAlign='end' gap='100' align='start'>
-            
-            {/* <Box paddingBlockEnd='200'> */}
-              {/* <Text as='p' variant='bodySm'>
-                / {frequency}
-              </Text> */}
-            {/* </Box> */}
-          </InlineStack>
-
-          <BlockStack gap='300'>
-            <Text as='p' variant='bodyLg' fontWeight='semibold'>Features</Text>
-            {features?.map((feature, id) => (
-              <InlineStack gap='100' align='start' key={id}>
-              <BlockStack gap='100' align='start' key={id}>
-                <Icon source={StatusActiveIcon} tone='success' />
-              </BlockStack>
-              <Text tone='subdued' as='p' variant='bodyMd' key={id}>
-                {feature}
-              </Text>
-              </InlineStack>
-            ))}
-          </BlockStack>
-
-         
-        </InlineStack>
-      </Card>
-      ) : (
-        <Card>
-        <BlockStack gap='400'>
-          <BlockStack gap='400' align='center' blockAlign='center' inlineAlign='center'>
-            <Text as='h3' variant='headingLg'>
-              {title}
-            </Text>
-            <Text as='h2' variant='heading2xl'>
-              ${price}<Text as='span' variant='bodySm' tone='subdued'>/month</Text>
-            </Text>
-            {description ? (
-              <Text as='p' variant='bodySm' tone='subdued'>
-                {description}
-              </Text>
-            ) : null}
-            <Button disabled={featuredText} onClick={() => handleSelectSubscription(title)} fullWidth={true} variant="primary" size="slim">{featuredText ? "Selected" : `Choose ${title}`}</Button>
-             
-          </BlockStack>
-
-          <InlineStack blockAlign='end' gap='100' align='start'>
-            
-            {/* <Box paddingBlockEnd='200'> */}
-              {/* <Text as='p' variant='bodySm'>
-                / {frequency}
-              </Text> */}
-            {/* </Box> */}
-          </InlineStack>
-
-          <BlockStack gap='200'>
-            <Text as='p' variant='bodyLg' fontWeight='semibold'>Features</Text>
-            {features?.map((feature, id) => (
-              <InlineStack gap='100' align='start' key={id}>
-              <BlockStack gap='100' align='start' key={id}>
-                <Icon source={StatusActiveIcon} tone='success' />
-              </BlockStack>
-              <Text tone='subdued' as='p' variant='bodyMd' key={id}>
-                {feature}
-              </Text>
-              </InlineStack>
-            ))}
-          </BlockStack>
-
-         
-        </BlockStack>
-      </Card>
       )}
+
+      <Card>
+        {isFree ? (
+          <InlineStack gap="400" blockAlign="start" align="start">
+            <Box
+              paddingBlockStart="200"
+              borderInlineEndWidth="050"
+              borderColor="border-disabled"
+              paddingInlineEnd="600"
+            >
+              <PricingCardHeader
+                title={title}
+                price={price}
+                featuredText={featuredText}
+                isFree
+                onAction={onAction}
+              />
+              {description && (
+                <Box paddingBlockStart="200">
+                  <Text as="p" variant="bodySm" tone="subdued">
+                    {description}
+                  </Text>
+                </Box>
+              )}
+            </Box>
+
+            <FeatureList features={features} />
+          </InlineStack>
+        ) : (
+          <BlockStack gap="400">
+            <PricingCardHeader
+              title={title}
+              price={price}
+              featuredText={featuredText}
+              isFree={false}
+              onAction={onAction}
+            />
+            {description && (
+              <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                {description}
+              </Text>
+            )}
+            <FeatureList features={features} />
+          </BlockStack>
+        )}
+      </Card>
     </div>
   );
-};
+}

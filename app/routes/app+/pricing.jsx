@@ -1,135 +1,107 @@
-import { Grid, InlineGrid, InlineStack, Page } from "@shopify/polaris";
-import { PricingCard } from "../../components/Pricing/Pricing";
+import { Grid, InlineStack, Page } from "@shopify/polaris";
+import { useLoaderData } from "react-router";
+
 import { authenticate } from "../../config/shopify.server";
-import * as ShopModel  from "../../models/shop.server";
-import { useLoaderData, useSearchParams } from "react-router";
-import { APP_PAID_PLANS, APP_FREE_PLAN, APP_BILLING_PLANS_NAMES, VIDEO_VIEW_LIMITS, VIDEO_UPLOAD_LIMITS } from "../../lib/constants/common";
-import { useEffect } from "react";
+import { PricingCard } from "../../components/Pricing/Pricing";
+import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
+import {
+  APP_BILLING_PLANS_NAMES,
+  APP_FREE_PLAN,
+  APP_PAID_PLANS,
+  VIDEO_UPLOAD_LIMITS,
+  VIDEO_VIEW_LIMITS,
+} from "../../lib/constants/common";
+import * as ShopModel from "../../models/shop.server";
 
 export const loader = async ({ request }) => {
   const { billing, session } = await authenticate.admin(request);
-  const searchParams = new URL(request.url).searchParams;
-  const chargeId = searchParams.get('charge_id');
+
   try {
+    const chargeId = new URL(request.url).searchParams.get("charge_id");
+
+    let shopData = await ShopModel.findByDomain(session.shop);
+    // When Shopify redirects back after a plan selection, confirm and persist it
     if (chargeId) {
       const billingCheck = await billing.check({
         plans: APP_BILLING_PLANS_NAMES,
       });
+
+      const planName = billingCheck?.appSubscriptions?.[0]?.name ?? "Free";
       
-      // Determine active plan from billing check (adjust based on actual billingCheck shape)
-      const activeSubscription = billingCheck?.appSubscriptions?.[0];
-      const planName = activeSubscription?.name; // e.g. "Basic", "Growth", "Advanced"
-      const appPlanValue = planName || "";
-      
-      if (appPlanValue && session.shop) {
-        await ShopModel.updateByDomain(session.shop, {
-          appPlan: appPlanValue,
-          videoViewLimit: VIDEO_VIEW_LIMITS[appPlanValue.toLowerCase()],
-          videoUploadLimit: VIDEO_UPLOAD_LIMITS[appPlanValue.toLowerCase()],
+      if (planName && session.shop) {
+        shopData = await ShopModel.updateByDomain(session.shop, {
+          appPlan: planName,
+          planLimits: {
+            videoViewLimit: VIDEO_VIEW_LIMITS[planName.toLowerCase()],
+            videoUploadLimit: VIDEO_UPLOAD_LIMITS[planName.toLowerCase()],
+          },
         });
       }
     }
-    const shopData = await ShopModel.findByDomain(session.shop);
-
-    return { shopData };
+    return apiSuccess({ shopData });
   } catch (error) {
     console.error("Error fetching pricing:", error);
-    return { shop: session.shop };
+
+    captureRouteError(error, {
+      route: "pricing",
+      url: request.url,
+      method: request.method,
+      shop: session?.shop ?? "unknown",
+    });
+
+    return apiError(error, {
+      route: "pricing",
+      code: "FETCH_PRICING_ERROR",
+      statusCode: 500,
+      requestId: request.id,
+    });
   }
 };
 
-export default function PricingPage() {
-  const { shopData } = useLoaderData();
-  // const [searchParams] = useSearchParams();
-  // const chargeId = searchParams.get('charge_id');
-  const currentPlan = shopData?.appPlan || 'Free';
 
-  // useEffect(() => {
-  //   if (chargeId) {
-  //     const confirmCharge = async () => {
-  //       const response = await fetch(
-  //         `/api/v1/pricing/accpetSubscription?charge_id=${chargeId}`,
-  //         { method: 'GET' }
-  //       );
-  //       const data = await response.json();
-  //       console.log("accept/confirm result -->", data);
-  //     };
-  //     confirmCharge();
-  //   }
-  // }, [chargeId, currentPlan]);
+export default function PricingPage() {
+  const { data } = useLoaderData();
+  const { shopData } = data;
+
+  const currentPlan = shopData?.appPlan ?? "Free";
 
   return (
-    <Page title="Pricing" subtitle="Choose the plan that's right for you">  
-    <InlineStack gap="600" align="center" blockAlign="start">
-      <Grid columns={{ xs: 1, sm: 2, md: 3, lg: 3 }} gap="400">
-        {APP_PAID_PLANS.map((plan) => (
-        <Grid.Cell columnSpan={{ xs: 1, sm: 1, md:1 , lg: 1 }} key={plan.id}>
-        <PricingCard
-          key={plan.id}
-          title={plan.name}
-          value={plan.value}
-          featuredText={plan.name === currentPlan ? "Active Plan" : null}
-          description={plan.description}
-          features={plan.features}
-          price={plan.price}
-          frequency={plan.frequency}
-        />
-      </Grid.Cell>
-      ))}
-      <Grid.Cell columnSpan={{ xs: 1, sm: 2, md: 3, lg: 3 }}>
-      <PricingCard
-        key={APP_FREE_PLAN.id}
-        title={APP_FREE_PLAN.name}
-        value={APP_FREE_PLAN.value}
-        featuredText={APP_FREE_PLAN.name === currentPlan ? "Active Plan" : null}
-        description={APP_FREE_PLAN.description}
-        features={APP_FREE_PLAN.features}
-        price={APP_FREE_PLAN.price}
-        frequency={APP_FREE_PLAN.frequency}
-      />
-      </Grid.Cell>
-      </Grid>
-      
-      {/* <PricingCard
-        title="Advanced"
-        featuredText="Most Popular"
-        description="For stores that are growing and need a reliable solution to scale with them"
-        features={[
-          "Process up to 10,000 orders/mo",
-          "Amazing feature",
-          "Another really cool feature",
-          "24/7 Customer Support",
-        ]}
-        price="$49"
-        frequency="month"
-        button={{
-          content: "Select Plan",
-          props: {
-            variant: "primary",
-            onClick: () => console.log("clicked plan!"),
-          },
-        }}
-      />
-      <PricingCard
-        title="Premium"
-        description="The best of the best, for stores that have the highest order processing needs"
-        features={[
-          "Process up to 100,000 orders/mo",
-          "Amazing feature",
-          "Another really cool feature",
-          "24/7 Customer Support",
-        ]}
-        price="$99"
-        frequency="month"
-        button={{
-          content: "Select Plan",
-          props: {
-            variant: "primary",
-            onClick: () => console.log("clicked plan!"),
-          },
-        }}
-      /> */}
-    </InlineStack>
+    <Page title="Pricing" subtitle="Choose the plan that's right for you">
+      <InlineStack gap="600" align="center" blockAlign="start">
+        <Grid columns={{ xs: 1, sm: 2, md: 3, lg: 3 }} gap="400">
+          {APP_PAID_PLANS.map((plan) => (
+            <Grid.Cell
+              key={plan.id}
+              columnSpan={{ xs: 1, sm: 1, md: 1, lg: 1 }}
+            >
+              <PricingCard
+                title={plan.name}
+                value={plan.value}
+                description={plan.description}
+                features={plan.features}
+                price={plan.price}
+                frequency={plan.frequency}
+                featuredText={plan.name === currentPlan ? "Active Plan" : null}
+              />
+            </Grid.Cell>
+          ))}
+
+          <Grid.Cell columnSpan={{ xs: 1, sm: 2, md: 3, lg: 3 }}>
+            <PricingCard
+              title={APP_FREE_PLAN.name}
+              value={APP_FREE_PLAN.value}
+              description={APP_FREE_PLAN.description}
+              features={APP_FREE_PLAN.features}
+              price={APP_FREE_PLAN.price}
+              frequency={APP_FREE_PLAN.frequency}
+              featuredText={
+                APP_FREE_PLAN.name === currentPlan ? "Active Plan" : null
+              }
+            />
+          </Grid.Cell>
+        </Grid>
+      </InlineStack>
     </Page>
   );
 }
