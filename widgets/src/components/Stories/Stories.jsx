@@ -148,7 +148,7 @@ export function VideoStories({ feed, videos, settings, onEvent, isPreview }) {
                       <img className="video-story-thumb" src={thumbUrl()} alt="" loading="lazy" />
                     </Show>
                   </span>
-                  <span className="video-story-label">{video?.title || `Story ${index() + 1}`}</span>
+                  {/* <span className="video-story-label">{video?.title || `Story ${index() + 1}`}</span> */}
                 </button>
               );
             }}
