@@ -13,6 +13,7 @@ import {
 import { InfoIcon } from "@shopify/polaris-icons";
 import PropTypes from "prop-types";
 import { Controller } from "react-hook-form";
+import { WIDGET_TEMPLATES, getTemplatesForType } from "../../lib/constants/templates";
 
 /**
  * Design settings tab. Placeholder for future design options.
@@ -28,42 +29,30 @@ export function DesignSettings({ control, watch, errors = {} }) {
             Layout & Spacing
           </Text>
           <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+
             <Controller
-              name="settings.design.cardCornerRadius"
+              name="settings.design.template"
               control={control}
               render={({ field }) => (
-                <BlockStack gap="300">
-                  <Text as="p">Card Corner Radius</Text>
-                  <RangeSlider
-                    // label="Card Corner Radius"
-                    value={field.value}
-                    onChange={(value) => field.onChange(value)}
-                    output
-                  />
-                </BlockStack>
+                <Select
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Template</Text>
+                      <Tooltip
+                        dismissOnMouseOut
+                        content="Choose the template you want to use for the widget."
+                      >
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  options={getTemplatesForType(widgetType).map((t) => ({ label: t.name, value: t.id }))}
+value={field.value ?? getTemplatesForType(widgetType)[0].id}
+                  onChange={field.onChange}
+                />
               )}
             />
 
-            {
-              (widgetType !== "floating") && (
-                <Controller
-                  name="settings.design.videoGap"
-                  control={control}
-                  render={({ field }) => (
-                    <BlockStack gap="300">
-                      <Text as="p">Video Gap</Text>
-                      <RangeSlider
-                        // label="Video Gap"
-                        value={field.value}
-                        onChange={(value) => field.onChange(value)}
-                        output
-                      />
-                    </BlockStack>
-                  )}
-                />
-
-              )
-            }
             <Controller
               name="settings.design.titleAlignment"
               control={control}
@@ -90,6 +79,76 @@ export function DesignSettings({ control, watch, errors = {} }) {
                 />
               )}
             />
+
+
+            <Controller
+              name="settings.design.cardCornerRadius"
+              control={control}
+              render={({ field }) => (
+                <BlockStack gap="300">
+                  <Text as="p">Card Corner Radius</Text>
+                  <RangeSlider
+                    // label="Card Corner Radius"
+                    value={field.value}
+                    onChange={(value) => field.onChange(value)}
+                    output
+                  />
+                </BlockStack>
+              )}
+            />
+
+            {
+              (widgetType === "carousel" || widgetType === "grid") && (
+                <Controller
+                  name="settings.design.hoverEffect"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      label={
+                        <InlineStack gap="200">
+                          <Text as="p">Card Hover Effect</Text>
+                          <Tooltip
+                            dismissOnMouseOut
+                            content="Choose what happens when a user hovers over a video card."
+                          >
+                            <Icon source={InfoIcon} />
+                          </Tooltip>
+                        </InlineStack>
+                      }
+                      options={[
+                        { label: "Lift", value: "lift" },
+                        { label: "Expand", value: "expand" },
+                        { label: "None", value: "none" },
+                      ]}
+                      value={field.value ?? "lift"}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              )
+            }
+
+            {
+              (widgetType !== "floating") && (
+                <Controller
+                  name="settings.design.videoGap"
+                  control={control}
+                  render={({ field }) => (
+                    <BlockStack gap="300">
+                      <Text as="p">Video Gap</Text>
+                      <RangeSlider
+                        // label="Video Gap"
+                        value={field.value}
+                        onChange={(value) => field.onChange(value)}
+                        output
+                      />
+                    </BlockStack>
+                  )}
+                />
+
+              )
+            }
+
             {
               (widgetType === "stories") && (
                 <Controller
