@@ -13,6 +13,7 @@ import {
 import { InfoIcon } from "@shopify/polaris-icons";
 import PropTypes from "prop-types";
 import { Controller } from "react-hook-form";
+import { WIDGET_TEMPLATES, getTemplatesForType } from "../../lib/constants/templates";
 
 /**
  * Design settings tab. Placeholder for future design options.
@@ -28,6 +29,58 @@ export function DesignSettings({ control, watch, errors = {} }) {
             Layout & Spacing
           </Text>
           <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+
+            <Controller
+              name="settings.design.template"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Template</Text>
+                      <Tooltip
+                        dismissOnMouseOut
+                        content="Choose the template you want to use for the widget."
+                      >
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  options={getTemplatesForType(widgetType).map((t) => ({ label: t.name, value: t.id }))}
+value={field.value ?? getTemplatesForType(widgetType)[0].id}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+
+            <Controller
+              name="settings.design.titleAlignment"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Widget Title Alignment</Text>
+                      <Tooltip
+                        dismissOnMouseOut
+                        content="Choose the page where you want to display the widget."
+                      >
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  options={[
+                    { label: "Start", value: "start" },
+                    { label: "Center", value: "center" },
+                    { label: "End", value: "end" },
+                  ]}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+
+
             <Controller
               name="settings.design.cardCornerRadius"
               control={control}
@@ -64,32 +117,7 @@ export function DesignSettings({ control, watch, errors = {} }) {
 
               )
             }
-            <Controller
-              name="settings.design.titleAlignment"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Widget Title Alignment</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Choose the page where you want to display the widget."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  options={[
-                    { label: "Start", value: "start" },
-                    { label: "Center", value: "center" },
-                    { label: "End", value: "end" },
-                  ]}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              )}
-            />
+
             {
               (widgetType === "stories") && (
                 <Controller

@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
         titleAlignment: "start",
         buttonBackgroundColor: "#000080",
         buttonTextColor: "#ffffff",
+        template: "default",
     },
     translation: {
         widgetHeading: "Check out these products",
