@@ -129,12 +129,31 @@
   background: #f3f4f6;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: flex 0.3s ease, transform 0.2s, box-shadow 0.2s;
 }
 
-.video-carousel-card:hover {
+/* Hover effect: Lift (default) */
+.hover-lift .video-carousel-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Hover effect: Expand — hovered card grows, siblings shrink */
+.hover-expand .video-carousel-track:hover .video-carousel-card {
+  flex: 0 0 calc((100% - (5 - 1) * 22px) / 5 * 0.95);
+  aspect-ratio: 9 / 16;
+}
+
+.hover-expand .video-carousel-track .video-carousel-card:hover {
+  flex: 0 0 calc((100% - (5 - 1) * 22px) / 5 * 1.2);
+  aspect-ratio: 9 / 16;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Hover effect: None */
+.hover-none .video-carousel-card:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .video-carousel-card-button {

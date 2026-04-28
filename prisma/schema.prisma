@@ -107,6 +107,7 @@ model Feed {
   feedName   String
   shopDomain String
   widgetType String  @default("carousel") // carousel | grid
+  template    String  @default("default")
   widgetPage String  @default("homePage") // homepage | productPage | collectionPage
   isEnabled  Boolean @default(true)
   isDeleted  Boolean @default(false)
