@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Controller } from "react-hook-form";
 import PropTypes from "prop-types";
 import {
@@ -44,8 +45,15 @@ const AUTO_PLAY_OPTIONS = [
  * General settings: feed name, widget type, status.
  * Uses react-hook-form control from parent.
  */
-export function GeneralSettings({ control, watch, errors = {} }) {
+export function GeneralSettings({ control, watch, errors = {}, setValue }) {
     const widgetType = watch("widgetType");
+    const prevWidgetType = useRef(widgetType);
+    useEffect(() => {
+        if (prevWidgetType.current && prevWidgetType.current !== widgetType) {
+            setValue("settings.design.template", "default");
+        }
+        prevWidgetType.current = widgetType;
+    }, [widgetType, setValue]);
 
     return (
         <BlockStack gap="200">

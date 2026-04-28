@@ -42,7 +42,7 @@ const SETTINGS_TABS = [
  * Settings tab content: sub-tabs General, Design, Translation with their panels.
  * Parent manages selected index and passes control/errors from react-hook-form.
  */
-export function SettingsTab({ control, watch, errors, selectedTab, onTabChange }) {
+export function SettingsTab({ control, watch, errors, selectedTab, onTabChange, setValue }) {
     return (
         <Box padding="400">
             <BlockStack gap="400">
@@ -59,7 +59,7 @@ export function SettingsTab({ control, watch, errors, selectedTab, onTabChange }
                 </Box>
                 {/* </Card> */}
                 {selectedTab === 0 && (
-                    <GeneralSettings control={control} watch={watch} errors={errors} />
+                    <GeneralSettings control={control} watch={watch} errors={errors} setValue={setValue} />
                 )}
                 {selectedTab === 1 && <DesignSettings control={control} watch={watch} errors={errors} />}
                 {selectedTab === 2 && (
@@ -76,6 +76,7 @@ SettingsTab.propTypes = {
     errors: PropTypes.object,
     selectedTab: PropTypes.number.isRequired,
     onTabChange: PropTypes.func.isRequired,
+    setValue: PropTypes.func.isRequired,
 };
 
 export { GeneralSettings } from "./GeneralSettings";

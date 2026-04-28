@@ -192,6 +192,7 @@ export default function FeedEditorPage() {
     control,
     watch,
     reset,
+    setValue,
     formState: { errors, isDirty },
   } = useForm({ values: formValues });
 
@@ -419,6 +420,7 @@ export default function FeedEditorPage() {
                       control={control}
                       watch={watch}
                       errors={errors}
+                      setValue={setValue}
                       selectedTab={settingsTab}
                       onTabChange={setSettingsTab}
                     />
