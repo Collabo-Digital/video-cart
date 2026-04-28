@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
         cardCornerRadius: 20,
         videoGap: 20,
         titleAlignment: "start",
+        hoverEffect: "lift",
         buttonBackgroundColor: "#000080",
         buttonTextColor: "#ffffff",
         template: "default",

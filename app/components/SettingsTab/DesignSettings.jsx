@@ -98,6 +98,37 @@ value={field.value ?? getTemplatesForType(widgetType)[0].id}
             />
 
             {
+              (widgetType === "carousel" || widgetType === "grid") && (
+                <Controller
+                  name="settings.design.hoverEffect"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      label={
+                        <InlineStack gap="200">
+                          <Text as="p">Card Hover Effect</Text>
+                          <Tooltip
+                            dismissOnMouseOut
+                            content="Choose what happens when a user hovers over a video card."
+                          >
+                            <Icon source={InfoIcon} />
+                          </Tooltip>
+                        </InlineStack>
+                      }
+                      options={[
+                        { label: "Lift", value: "lift" },
+                        { label: "Expand", value: "expand" },
+                        { label: "None", value: "none" },
+                      ]}
+                      value={field.value ?? "lift"}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
+              )
+            }
+
+            {
               (widgetType !== "floating") && (
                 <Controller
                   name="settings.design.videoGap"

@@ -43,6 +43,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
 
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
+  const hoverEffect = () =>  design?.hoverEffect  || 'lift'    ;
   const autoplay = () => settings?.general?.autoPlay ?? feed?.settings?.general?.autoPlay;
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || DEFAULT_SUBTITLE;
@@ -171,7 +172,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
 
   return (
     <div
-      className={`video-carousel-container${uniqueClass ? ` ${uniqueClass}` : ''}`}
+      className={`video-carousel-container hover-${hoverEffect()}${uniqueClass ? ` ${uniqueClass}` : ''}`}
       ref={setContainerRef}
     >
 
