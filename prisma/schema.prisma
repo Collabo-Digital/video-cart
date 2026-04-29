@@ -47,6 +47,16 @@ model Shop {
   planDisplayName    String?
   partnerDevelopment Boolean @default(false)
   shopifyPlus        Boolean @default(false)
+  shopOwnerName  String?
+  shopAddress1   String?
+  shopAddress2   String?
+  shopCity       String?
+  shopProvince   String?
+  shopZip        String?
+  shopCountry    String?
+  shopLatitude   Float?
+  shopLongitude  Float?
+  shopPhone      String?
 
   // Timestamps
   createdAt     DateTime  @default(now())
