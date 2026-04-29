@@ -1,1 +1,1 @@
-export * from "~/lib/utils/observability/errorCapture";
+export * from "../../../lib/utils/observability/errorCapture";

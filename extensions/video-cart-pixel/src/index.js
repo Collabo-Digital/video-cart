@@ -56,6 +56,9 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
 
   analytics.subscribe("checkout_completed", (event) => {
     const checkout = event.data.checkout;
+    const backendUrl = settings?.apiBaseUrl || 'https://video-cart.vercel.app';
+
+    console.log('checkout ----->', checkout);
 
     Promise.all([
       browser.localStorage.getItem('vdcrt_atc_products'),
@@ -89,7 +92,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
 
       if (videoItems.length === 0) return;
 
-      const backendUrl = settings?.apiBaseUrl || 'https://video-cart.vercel.app';
+
       if (!backendUrl) return;
 
       fetch(`${backendUrl}/api/v1/analytics/conversion`, {
@@ -114,6 +117,15 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
         .finally(() => {
           browser.localStorage.removeItem('vdcrt_atc_products');
         });
+    });
+
+    fetch(`${backendUrl}/api/v1/analytics/orderGenerated`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shop: event.context.document.location.hostname,
+        order: checkout?.order || null,
+      }),
     });
   });
 
