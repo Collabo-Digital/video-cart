@@ -12,6 +12,7 @@ import {
   VIDEO_UPLOAD_LIMITS,
   VIDEO_VIEW_LIMITS,
 } from "../../lib/constants/common";
+import { notifyShopInstall } from "../../lib/utils/slack.server";
 import { getNextResetDate } from "../../lib/utils/common";
 
 /**
@@ -45,6 +46,18 @@ export async function doTaskAfterAuth({ session, admin }) {
             name
             email
             contactEmail
+            shopOwnerName
+            billingAddress  {
+              address1
+              address2
+              city
+              province
+              zip
+              country
+              latitude
+              longitude
+              phone
+            }
             plan {
               displayName
               partnerDevelopment
@@ -132,6 +145,16 @@ export async function doTaskAfterAuth({ session, admin }) {
         false,
       shopifyPlus: shop.plan?.shopifyPlus ?? existingShop?.shopifyPlus ?? false,
 
+      shopOwnerName: shop.shopOwnerName || existingShop?.shopOwnerName || null,
+      shopAddress1: shop.shopAddress?.address1 || existingShop?.shopAddress1 || null,
+      shopAddress2: shop.shopAddress?.address2 || existingShop?.shopAddress2 || null,
+      shopCity: shop.shopAddress?.city || existingShop?.shopCity || null,
+      shopProvince: shop.shopAddress?.province || existingShop?.shopProvince || null,
+      shopZip: shop.shopAddress?.zip || existingShop?.shopZip || null,
+      shopCountry: shop.shopAddress?.country || existingShop?.shopCountry || null,
+      shopLatitude: shop.shopAddress?.latitude || existingShop?.shopLatitude || null,
+      shopLongitude: shop.shopAddress?.longitude || existingShop?.shopLongitude || null,
+      shopPhone: shop.shopAddress?.phone || existingShop?.shopPhone || null,
       // App specific:
       // - isActive: keep existing, default to true on first install
       // - installedAt: never overwrite once set
@@ -147,6 +170,15 @@ export async function doTaskAfterAuth({ session, admin }) {
       shopDomain: savedShop.shopDomain,
       name: savedShop.name,
     });
+
+    if (!existingShop) {
+      notifyShopInstall({
+        shopDomain: session.shop,
+        name: shop.name,
+        email: shop.email || shop.contactEmail,
+        plan: shop.plan?.displayName,
+      });
+    }
 
     // Ensure app pixel is activated (creates web pixel record once per shop)
     // apiBaseUrl lets the pixel POST to the app (pixel cannot call same-origin store).

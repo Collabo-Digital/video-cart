@@ -194,12 +194,16 @@
 
 /* Mobile */
 @media (max-width: 768px) {
+  .template-spotlight .spotlight-stage {
+    overflow: hidden;
+  }
+
   .template-spotlight .spotlight-track {
     min-height: 340px;
   }
 
   .template-spotlight .spotlight-card {
-    width: 200px;
+    width: min(200px, 48vw);
   }
 
   .template-spotlight .spotlight-card.is-prev {
@@ -214,5 +218,14 @@
   .template-spotlight .spotlight-card.is-far-next {
     opacity: 0;
     pointer-events: none;
+    transform: translateX(0) scale(0.5);
+  }
+
+  .template-spotlight .spotlight-nav-prev {
+    margin-right: 8px;
+  }
+
+  .template-spotlight .spotlight-nav-next {
+    margin-left: 8px;
   }
 }
