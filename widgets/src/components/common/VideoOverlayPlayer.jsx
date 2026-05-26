@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- shared overlay used by widget variants */
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import Hls from 'hls.js';
 import mux from 'mux-embed';
 import { getPlaybackUrl, getThumbnailPreviewUrl } from '../../shared/mux';
@@ -41,13 +42,14 @@ export function VideoOverlayPlayer({
     return list[idx];
   });
 
-  const canGoPrev = () => (expandedIndex() ?? 0) > 0;
-  const canGoNext = () => (expandedIndex() ?? 0) < (videos?.length ?? 0) - 1;
+  const total = () => videos?.length ?? 0;
   const goPrev = () => {
-    if (canGoPrev()) setExpandedIndex((i) => i - 1);
+    if (!total()) return;
+    setExpandedIndex((i) => (i - 1 + total()) % total());
   };
   const goNext = () => {
-    if (canGoNext()) setExpandedIndex((i) => i + 1);
+    if (!total()) return;
+    setExpandedIndex((i) => (i + 1) % total());
   };
 
   createEffect(() => {
@@ -154,16 +156,24 @@ export function VideoOverlayPlayer({
     }
   });
 
+  const [prevIndex, setPrevIndex] = createSignal(null);
+
   /** On mobile reels: scroll track to the slide at expandedIndex (after layout) */
   createEffect(() => {
     if (!isMobile() || expandedIndex() == null) return;
     const track = reelsTrackRef();
     if (!track) return;
     const idx = expandedIndex();
+    const prev = prevIndex();
+    setPrevIndex(idx);
+    const lastIdx = (videos?.length ?? 1) - 1;
+    const isWrap = (prev === 0 && idx === lastIdx) || (prev === lastIdx && idx === 0);
+    const behavior = isWrap ? 'instant' : 'smooth';
+
     const slides = track.querySelectorAll('.video-carousel-reels-slide');
     const slideEl = slides[idx];
     const scrollToSlide = () => {
-      if (slideEl) track.scrollTo({ top: slideEl.offsetTop, behavior: 'smooth' });
+      if (slideEl) track.scrollTo({ top: slideEl.offsetTop, behavior });
     };
     if (slideEl) scrollToSlide();
     else {
@@ -194,6 +204,70 @@ export function VideoOverlayPlayer({
     );
     slides.forEach((el) => observer.observe(el));
     onCleanup(() => observer.disconnect());
+  });
+
+  /** On mobile reels: circular swipe — intercept boundary gestures and wrap */
+  createEffect(() => {
+    if (!isMobile() || expandedIndex() == null || !videos?.length || videos.length < 2) return;
+    const track = reelsTrackRef();
+    if (!track) return;
+
+    const SWIPE_THRESHOLD = 40;
+    let startY = null;
+    let isBoundarySwipe = false;
+
+    const onTouchStart = (e) => {
+      startY = e.touches[0].clientY;
+      isBoundarySwipe = false;
+    };
+
+    const onTouchMove = (e) => {
+      if (startY == null) return;
+      const currentY = e.touches[0].clientY;
+      const diff = startY - currentY;
+      const idx = expandedIndex();
+      const lastIdx = videos.length - 1;
+      const atTop = track.scrollTop <= 2;
+      const atBottom = track.scrollTop + track.clientHeight >= track.scrollHeight - 2;
+
+      if ((diff > 10 && atBottom && idx === lastIdx) ||
+          (diff < -10 && atTop && idx === 0)) {
+        isBoundarySwipe = true;
+        e.preventDefault();
+      }
+    };
+
+    const onTouchEnd = (e) => {
+      if (startY == null || !isBoundarySwipe) {
+        startY = null;
+        isBoundarySwipe = false;
+        return;
+      }
+      const endY = e.changedTouches[0].clientY;
+      const diff = startY - endY;
+      startY = null;
+      isBoundarySwipe = false;
+
+      if (Math.abs(diff) < SWIPE_THRESHOLD) return;
+
+      const idx = expandedIndex();
+      const lastIdx = videos.length - 1;
+
+      if (diff > 0 && idx === lastIdx) {
+        setExpandedIndex(0);
+      } else if (diff < 0 && idx === 0) {
+        setExpandedIndex(lastIdx);
+      }
+    };
+
+    track.addEventListener('touchstart', onTouchStart, { passive: true });
+    track.addEventListener('touchmove', onTouchMove, { passive: false });
+    track.addEventListener('touchend', onTouchEnd, { passive: true });
+    onCleanup(() => {
+      track.removeEventListener('touchstart', onTouchStart);
+      track.removeEventListener('touchmove', onTouchMove);
+      track.removeEventListener('touchend', onTouchEnd);
+    });
   });
 
   /** Sync mute state and track currentTime/duration for custom controls */
@@ -237,6 +311,7 @@ export function VideoOverlayPlayer({
 
   return (
     <Show when={expandedIndex() != null && videos?.length > 0}>
+      <Portal>
       <div
         className={`video-carousel-overlay${isMobile() ? ' video-carousel-overlay-reels' : ''}`}
         role="dialog"
@@ -255,7 +330,7 @@ export function VideoOverlayPlayer({
         {/* Desktop: horizontal nav with center video */}
         <Show when={!isMobile()}>
           <div className="video-carousel-overlay-body">
-            <Show when={canGoPrev()}>
+            <Show when={total() > 1}>
               <button
                 type="button"
                 className="video-carousel-overlay-nav video-carousel-overlay-nav-prev"
@@ -274,8 +349,8 @@ export function VideoOverlayPlayer({
                       ref={setVideoEl}
                       className="video-carousel-overlay-video"
                       autoPlay
+                      loop
                       muted
-                    // playsInline
                     />
                     <div className="video-carousel-custom-controls">
                       <button
@@ -304,7 +379,7 @@ export function VideoOverlayPlayer({
                 )}
               </Show>
             </div>
-            <Show when={canGoNext()}>
+            <Show when={total() > 1}>
               <button
                 type="button"
                 className="video-carousel-overlay-nav video-carousel-overlay-nav-next"
@@ -319,6 +394,24 @@ export function VideoOverlayPlayer({
 
         {/* Mobile: Reels-style vertical scroll (swipe up/down) */}
         <Show when={isMobile()}>
+          <Show when={total() > 1}>
+            <button
+              type="button"
+              className="video-carousel-reels-nav video-carousel-reels-nav-prev"
+              aria-label="Previous video"
+              onClick={goPrev}
+            >
+              <LeftToggleIcon />
+            </button>
+            <button
+              type="button"
+              className="video-carousel-reels-nav video-carousel-reels-nav-next"
+              aria-label="Next video"
+              onClick={goNext}
+            >
+              <RightToggleIcon />
+            </button>
+          </Show>
           <div
             className="video-carousel-overlay-reels-track"
             ref={setReelsTrackRef}
@@ -338,10 +431,9 @@ export function VideoOverlayPlayer({
                         <video
                           ref={setVideoEl}
                           className="video-carousel-overlay-video"
-                          // controls
                           autoPlay
+                          loop
                           muted
-                        // playsInline
                         />
                         <div className="video-carousel-custom-controls">
                           <button
@@ -446,6 +538,7 @@ export function VideoOverlayPlayer({
           </aside>
         </Show>
       </div>
+      </Portal>
     </Show>
   );
 }

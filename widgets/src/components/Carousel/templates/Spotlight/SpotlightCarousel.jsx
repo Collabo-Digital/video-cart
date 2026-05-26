@@ -197,7 +197,12 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
                     type="button"
                     className="spotlight-card-button"
                     aria-label={video.title || `Video ${index() + 1}`}
-                    onClick={() => handleCardClick(video, index())}
+                    onClick={(e) => {
+                      const isProductAction = e.target.closest(
+                        '.vd-product-overlay-item-button, .vd-overlay-nav-btn'
+                      );
+                      if (!isProductAction) handleCardClick(video, index());
+                    }}
                   >
                     <span className="spotlight-card-image-wrap">
                       <Show

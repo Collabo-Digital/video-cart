@@ -103,7 +103,11 @@ export async function initFeeds() {
 
       const currentPage = window.__video_cart_config__?.store_page || 'other';
       const feedPage = feed.widgetPage || 'homePage';
-      if (currentPage !== feedPage) continue;
+      if (feedPage === 'custom') {
+        if (window.location.pathname !== feed.customPagePath) continue;
+      } else {
+        if (currentPage !== feedPage) continue;
+      }
 
       const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;
       const widgetDef = getWidget(widgetType);

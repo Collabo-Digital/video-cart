@@ -44,6 +44,7 @@ export function getFeedFormDefaultValues(feed, widgetType, widgetPage) {
         widgetType: defaultWidgetType,
         isEnabled: feed?.isEnabled ?? true,
         widgetPage: defaultWidgetPage,
+        customPagePath: feed?.customPagePath || "",
         settings: {
             general: { ...DEFAULT_SETTINGS.general, ...feed?.settings?.general },
             design: { ...DEFAULT_SETTINGS.design, ...feed?.settings?.design },

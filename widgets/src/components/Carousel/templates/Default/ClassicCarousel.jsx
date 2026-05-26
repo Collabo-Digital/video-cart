@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent (ARCHITECTURE-RULES §4) */
-import { createSignal, For, Show, createEffect, onCleanup } from 'solid-js';
+import { createSignal, createMemo, For, Show, createEffect, onCleanup } from 'solid-js';
 
 import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../../../shared/mux';
 import { EVENT_TYPES } from '../../../../api/services/analyticsService';
@@ -27,6 +27,7 @@ import './carousel.css';
 
 
 const DEFAULT_SUBTITLE = '';
+const CLONE_COUNT = 5;
 
 
 export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) {
@@ -59,6 +60,20 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     source: 'carousel',
     isPreview,
   });
+
+  const total = () => videos?.length ?? 0;
+  const cloneCount = () => Math.min(CLONE_COUNT, total());
+
+  const loopItems = createMemo(() => {
+    if (!videos?.length) return [];
+    const n = cloneCount();
+    const tail = videos.slice(-n);
+    const head = videos.slice(0, n);
+    return [...tail, ...videos, ...head];
+  });
+
+  const toTrackIndex = (realIdx) => realIdx + cloneCount();
+  const toRealIndex = (trackIdx) => ((trackIdx - cloneCount()) % total() + total()) % total();
 
   createEffect(() => {
     const container = containerRef();
@@ -98,37 +113,75 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     onCleanup(() => observer.disconnect());
   });
 
+  const getCardWidth = () => {
+    const el = trackRef();
+    const card = el?.querySelector('.video-carousel-card');
+    return card?.offsetWidth ?? 0;
+  };
+
+  const scrollToTrackIndex = (idx, behavior = 'smooth') => {
+    const el = trackRef();
+    const cardW = getCardWidth();
+    if (!el || !cardW) return;
+    el.scrollTo({ left: idx * (cardW + CARD_GAP), behavior });
+  };
+
+  const getTrackIndex = () => {
+    const el = trackRef();
+    const cardW = getCardWidth();
+    if (!el || !cardW) return cloneCount();
+    return Math.round(el.scrollLeft / (cardW + CARD_GAP));
+  };
+
+  /** Position track at the first real card on mount */
   createEffect(() => {
     const el = trackRef();
-    if (!el) return;
+    if (!el || !total()) return;
+    requestAnimationFrame(() => {
+      scrollToTrackIndex(cloneCount(), 'instant');
+      setCurrentIndex(0);
+    });
+  });
+
+  /** Track scroll position and silently reposition when entering cloned region */
+  createEffect(() => {
+    const el = trackRef();
+    if (!el || !total()) return;
+
+    let repositionTimer = null;
 
     const onScroll = () => {
-      const card = el.querySelector('.video-carousel-card');
-      if (!card) return;
-      const cardW = card.offsetWidth;
-      if (!cardW) return;
-      setCurrentIndex(Math.round(el.scrollLeft / (cardW + CARD_GAP)));
+      const trackIdx = getTrackIndex();
+      setCurrentIndex(toRealIndex(trackIdx));
+
+      clearTimeout(repositionTimer);
+      repositionTimer = setTimeout(() => {
+        const n = cloneCount();
+        const t = total();
+        const idx = getTrackIndex();
+
+        if (idx < n) {
+          const realIdx = toRealIndex(idx);
+          scrollToTrackIndex(realIdx + n, 'instant');
+        } else if (idx >= n + t) {
+          const realIdx = toRealIndex(idx);
+          scrollToTrackIndex(realIdx + n, 'instant');
+        }
+      }, 60);
     };
 
     el.addEventListener('scroll', onScroll, { passive: true });
-    onCleanup(() => el.removeEventListener('scroll', onScroll));
+    onCleanup(() => {
+      clearTimeout(repositionTimer);
+      el.removeEventListener('scroll', onScroll);
+    });
   });
 
-  const scrollToCard = (index) => {
-    const el = trackRef();
-    const card = el?.querySelector('.video-carousel-card');
-    if (!el || !card) return;
-    el.scrollTo({ left: index * (card.offsetWidth + CARD_GAP), behavior: 'smooth' });
-  };
-
   const handleNav = (direction) => {
-    const total = videos?.length ?? 0;
-    if (!total) return;
-    const current = currentIndex();
-    const next = direction === 'next'
-      ? (current + 1) % total
-      : (current - 1 + total) % total;
-    scrollToCard(next);
+    if (!total()) return;
+    const trackIdx = getTrackIndex();
+    const nextTrack = direction === 'next' ? trackIdx + 1 : trackIdx - 1;
+    scrollToTrackIndex(nextTrack);
   };
 
   const isPrevDisabled = () => !videos?.length;
@@ -147,25 +200,25 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     });
   };
 
-  const handleCardClick = (e, _video, index) => {
+  const handleCardClick = (e, _video, trackIdx) => {
     if (isPreview) return;
-    setExpandedIndex(index);
+    setExpandedIndex(toRealIndex(trackIdx));
   };
 
-  const handleCardMouseEnter = (index) => {
-    if (autoplay() === 'onHover') setHoveredIndex(index);
+  const handleCardMouseEnter = (trackIdx) => {
+    if (autoplay() === 'onHover') setHoveredIndex(toRealIndex(trackIdx));
   };
 
   const handleCardMouseLeave = () => {
     if (autoplay() === 'onHover') setHoveredIndex(null);
   };
 
-  const getThumbUrl = (video, index) => {
+  const getThumbUrl = (video, realIndex) => {
     const staticUrl = () => getThumbnailUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
     const animatedUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
     const mode = autoplay();
 
-    if (mode === 'onHover') return hoveredIndex() === index ? animatedUrl() : staticUrl();
+    if (mode === 'onHover') return hoveredIndex() === realIndex ? animatedUrl() : staticUrl();
     if (mode === 'never') return staticUrl();
     return animatedUrl();
   };
@@ -231,50 +284,53 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
       <Show when={videos?.length > 0}>
         <div className="video-carousel-track-wrap">
           <div className="video-carousel-track" ref={setTrackRef} role="list">
-            <For each={videos}>
-              {(video, index) => (
-                <article
-                  className="video-carousel-card"
-                  role="listitem"
-                  onMouseEnter={() => handleCardMouseEnter(index())}
-                  onMouseLeave={handleCardMouseLeave}
-                >
-                  <button
-                    type="button"
-                    className="video-carousel-card-button"
-                    aria-label={`${video.title || `Video ${index() + 1}`}, ${LABEL_WATCH}`}
-                    onClick={(e) => {
-                      const isProductAction = e.target.closest(
-                        '.video-carousel-card-product-button, .video-carousel-products-btn'
-                      );
-                      if (!isProductAction) handleCardClick(e, video, index());
-                    }}
+            <For each={loopItems()}>
+              {(video, trackIdx) => {
+                const realIndex = () => toRealIndex(trackIdx());
+                return (
+                  <article
+                    className="video-carousel-card"
+                    role="listitem"
+                    onMouseEnter={() => handleCardMouseEnter(trackIdx())}
+                    onMouseLeave={handleCardMouseLeave}
                   >
+                    <button
+                      type="button"
+                      className="video-carousel-card-button"
+                      aria-label={`${video.title || `Video ${realIndex() + 1}`}, ${LABEL_WATCH}`}
+                      onClick={(e) => {
+                        const isProductAction = e.target.closest(
+                          '.vd-product-overlay-item-button, .vd-overlay-nav-btn, .video-carousel-card-product-button, .video-carousel-products-btn'
+                        );
+                        if (!isProductAction) handleCardClick(e, video, trackIdx());
+                      }}
+                    >
 
-                    <span className="video-carousel-card-image-wrap">
-                      <Show
-                        when={getThumbUrl(video, index())}
-                        fallback={<span className="video-carousel-card-image-fallback" />}
-                      >
-                        <img
-                          className="video-carousel-card-image"
-                          src={getThumbUrl(video, index())}
-                          alt=""
-                          loading="lazy"
-                        />
-                      </Show>
-                    </span>
+                      <span className="video-carousel-card-image-wrap">
+                        <Show
+                          when={getThumbUrl(video, realIndex())}
+                          fallback={<span className="video-carousel-card-image-fallback" />}
+                        >
+                          <img
+                            className="video-carousel-card-image"
+                            src={getThumbUrl(video, realIndex())}
+                            alt=""
+                            loading="lazy"
+                          />
+                        </Show>
+                      </span>
 
-                    <ProductOverlay
-                      video={video}
-                      addToCartButtonLabel={addToCartButtonLabel}
-                      addToCartButtonStyle={addToCartButtonStyle}
-                      onProductClick={handleProductClick}
-                    />
+                      <ProductOverlay
+                        video={video}
+                        addToCartButtonLabel={addToCartButtonLabel}
+                        addToCartButtonStyle={addToCartButtonStyle}
+                        onProductClick={handleProductClick}
+                      />
 
-                  </button>
-                </article>
-              )}
+                    </button>
+                  </article>
+                );
+              }}
             </For>
           </div>
         </div>
