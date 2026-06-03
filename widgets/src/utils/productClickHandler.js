@@ -40,54 +40,55 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
 
         if (behavior === BUTTON_BEHAVIOR_ADD_TO_CART) {
             const productObj = typeof product === 'object' ? product : { id: product };
-            await addToCart([{
-                id: getVariantId(productObj),
-                quantity: 1,
-            }])
-                .then(async () => {
-                    // if (isAddToCartSuccess(response)) {
-                    const existing = getStorageItem('atc_products', []);
-                    const newEntry = {
-                        product_id: productObj.id,
-                        video_id: video?.id,
-                        widget_id: feed?.id,
-                        source: cartSource,
-                        timestamp: Date.now(),
-                    };
+            try {
+                await addToCart([{
+                    id: getVariantId(productObj),
+                    quantity: 1,
+                }]);
 
-                    const idx = existing.findIndex(
-                        (item) =>
-                            item.product_id === productObj.id &&
-                            item.video_id === video?.id &&
-                            item.widget_id === feed?.id
-                    );
+                const existing = getStorageItem('atc_products', []);
+                const newEntry = {
+                    product_id: productObj.id,
+                    video_id: video?.id,
+                    widget_id: feed?.id,
+                    source: cartSource,
+                    timestamp: Date.now(),
+                };
 
-                    if (idx !== -1) {
-                        existing[idx].quantity = (existing[idx].quantity || 1) + 1;
-                        existing[idx].timestamp = Date.now();
-                    } else {
-                        existing.push({ ...newEntry, quantity: 1 });
-                    }
+                const idx = existing.findIndex(
+                    (item) =>
+                        item.product_id === productObj.id &&
+                        item.video_id === video?.id &&
+                        item.widget_id === feed?.id
+                );
 
-                    setStorageItem('atc_products', existing);
-                    showToast(TOAST_ADDED, 'success');
-                    if (feed?.id) {
-                        await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });
-                    }
-                    if (feed?.id && video?.id) {
-                        await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
-                    }
-                    // }
-                })
-                .catch(() => {
-                    showToast(TOAST_ADD_FAILED, 'error');
-                });
+                if (idx !== -1) {
+                    existing[idx].quantity = (existing[idx].quantity || 1) + 1;
+                    existing[idx].timestamp = Date.now();
+                } else {
+                    existing.push({ ...newEntry, quantity: 1 });
+                }
+
+                setStorageItem('atc_products', existing);
+                showToast(TOAST_ADDED, 'success');
+
+                // Fire-and-forget — don't block the UI for analytics
+                if (feed?.id) {
+                    trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_ATC });
+                }
+                if (feed?.id && video?.id) {
+                    trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
+                }
+            } catch {
+                showToast(TOAST_ADD_FAILED, 'error');
+            }
             return;
         }
 
+        // Fire-and-forget — don't block navigation for analytics
         if (feed?.id && video?.id) {
-            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+            trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+            trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
         }
 
         const handle = typeof product === 'object' ? getProductHandle(product) : product;
