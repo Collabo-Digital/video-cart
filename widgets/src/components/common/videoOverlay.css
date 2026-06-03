@@ -455,6 +455,44 @@
   margin: 0;
 }
 
+/* Mobile reels prev/next nav buttons */
+.video-carousel-reels-nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 12;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.video-carousel-reels-nav svg {
+  width: 14px;
+  height: 14px;
+  fill: #fff;
+}
+
+.video-carousel-reels-nav:active {
+  background: rgba(0, 0, 0, 0.65);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.video-carousel-reels-nav-prev {
+  left: 8px;
+}
+
+.video-carousel-reels-nav-next {
+  right: 8px;
+}
+
 @media (max-width: 768px) {
   .video-carousel-overlay:not(.video-carousel-overlay-reels) {
     flex-direction: column;

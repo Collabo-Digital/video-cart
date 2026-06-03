@@ -33,6 +33,7 @@ const WIDGET_DISPLAY_PAGE_OPTIONS = [
     { label: "Homepage", value: "homePage" },
     { label: "Product page", value: "productPage" },
     { label: "Collection page", value: "collectionPage" },
+    { label: "Custom", value: "custom" },
 ];
 
 const AUTO_PLAY_OPTIONS = [
@@ -47,6 +48,7 @@ const AUTO_PLAY_OPTIONS = [
  */
 export function GeneralSettings({ control, watch, errors = {}, setValue }) {
     const widgetType = watch("widgetType");
+    const widgetPage = watch("widgetPage");
     const prevWidgetType = useRef(widgetType);
     useEffect(() => {
         if (prevWidgetType.current && prevWidgetType.current !== widgetType) {
@@ -139,6 +141,31 @@ export function GeneralSettings({ control, watch, errors = {}, setValue }) {
                                 />
                             )}
                         />
+
+                        {widgetPage === "custom" && (
+                            <Controller
+                                name="customPagePath"
+                                control={control}
+                                rules={{
+                                    required: "Page path is required",
+                                    pattern: {
+                                        value: /^\/.*/,
+                                        message: "Path must start with /",
+                                    },
+                                }}
+                                render={({ field }) => (
+                                    <TextField
+                                        label="Custom Page Path"
+                                        placeholder="/pages/about, /blogs/news, etc."
+                                        autoComplete="off"
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                        error={errors.customPagePath?.message}
+                                        helpText="Enter the URL path where the widget should display."
+                                    />
+                                )}
+                            />
+                        )}
                     </InlineGrid>
                 </BlockStack>
             </Box>

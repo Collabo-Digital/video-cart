@@ -72,7 +72,10 @@ export function ProductOverlay({
                         type="button"
                         className="vd-product-overlay-item-button"
                         style={addToCartButtonStyle()}
-                        onClick={() => onProductClick(product, video)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onProductClick(product, video);
+                        }}
                       >
                         {addToCartButtonLabel()}
                       </button>

@@ -95,7 +95,7 @@ export async function getFeedsWithPaginationAndFilters(shopDomain, filters = {})
  * @returns {Promise<Object>} Created feed
  */
 export async function createFeed(data) {
-  const { feedName, shopDomain, widgetType, widgetPage, isEnabled, settings, videos = [] } = data;
+  const { feedName, shopDomain, widgetType, widgetPage, customPagePath, isEnabled, settings, videos = [] } = data;
 
   if (!feedName || feedName.trim().length < 3) {
     throw new Error('Feed name must be at least 3 characters');
@@ -110,6 +110,7 @@ export async function createFeed(data) {
     shop: { connect: { shopDomain } },
     widgetType: widgetType || 'carousel',
     widgetPage: widgetPage || 'homePage',
+    customPagePath: widgetPage === 'custom' ? (customPagePath || null) : null,
     isEnabled: isEnabled !== false,
     settings: settings || undefined,
     videos: {
@@ -140,7 +141,7 @@ export async function updateFeed(feedId, data) {
     throw new Error('Feed ID is required');
   }
 
-  const { feedName, widgetType, widgetPage, isEnabled, settings, videos } = data;
+  const { feedName, widgetType, widgetPage, customPagePath, isEnabled, settings, videos } = data;
 
   const updateData = {};
 
@@ -157,6 +158,7 @@ export async function updateFeed(feedId, data) {
 
   if (widgetPage !== undefined) {
     updateData.widgetPage = widgetPage;
+    updateData.customPagePath = widgetPage === 'custom' ? (customPagePath || null) : null;
   }
 
   if (isEnabled !== undefined) {

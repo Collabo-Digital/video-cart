@@ -94,6 +94,7 @@ export const loader = async ({ request, params }) => {
         feedName: feed.feedName,
         widgetType: feed.widgetType || 'carousel',
         widgetPage: feed.widgetPage,
+        customPagePath: feed.customPagePath || null,
         isEnabled: feed.isEnabled,
         videos: feed.videos,
         settings: {
