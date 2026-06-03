@@ -37,6 +37,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
   const autoplay = () => settings?.general?.autoPlay ?? feed?.settings?.general?.autoPlay;
+  const autoLoop = () => settings?.general?.autoLoop ?? feed?.settings?.general?.autoLoop ?? true;
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || '';
 
@@ -125,6 +126,13 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
         : (prev - 1 + total) % total
     );
   };
+
+  createEffect(() => {
+    const total = videos?.length ?? 0;
+    if (!autoLoop() || !total || total <= 1) return;
+    const interval = setInterval(() => handleNav('next'), 4000);
+    onCleanup(() => clearInterval(interval));
+  });
 
   const handleCardClick = (video, index) => {
     if (index !== activeIndex()) {
