@@ -6,6 +6,7 @@ const DEFAULT_SETTINGS = {
     general: {
         buttonBehavior: "addToCart",
         autoPlay: "always",
+        autoLoop: true,
         visibleOnDesktop: true,
         visibleOnMobile: true,
         videosPerRow: 4,

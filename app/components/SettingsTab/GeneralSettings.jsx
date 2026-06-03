@@ -219,6 +219,28 @@ export function GeneralSettings({ control, watch, errors = {}, setValue }) {
                                 />
                             )}
                         />
+                        <Controller
+                            name="settings.general.autoLoop"
+                            control={control}
+                            render={({ field: { value, onChange, ...field } }) => (
+                                <Checkbox
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Auto Loop Video</Text>
+                                            <Tooltip
+                                                dismissOnMouseOut
+                                                content="When enabled, videos will loop automatically after they finish playing."
+                                            >
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    checked={value}
+                                    onChange={onChange}
+                                    {...field}
+                                />
+                            )}
+                        />
                         <BlockStack gap="200">
                             <Text as="p">Device Visibility</Text>
                             <InlineStack gap="600">

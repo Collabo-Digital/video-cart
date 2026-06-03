@@ -46,6 +46,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   const uniqueClass = getUniqueClassIdentifier(design);
   const hoverEffect = () =>  design?.hoverEffect  || 'lift'    ;
   const autoplay = () => settings?.general?.autoPlay ?? feed?.settings?.general?.autoPlay;
+  const autoLoop = () => settings?.general?.autoLoop ?? feed?.settings?.general?.autoLoop ?? true;
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || DEFAULT_SUBTITLE;
 
@@ -183,6 +184,12 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     const nextTrack = direction === 'next' ? trackIdx + 1 : trackIdx - 1;
     scrollToTrackIndex(nextTrack);
   };
+
+  createEffect(() => {
+    if (!autoLoop() || !total() || total() <= 1) return;
+    const interval = setInterval(() => handleNav('next'), 4000);
+    onCleanup(() => clearInterval(interval));
+  });
 
   const isPrevDisabled = () => !videos?.length;
   const isNextDisabled = () => !videos?.length;
