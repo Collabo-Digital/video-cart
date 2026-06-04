@@ -1,9 +1,7 @@
 import { Box, BlockStack, Tabs, Icon, InlineStack } from "@shopify/polaris";
 import {
     AppsIcon, PaintBrushFlatIcon, TextIcon
-
 } from "@shopify/polaris-icons";
-
 import PropTypes from "prop-types";
 import { GeneralSettings } from "./GeneralSettings";
 import { DesignSettings } from "./DesignSettings";
@@ -39,31 +37,36 @@ const SETTINGS_TABS = [
 ];
 
 /**
- * Settings tab content: sub-tabs General, Design, Translation with their panels.
- * Parent manages selected index and passes control/errors from react-hook-form.
+ * Shared settings tabs: General, Design, Content.
+ * Renders different fields based on mode ("widget" for feed editor, "global" for app settings).
  */
-export function SettingsTab({ control, watch, errors, selectedTab, onTabChange, setValue }) {
+export function SettingsTab({
+    control, watch, errors, selectedTab, onTabChange, setValue,
+    mode = "widget",
+    feeds = [],
+}) {
     return (
         <Box padding="400">
             <BlockStack gap="400">
                 <Box borderRadius="200" background="bg-fill-secondary">
-                    {/* <Card padding="0" background="bg-surface-secondary"> */}
-
                     <Tabs
                         tabs={SETTINGS_TABS}
                         selected={selectedTab}
                         onSelect={onTabChange}
                         fitted
                     />
-
                 </Box>
-                {/* </Card> */}
                 {selectedTab === 0 && (
-                    <GeneralSettings control={control} watch={watch} errors={errors} setValue={setValue} />
+                    <GeneralSettings
+                        control={control} watch={watch} errors={errors} setValue={setValue}
+                        mode={mode} feeds={feeds}
+                    />
                 )}
-                {selectedTab === 1 && <DesignSettings control={control} watch={watch} errors={errors} />}
+                {selectedTab === 1 && (
+                    <DesignSettings control={control} watch={watch} errors={errors} mode={mode} />
+                )}
                 {selectedTab === 2 && (
-                    <TranslationSettings control={control} watch={watch} errors={errors} />
+                    <TranslationSettings control={control} watch={watch} errors={errors} mode={mode} />
                 )}
             </BlockStack>
         </Box>
@@ -77,6 +80,8 @@ SettingsTab.propTypes = {
     selectedTab: PropTypes.number.isRequired,
     onTabChange: PropTypes.func.isRequired,
     setValue: PropTypes.func.isRequired,
+    mode: PropTypes.oneOf(["widget", "global"]),
+    feeds: PropTypes.array,
 };
 
 export { GeneralSettings } from "./GeneralSettings";

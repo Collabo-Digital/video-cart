@@ -18,7 +18,7 @@ import { WIDGET_TEMPLATES, getTemplatesForType } from "../../lib/constants/templ
 /**
  * Design settings tab. Placeholder for future design options.
  */
-export function DesignSettings({ control, watch, errors = {} }) {
+export function DesignSettings({ control, watch, errors = {}, mode = "widget" }) {
   const widgetType = watch("widgetType");
 
   return (
@@ -30,58 +30,61 @@ export function DesignSettings({ control, watch, errors = {} }) {
           </Text>
           <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
 
-            <Controller
-              name="settings.design.template"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Template</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Choose the template you want to use for the widget."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  options={getTemplatesForType(widgetType).map((t) => ({ label: t.name, value: t.id }))}
-value={field.value ?? getTemplatesForType(widgetType)[0].id}
-                  onChange={field.onChange}
-                />
-              )}
-            />
+            {mode === "widget" && (
+              <Controller
+                name="settings.design.template"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Template</Text>
+                        <Tooltip
+                          dismissOnMouseOut
+                          content="Choose the template you want to use for the widget."
+                        >
+                          <Icon source={InfoIcon} />
+                        </Tooltip>
+                      </InlineStack>
+                    }
+                    options={getTemplatesForType(widgetType).map((t) => ({ label: t.name, value: t.id }))}
+                    value={field.value ?? getTemplatesForType(widgetType)[0].id}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            )}
 
-            <Controller
-              name="settings.design.titleAlignment"
-              control={control}
-              render={({ field }) => (
-                <Select
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Widget Title Alignment</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Choose the page where you want to display the widget."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  options={[
-                    { label: "Start", value: "start" },
-                    { label: "Center", value: "center" },
-                    { label: "End", value: "end" },
-                  ]}
-                  value={field.value}
-                  onChange={field.onChange}
-                />
-              )}
-            />
+            {mode === "widget" && (
+              <Controller
+                name="settings.design.titleAlignment"
+                control={control}
+                render={({ field }) => (
+                  <Select
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Widget Title Alignment</Text>
+                        <Tooltip
+                          dismissOnMouseOut
+                          content="Choose the alignment of the widget title."
+                        >
+                          <Icon source={InfoIcon} />
+                        </Tooltip>
+                      </InlineStack>
+                    }
+                    options={[
+                      { label: "Start", value: "start" },
+                      { label: "Center", value: "center" },
+                      { label: "End", value: "end" },
+                    ]}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+            )}
 
-
-            <Controller
+           {mode === "widget" && <Controller
               name="settings.design.cardCornerRadius"
               control={control}
               render={({ field }) => (
@@ -96,9 +99,9 @@ value={field.value ?? getTemplatesForType(widgetType)[0].id}
                 </BlockStack>
               )}
             />
-
+}
             {
-              (widgetType === "carousel" || widgetType === "grid") && (
+              mode === "widget" && (widgetType === "carousel" || widgetType === "grid") && (
                 <Controller
                   name="settings.design.hoverEffect"
                   control={control}
@@ -150,7 +153,7 @@ value={field.value ?? getTemplatesForType(widgetType)[0].id}
             }
 
             {
-              (widgetType === "stories") && (
+              mode === "widget" && (widgetType === "stories") && (
                 <Controller
                   name="settings.design.ringColor"
                   control={control}
@@ -178,7 +181,7 @@ value={field.value ?? getTemplatesForType(widgetType)[0].id}
       </Box>
 
       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-        <BlockStack gap="400">
+        {mode === "widget" && <BlockStack gap="400">
           <Text as="p" variant="bodyMd" fontWeight="semibold">
             Button Style
           </Text>
@@ -228,67 +231,69 @@ value={field.value ?? getTemplatesForType(widgetType)[0].id}
         Design options will be available here in a future update.
         
       </Text> */}
-        </BlockStack>
+        </BlockStack>}
       </Box>
 
-      <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-        <BlockStack gap="400">
-          <Text as="p" variant="bodyMd" fontWeight="semibold">
-            Custom Styles
-          </Text>
-          <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
-            <Controller
-              name="settings.design.uniqueClassIdentifier"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Unique class identifier</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Give your feed a name to help you identify it."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  placeholder="e.g., video-cart-widget"
-                  autoComplete="off"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.uniqueClassIdentifier?.message}
-                />
-              )}
-            />
-            <Controller
-              name="settings.design.customCss"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Custom CSS</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Add custom CSS to the widget."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  placeholder="e.g., .video-cart-widget { background-color: #000080; }"
-                  multiline={4}
-                  autoComplete="off"
-                  value={field.value}
-                  onChange={field.onChange}
-                  error={errors.customCss?.message}
-                />
-              )}
-            />
-          </InlineGrid>
-        </BlockStack>
-      </Box>
+      {mode === "widget" && (
+        <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">
+              Custom Styles
+            </Text>
+            <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
+              <Controller
+                name="settings.design.uniqueClassIdentifier"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Unique class identifier</Text>
+                        <Tooltip
+                          dismissOnMouseOut
+                          content="Give your feed a name to help you identify it."
+                        >
+                          <Icon source={InfoIcon} />
+                        </Tooltip>
+                      </InlineStack>
+                    }
+                    placeholder="e.g., video-cart-widget"
+                    autoComplete="off"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.uniqueClassIdentifier?.message}
+                  />
+                )}
+              />
+              <Controller
+                name="settings.design.customCss"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Custom CSS</Text>
+                        <Tooltip
+                          dismissOnMouseOut
+                          content="Add custom CSS to the widget."
+                        >
+                          <Icon source={InfoIcon} />
+                        </Tooltip>
+                      </InlineStack>
+                    }
+                    placeholder="e.g., .video-cart-widget { background-color: #000080; }"
+                    multiline={4}
+                    autoComplete="off"
+                    value={field.value}
+                    onChange={field.onChange}
+                    error={errors.customCss?.message}
+                  />
+                )}
+              />
+            </InlineGrid>
+          </BlockStack>
+        </Box>
+      )}
     </BlockStack>
   );
 }
@@ -297,4 +302,5 @@ DesignSettings.propTypes = {
   control: PropTypes.object.isRequired,
   watch: PropTypes.func.isRequired,
   errors: PropTypes.object,
+  mode: PropTypes.oneOf(["widget", "global"]),
 };
