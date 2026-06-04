@@ -12,6 +12,8 @@ export const CONTAINER_SELECTOR = '.video-cart-container';
 export const FEED_API_PATH = '/apps/video-widget/feeds';
 /** App proxy path for recording analytics events (impression, view, click) in DB. */
 export const ANALYTICS_EVENT_PATH = '/apps/video-widget/eventLog';
+export const SETTINGS_API_PATH = '/apps/video-widget/settings';
+export const DISCOVERY_API_PATH = '/apps/video-widget/discovery';
 
 /** Demo/placeholder playback ID (e.g. for demo or input); do not hardcode full URLs in components. */
 export const DEMO_PLAYBACK_ID = '7O7RsL2n51IHLTkYLPQ2GqrmEYez00DyevmpNUSgG024A';

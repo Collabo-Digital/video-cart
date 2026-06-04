@@ -5,8 +5,10 @@
 
 import { feedsService } from './services/feedsService';
 import { analyticsService } from './services/analyticsService';
+import { settingsService } from './services/settingsService';
 
 export const api = {
   feeds: feedsService,
   analytics: analyticsService,
+  settings: settingsService,
 };
