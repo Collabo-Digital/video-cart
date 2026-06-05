@@ -7,7 +7,7 @@ import { GeneralSettings } from "./GeneralSettings";
 import { DesignSettings } from "./DesignSettings";
 import { TranslationSettings } from "./TranslationSettings";
 
-const SETTINGS_TABS = [
+const WIDGET_SETTINGS_TABS = [
     {
         id: "settings-general",
         content: (
@@ -36,6 +36,35 @@ const SETTINGS_TABS = [
     },
 ];
 
+const GLOBAL_SETTINGS_TABS = [
+    {
+        id: "settings-general",
+        content: (
+            <InlineStack gap="200" blockAlign="center">
+                <Icon source={AppsIcon} />
+                <span>Discovery</span>
+            </InlineStack>
+        ),
+        panelID: "settings-general-content",
+    },
+    {
+        id: "settings-design", content: (
+            <InlineStack gap="200" blockAlign="center">
+                <Icon source={PaintBrushFlatIcon} />
+                <span>Appearance</span>
+            </InlineStack>
+        ), panelID: "settings-design-content"
+    },
+    {
+        id: "settings-translation", content: (
+            <InlineStack gap="200" blockAlign="center">
+                <Icon source={TextIcon} />
+                <span>Messaging</span>
+            </InlineStack>
+        ), panelID: "settings-translation-content"
+    },
+];
+
 /**
  * Shared settings tabs: General, Design, Content.
  * Renders different fields based on mode ("widget" for feed editor, "global" for app settings).
@@ -50,7 +79,7 @@ export function SettingsTab({
             <BlockStack gap="400">
                 <Box borderRadius="200" background="bg-fill-secondary">
                     <Tabs
-                        tabs={SETTINGS_TABS}
+                        tabs={mode === "global" ? GLOBAL_SETTINGS_TABS : WIDGET_SETTINGS_TABS}
                         selected={selectedTab}
                         onSelect={onTabChange}
                         fitted

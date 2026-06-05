@@ -1,4 +1,5 @@
 import { authenticate } from "../../config/shopify.server";
+import { getAppSettingsFormDefaults } from "../../lib/constants/globalSettings";
 import * as GlobalSettingsModel from "../../models/globalSettings.server";
 
 export const loader = async ({ request }) => {
@@ -10,10 +11,11 @@ export const loader = async ({ request }) => {
     }
 
     const globalRecord = await GlobalSettingsModel.findByShopDomain(session.shop);
+    const settings = getAppSettingsFormDefaults(globalRecord?.settings ?? null).settings;
 
     return Response.json({
       success: true,
-      data: { settings: globalRecord?.settings ?? null },
+      data: { settings },
     });
   } catch (error) {
     console.error("[Proxy Settings] Error:", error);

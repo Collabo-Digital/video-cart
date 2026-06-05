@@ -36,7 +36,7 @@ export const loader = async ({ request }) => {
       for (const fv of feed.videos) {
         if (videoMap.has(fv.videoId)) continue;
         const v = fv.video;
-        if (!v || v.status !== "READY" || !v.videoPlaybackId) continue;
+        if (!v || !v.videoPlaybackId) continue;
 
         videoMap.set(fv.videoId, {
           id: v.id,

@@ -1,6 +1,6 @@
 import { Controller } from "react-hook-form";
 import PropTypes from "prop-types";
-import { TextField, Box, InlineGrid, InlineStack, Tooltip, Icon, Text } from "@shopify/polaris";
+import { TextField, Box, BlockStack, InlineGrid, InlineStack, Tooltip, Icon, Text } from "@shopify/polaris";
 import { InfoIcon } from '@shopify/polaris-icons';
 
 /**
@@ -9,6 +9,123 @@ import { InfoIcon } from '@shopify/polaris-icons';
  */
 export function TranslationSettings({ control, watch, errors = {}, mode = "widget" }) {
     const widgetType = watch("widgetType");
+
+    if (mode === "global") {
+        return (
+            <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                <BlockStack gap="400">
+                    <BlockStack gap="100">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">Customer-facing text</Text>
+                        <Text as="p" tone="subdued">
+                            Customize the messaging customers see when interacting with Video Discovery.
+                        </Text>
+                    </BlockStack>
+                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+                        <Controller
+                            name="settings.translation.addToCartText"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Product action label</Text>
+                                            <Tooltip dismissOnMouseOut content="Text displayed on the product call-to-action within the video viewer.">
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    placeholder="Shop Now"
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    autoComplete="off"
+                                />
+                            )}
+                        />
+                        <Controller
+                            name="settings.translation.videoDiscoveryPageTitle"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Discovery title</Text>
+                                            <Tooltip dismissOnMouseOut content="Primary heading shown when customers open Video Discovery.">
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    placeholder="Video Discovery"
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    autoComplete="off"
+                                />
+                            )}
+                        />
+                        <Controller
+                            name="settings.translation.videoDiscoveryPageDescription"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Discovery description</Text>
+                                            <Tooltip dismissOnMouseOut content="Supporting text displayed beneath the discovery title.">
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    placeholder="Explore products through video"
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    autoComplete="off"
+                                />
+                            )}
+                        />
+                        <Controller
+                            name="settings.translation.videoDiscoveryNavLabel"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Default entry label</Text>
+                                            <Tooltip dismissOnMouseOut content="Fallback text for the discovery entry point. Device-specific labels in Discovery settings take precedence.">
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    placeholder="Videos"
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    autoComplete="off"
+                                />
+                            )}
+                        />
+                        <Controller
+                            name="settings.translation.videoDiscoveryEmptyText"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Empty collection message</Text>
+                                            <Tooltip dismissOnMouseOut content="Message displayed when no videos are available to show.">
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    placeholder="No videos are available at this time."
+                                    value={field.value ?? ""}
+                                    onChange={field.onChange}
+                                    autoComplete="off"
+                                />
+                            )}
+                        />
+                    </InlineGrid>
+                </BlockStack>
+            </Box>
+        );
+    }
 
     return (
         <Box padding="400" background="bg-surface-secondary" borderRadius="200">
@@ -53,59 +170,6 @@ export function TranslationSettings({ control, watch, errors = {}, mode = "widge
                         />
                     )}
                 />
-
-                {mode === "global" && (
-                    <>
-                        <Controller
-                            name="settings.translation.videoDiscoveryPageTitle"
-                            control={control}
-                            render={({ field }) => (
-                                <TextField
-                                    label={<InlineStack gap="200"><Text as="p">Discovery Page Title</Text><Tooltip dismissOnMouseOut content="The heading shown on the Video Discovery page."><Icon source={InfoIcon} /></Tooltip></InlineStack>}
-                                    value={field.value ?? ""}
-                                    onChange={field.onChange}
-                                    autoComplete="off"
-                                />
-                            )}
-                        />
-                        <Controller
-                            name="settings.translation.videoDiscoveryPageDescription"
-                            control={control}
-                            render={({ field }) => (
-                                <TextField
-                                    label={<InlineStack gap="200"><Text as="p">Discovery Page Description</Text><Tooltip dismissOnMouseOut content="The subtitle shown on the Video Discovery page."><Icon source={InfoIcon} /></Tooltip></InlineStack>}
-                                    value={field.value ?? ""}
-                                    onChange={field.onChange}
-                                    autoComplete="off"
-                                />
-                            )}
-                        />
-                        <Controller
-                            name="settings.translation.videoDiscoveryNavLabel"
-                            control={control}
-                            render={({ field }) => (
-                                <TextField
-                                    label={<InlineStack gap="200"><Text as="p">Navigation Label</Text><Tooltip dismissOnMouseOut content="Text shown on the navigation icon/link."><Icon source={InfoIcon} /></Tooltip></InlineStack>}
-                                    value={field.value ?? ""}
-                                    onChange={field.onChange}
-                                    autoComplete="off"
-                                />
-                            )}
-                        />
-                        <Controller
-                            name="settings.translation.videoDiscoveryEmptyText"
-                            control={control}
-                            render={({ field }) => (
-                                <TextField
-                                    label={<InlineStack gap="200"><Text as="p">Empty State Text</Text><Tooltip dismissOnMouseOut content="Message shown when there are no videos to display."><Icon source={InfoIcon} /></Tooltip></InlineStack>}
-                                    value={field.value ?? ""}
-                                    onChange={field.onChange}
-                                    autoComplete="off"
-                                />
-                            )}
-                        />
-                    </>
-                )}
             </InlineGrid>
         </Box>
     );

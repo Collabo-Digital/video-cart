@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Controller } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
 import PropTypes from "prop-types";
 import {
     TextField,
@@ -45,29 +45,22 @@ const AUTO_PLAY_OPTIONS = [
 ];
 
 const FEED_SOURCE_OPTIONS = [
-    { label: "All feeds", value: "all" },
-    { label: "Carousel feeds", value: "carousel" },
-    { label: "Grid feeds", value: "grid" },
-    { label: "Stories feeds", value: "stories" },
-    { label: "Floating feeds", value: "floating" },
+    { label: "All video feeds", value: "all" },
+    { label: "Carousel feeds only", value: "carousel" },
+    { label: "Grid feeds only", value: "grid" },
+    { label: "Stories feeds only", value: "stories" },
+    { label: "Floating widget feeds only", value: "floating" },
 ];
 
 const SORT_ORDER_OPTIONS = [
     { label: "Newest first", value: "newest" },
     { label: "Most popular", value: "popular" },
-    { label: "Random", value: "random" },
-];
-
-const ICON_POSITION_OPTIONS = [
-    { label: "Bottom", value: "bottomBar" },
-    { label: "Top", value: "topBar" },
-    { label: "Left", value: "leftBar" },
-    { label: "Right", value: "rightBar" },
+    { label: "Randomized", value: "random" },
 ];
 
 const LAYOUT_STYLE_OPTIONS = [
-    { label: "Floating", value: "floating" },
-    { label: "Inline", value: "inline" },
+    { label: "Floating button", value: "floating" },
+    { label: "Inline navigation link", value: "inline" },
 ];
 
 const FLOATING_POSITION_OPTIONS = [
@@ -82,9 +75,11 @@ const DEVICE_TABS = [
     { id: "mobile", content: "Mobile", panelID: "mobile-panel" },
 ];
 
-function DeviceSettings({ device, control, watch }) {
+function DeviceSettings({ device, control }) {
     const prefix = `settings.general.videoDiscovery.${device}`;
-    const layoutStyle = watch(`${prefix}.layoutStyle`);
+    const deviceValues = useWatch({ control, name: prefix }) ?? {};
+    const isVisible = deviceValues.isVisible ?? true;
+    const layoutStyle = deviceValues.layoutStyle ?? "floating";
 
     return (
         <BlockStack gap="400">
@@ -93,7 +88,8 @@ function DeviceSettings({ device, control, watch }) {
                 control={control}
                 render={({ field: { value, onChange, ...field } }) => (
                     <Checkbox
-                        label={`Show Video Discovery on ${device === "desktop" ? "Desktop" : "Mobile"}`}
+                        label={`Enable on ${device === "desktop" ? "Desktop" : "Mobile"}`}
+                        helpText={`Control whether Video Discovery is visible to customers on ${device === "desktop" ? "desktop" : "mobile"} devices.`}
                         checked={value}
                         onChange={onChange}
                         {...field}
@@ -101,114 +97,129 @@ function DeviceSettings({ device, control, watch }) {
                 )}
             />
 
-            {!watch(`${prefix}.isVisible`) && (
+            {!isVisible && (
                 <Banner tone="info">
-                    Video Discovery is hidden on {device === "desktop" ? "desktop" : "mobile"} devices.
+                    Video Discovery is currently disabled for {device === "desktop" ? "desktop" : "mobile"} visitors.
                 </Banner>
             )}
 
-            {watch(`${prefix}.isVisible`) && (
-            <>
-            <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                <Controller
-                    name={`${prefix}.layoutStyle`}
-                    control={control}
-                    render={({ field }) => (
-                        <Select
-                            label={
-                                <InlineStack gap="200">
-                                    <Text as="p">Layout Style</Text>
-                                    <Tooltip dismissOnMouseOut content="How Video Discovery appears on the storefront.">
-                                        <Icon source={InfoIcon} />
-                                    </Tooltip>
-                                </InlineStack>
-                            }
-                            options={LAYOUT_STYLE_OPTIONS}
-                            value={field.value}
-                            onChange={field.onChange}
-                        />
-                    )}
-                />
-
-                {layoutStyle === "floating" && (
-                    <Controller
-                        name={`${prefix}.floatingPosition`}
-                        control={control}
-                        render={({ field }) => (
-                            <Select
-                                label={
-                                    <InlineStack gap="200">
-                                        <Text as="p">Floating Position</Text>
-                                        <Tooltip dismissOnMouseOut content="Where the floating widget appears on screen.">
-                                            <Icon source={InfoIcon} />
-                                        </Tooltip>
-                                    </InlineStack>
-                                }
-                                options={FLOATING_POSITION_OPTIONS}
-                                value={field.value}
-                                onChange={field.onChange}
-                            />
-                        )}
-                    />
-                )}
-
-                {layoutStyle === "inline" && (
-                    <Controller
-                        name={`${prefix}.inlinePosition`}
-                        control={control}
-                        render={({ field }) => (
-                            <TextField
-                                label={
-                                    <InlineStack gap="200">
-                                        <Text as="p">CSS Selector</Text>
-                                        <Tooltip dismissOnMouseOut content="CSS selector for where the inline widget is inserted (e.g. .header, #main).">
-                                            <Icon source={InfoIcon} />
-                                        </Tooltip>
-                                    </InlineStack>
-                                }
-                                placeholder=".header, #main, etc."
-                                autoComplete="off"
-                                value={field.value ?? ""}
-                                onChange={field.onChange}
-                            />
-                        )}
-                    />
-                )}
-            </InlineGrid>
-
-            <Text as="p" variant="bodyMd" fontWeight="semibold">Navigation</Text>
-            <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                <Controller
-                    name={`${prefix}.showNavIcon`}
-                    control={control}
-                    render={({ field: { value, onChange, ...field } }) => (
-                        <Checkbox
-                            label="Show navigation icon"
-                            helpText="Adds a Video Discovery entry point on the storefront."
-                            checked={value}
-                            onChange={onChange}
-                            {...field}
-                        />
-                    )}
-                />
-                {watch(`${prefix}.showNavIcon`) && (
-                    <>
+            {isVisible && (
+                <>
+                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                         <Controller
-                            name={`${prefix}.iconPosition`}
+                            name={`${prefix}.layoutStyle`}
                             control={control}
                             render={({ field }) => (
                                 <Select
                                     label={
                                         <InlineStack gap="200">
-                                            <Text as="p">Icon Position</Text>
-                                            <Tooltip dismissOnMouseOut content="Where the icon appears on the storefront.">
+                                            <Text as="p">Display format</Text>
+                                            <Tooltip dismissOnMouseOut content="Choose how customers access Video Discovery on this device. Floating button: a persistent button fixed to the viewport. Inline navigation link: a link integrated within your theme header or menu.">
                                                 <Icon source={InfoIcon} />
                                             </Tooltip>
                                         </InlineStack>
                                     }
-                                    options={ICON_POSITION_OPTIONS}
+                                    options={LAYOUT_STYLE_OPTIONS}
                                     value={field.value}
                                     onChange={field.onChange}
+                                />
+                            )}
+                        />
+
+                        {layoutStyle === "floating" && (
+                            <>
+                                <Controller
+                                    name={`${prefix}.floatingPosition`}
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Button placement</Text>
+                                                    <Tooltip dismissOnMouseOut content="Specify the screen position of the floating entry point.">
+                                                        <Icon source={InfoIcon} />
+                                                    </Tooltip>
+                                                </InlineStack>
+                                            }
+                                            options={FLOATING_POSITION_OPTIONS}
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name={`${prefix}.floatingBgColor`}
+                                    control={control}
+                                    defaultValue="#111827"
+                                    render={({ field }) => (
+                                        <BlockStack gap="100">
+                                            <InlineStack gap="200">
+                                                <Text as="p">Button color</Text>
+                                                <Tooltip dismissOnMouseOut content="Set the background color of the floating discovery button.">
+                                                    <Icon source={InfoIcon} />
+                                                </Tooltip>
+                                            </InlineStack>
+                                            <s-color-field
+                                                placeholder="Select a color (e.g., #111827)"
+                                                value={field.value ?? "#111827"}
+                                                onInput={(e) =>
+                                                    field.onChange(e.currentTarget?.value ?? field.value)
+                                                }
+                                                onChange={(e) =>
+                                                    field.onChange(e.currentTarget?.value ?? field.value)
+                                                }
+                                            />
+                                        </BlockStack>
+                                    )}
+                                />
+                            </>
+                        )}
+
+                        {layoutStyle === "inline" && (
+                            <>
+                                <Controller
+                                    name={`${prefix}.inlinePosition`}
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Navigation target</Text>
+                                                    <Tooltip dismissOnMouseOut content="Enter the CSS selector or class name of the container where the discovery link should be rendered. Refer to your theme header or menu structure.">
+                                                        <Icon source={InfoIcon} />
+                                                    </Tooltip>
+                                                </InlineStack>
+                                            }
+                                            placeholder="nav or .header__menu"
+                                            helpText="Example selectors: nav, header__inline-menu, .header__menu"
+                                            autoComplete="off"
+                                            value={field.value ?? "nav"}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                            </>
+                        )}
+                    </InlineGrid>
+
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">Entry point styling</Text>
+                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                        <Controller
+                            name={`${prefix}.showNavIcon`}
+                            control={control}
+                            defaultValue={true}
+                            render={({ field: { value, onChange } }) => (
+                                <Checkbox
+                                    label={
+                                        <InlineStack gap="200">
+                                            <Text as="p">Display icon</Text>
+                                            <Tooltip dismissOnMouseOut content="Show a video icon alongside the entry point label.">
+                                                <Icon source={InfoIcon} />
+                                            </Tooltip>
+                                        </InlineStack>
+                                    }
+                                    checked={value !== false}
+                                    onChange={(checked) => onChange(checked)}
                                 />
                             )}
                         />
@@ -219,8 +230,8 @@ function DeviceSettings({ device, control, watch }) {
                                 <TextField
                                     label={
                                         <InlineStack gap="200">
-                                            <Text as="p">Navigation Label</Text>
-                                            <Tooltip dismissOnMouseOut content="Text shown on the navigation link.">
+                                            <Text as="p">Entry point label</Text>
+                                            <Tooltip dismissOnMouseOut content="The text displayed on the floating button or navigation link.">
                                                 <Icon source={InfoIcon} />
                                             </Tooltip>
                                         </InlineStack>
@@ -232,10 +243,8 @@ function DeviceSettings({ device, control, watch }) {
                                 />
                             )}
                         />
-                    </>
-                )}
-            </InlineGrid>
-            </>
+                    </InlineGrid>
+                </>
             )}
         </BlockStack>
     );
@@ -244,7 +253,6 @@ function DeviceSettings({ device, control, watch }) {
 DeviceSettings.propTypes = {
     device: PropTypes.oneOf(["desktop", "mobile"]).isRequired,
     control: PropTypes.object.isRequired,
-    watch: PropTypes.func.isRequired,
 };
 
 export function GeneralSettings({ control, watch, errors = {}, setValue, mode = "widget", feeds = [] }) {
@@ -359,11 +367,12 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                 </Box>
             )}
 
-            {/* Widget Behavior — shared */}
+            {/* Widget Behavior — widget only */}
+            {mode === "widget" && (
             <Box padding="400" background="bg-surface-secondary" borderRadius="200">
                 <BlockStack gap="400">
                     <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        {mode === "widget" ? "Widget Behavior" : "Default Widget Behavior"}
+                        Widget Behavior
                     </Text>
                     <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                         <Controller
@@ -463,6 +472,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                     </InlineGrid>
                 </BlockStack>
             </Box>
+            )}
 
             {/* Video Discovery — global only */}
             {mode === "global" && (
@@ -474,7 +484,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                             render={({ field: { value, onChange, ...field } }) => (
                                 <Checkbox
                                     label="Enable Video Discovery"
-                                    helpText="Adds a dedicated video browsing page on your storefront where customers can discover all your shoppable videos."
+                                    helpText="Provide customers with a dedicated way to browse your shoppable video content from anywhere on your storefront."
                                     checked={value}
                                     onChange={onChange}
                                     {...field}
@@ -484,14 +494,14 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
 
                         {!watch("settings.general.videoDiscovery.isEnabled") && (
                             <Banner tone="info">
-                                Enable Video Discovery to configure how customers browse your videos.
+                                Enable Video Discovery to configure video sourcing, display preferences, and device-specific placement.
                             </Banner>
                         )}
 
                         {watch("settings.general.videoDiscovery.isEnabled") && (
                             <BlockStack gap="400">
                                 {/* Common settings */}
-                                <Text as="p" variant="bodyMd" fontWeight="semibold">Content</Text>
+                                <Text as="p" variant="bodyMd" fontWeight="semibold">Video sourcing</Text>
                                 <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                                     <Controller
                                         name="settings.general.videoDiscovery.feedSource"
@@ -500,8 +510,8 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                             <Select
                                                 label={
                                                     <InlineStack gap="200">
-                                                        <Text as="p">Include videos from</Text>
-                                                        <Tooltip dismissOnMouseOut content="Show videos from all feeds or filter by type.">
+                                                        <Text as="p">Video source</Text>
+                                                        <Tooltip dismissOnMouseOut content="Select which video feeds are included in Video Discovery.">
                                                             <Icon source={InfoIcon} />
                                                         </Tooltip>
                                                     </InlineStack>
@@ -519,8 +529,8 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                             <Select
                                                 label={
                                                     <InlineStack gap="200">
-                                                        <Text as="p">Sort Order</Text>
-                                                        <Tooltip dismissOnMouseOut content="How videos are ordered in Video Discovery.">
+                                                        <Text as="p">Display order</Text>
+                                                        <Tooltip dismissOnMouseOut content="Define how videos are prioritized when customers browse your collection.">
                                                             <Icon source={InfoIcon} />
                                                         </Tooltip>
                                                     </InlineStack>
@@ -560,7 +570,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                     </BlockStack>
                                 )} */}
 
-                                {/* Desktop / Mobile tabs */}
+                                <Text as="p" variant="bodyMd" fontWeight="semibold">Device configuration</Text>
                                 <Box borderRadius="200" background="bg-fill-secondary">
                                     <Tabs
                                         tabs={DEVICE_TABS}
@@ -571,9 +581,9 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                 </Box>
 
                                 <DeviceSettings
+                                    key={deviceTab === 0 ? "desktop" : "mobile"}
                                     device={deviceTab === 0 ? "desktop" : "mobile"}
                                     control={control}
-                                    watch={watch}
                                 />
                             </BlockStack>
                         )}

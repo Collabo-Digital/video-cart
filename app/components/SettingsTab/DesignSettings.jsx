@@ -21,6 +21,76 @@ import { WIDGET_TEMPLATES, getTemplatesForType } from "../../lib/constants/templ
 export function DesignSettings({ control, watch, errors = {}, mode = "widget" }) {
   const widgetType = watch("widgetType");
 
+  if (mode === "global") {
+    return (
+      <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+        <BlockStack gap="400">
+          <BlockStack gap="100">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">
+              Advanced styling
+            </Text>
+            <Text as="p" tone="subdued">
+              Apply custom CSS to refine the appearance of Video Discovery on your storefront.
+            </Text>
+          </BlockStack>
+          <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
+            <Controller
+              name="settings.design.uniqueClassIdentifier"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Custom class name</Text>
+                      <Tooltip
+                        dismissOnMouseOut
+                        content="Assign a unique CSS class to the Video Discovery component for targeted styling."
+                      >
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  placeholder="video-discovery-custom"
+                  helpText="Use this class name to scope your CSS rules to Video Discovery only."
+                  autoComplete="off"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.uniqueClassIdentifier?.message}
+                />
+              )}
+            />
+            <Controller
+              name="settings.design.customCss"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Custom stylesheet</Text>
+                      <Tooltip
+                        dismissOnMouseOut
+                        content="Enter CSS rules to customize Video Discovery. Scope styles using your custom class name."
+                      >
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  placeholder=".video-discovery-custom .vc-discovery-trigger { font-weight: 600; }"
+                  helpText="Supported selectors: .vc-discovery-trigger, .vc-discovery-label, .vc-discovery-floating, .vc-discovery-inline"
+                  multiline={4}
+                  autoComplete="off"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.customCss?.message}
+                />
+              )}
+            />
+          </InlineGrid>
+        </BlockStack>
+      </Box>
+    );
+  }
+
   return (
     <BlockStack gap="200">
       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
@@ -181,7 +251,7 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
       </Box>
 
       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-        {mode === "widget" && <BlockStack gap="400">
+        <BlockStack gap="400">
           <Text as="p" variant="bodyMd" fontWeight="semibold">
             Button Style
           </Text>
@@ -231,69 +301,64 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
         Design options will be available here in a future update.
         
       </Text> */}
-        </BlockStack>}
+        </BlockStack>
       </Box>
 
-      {mode === "widget" && (
-        <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-          <BlockStack gap="400">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">
-              Custom Styles
-            </Text>
-            <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
-              <Controller
-                name="settings.design.uniqueClassIdentifier"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    label={
-                      <InlineStack gap="200">
-                        <Text as="p">Unique class identifier</Text>
-                        <Tooltip
-                          dismissOnMouseOut
-                          content="Give your feed a name to help you identify it."
-                        >
-                          <Icon source={InfoIcon} />
-                        </Tooltip>
-                      </InlineStack>
-                    }
-                    placeholder="e.g., video-cart-widget"
-                    autoComplete="off"
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.uniqueClassIdentifier?.message}
-                  />
-                )}
-              />
-              <Controller
-                name="settings.design.customCss"
-                control={control}
-                render={({ field }) => (
-                  <TextField
-                    label={
-                      <InlineStack gap="200">
-                        <Text as="p">Custom CSS</Text>
-                        <Tooltip
-                          dismissOnMouseOut
-                          content="Add custom CSS to the widget."
-                        >
-                          <Icon source={InfoIcon} />
-                        </Tooltip>
-                      </InlineStack>
-                    }
-                    placeholder="e.g., .video-cart-widget { background-color: #000080; }"
-                    multiline={4}
-                    autoComplete="off"
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.customCss?.message}
-                  />
-                )}
-              />
-            </InlineGrid>
-          </BlockStack>
-        </Box>
-      )}
+      <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+        <BlockStack gap="400">
+          <Text as="p" variant="bodyMd" fontWeight="semibold">
+            Custom Styles
+          </Text>
+          <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
+            <Controller
+              name="settings.design.uniqueClassIdentifier"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Unique class identifier</Text>
+                      <Tooltip
+                        dismissOnMouseOut
+                        content="A custom class added to this widget on the storefront for scoping your CSS."
+                      >
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  placeholder="e.g., video-cart-widget"
+                  autoComplete="off"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.uniqueClassIdentifier?.message}
+                />
+              )}
+            />
+            <Controller
+              name="settings.design.customCss"
+              control={control}
+              render={({ field }) => (
+                <TextField
+                  label={
+                    <InlineStack gap="200">
+                      <Text as="p">Custom CSS</Text>
+                      <Tooltip dismissOnMouseOut content="Add custom CSS to the widget.">
+                        <Icon source={InfoIcon} />
+                      </Tooltip>
+                    </InlineStack>
+                  }
+                  placeholder="e.g., .video-cart-widget { background-color: #000080; }"
+                  multiline={4}
+                  autoComplete="off"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  error={errors.customCss?.message}
+                />
+              )}
+            />
+          </InlineGrid>
+        </BlockStack>
+      </Box>
     </BlockStack>
   );
 }

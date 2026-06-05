@@ -19,6 +19,8 @@ export const DEFAULT_SETTINGS = {
         buttonBackgroundColor: "#000080",
         buttonTextColor: "#ffffff",
         template: "default",
+        uniqueClassIdentifier: "",
+        customCss: "",
     },
     translation: {
         widgetHeading: "Check out these products",

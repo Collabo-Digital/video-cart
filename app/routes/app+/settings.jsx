@@ -98,7 +98,10 @@ export default function SettingsPage() {
 
   return (
     <>
-      <Page title="Settings" subtitle="Configure global app settings">
+      <Page
+        title="Global Settings"
+        subtitle="Manage Video Discovery, storefront presentation, and customer-facing messaging across your store."
+      >
         <BlockStack gap="400">
           {actionData?.error && (
             <Banner tone="critical" onDismiss={() => {}}>
