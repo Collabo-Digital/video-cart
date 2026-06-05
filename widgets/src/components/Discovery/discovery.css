@@ -1,0 +1,162 @@
+.vc-discovery-floating {
+  position: fixed;
+  z-index: 9998;
+}
+
+.vc-discovery-inline {
+  display: inline-flex;
+  align-items: center;
+}
+
+.vc-discovery-nav-item {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.vc-discovery-nav-item .vc-discovery-inline {
+  margin-left: 0;
+}
+
+.vc-discovery-btn-bottom {
+  bottom: 24px;
+  right: 24px;
+}
+
+.vc-discovery-btn-top {
+  top: 24px;
+  right: 24px;
+}
+
+.vc-discovery-btn-left {
+  bottom: 24px;
+  left: 24px;
+}
+
+.vc-discovery-btn-right {
+  bottom: 24px;
+  right: 24px;
+}
+
+.vc-discovery-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.vc-discovery-floating .vc-discovery-trigger {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: #111827;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vc-discovery-floating .vc-discovery-trigger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+.vc-discovery-inline,
+.vc-discovery-inline .vc-discovery-trigger,
+.vc-discovery-inline .vc-discovery-label {
+  font: inherit;
+  font-style: inherit;
+  font-weight: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.vc-discovery-inline .vc-discovery-trigger {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  text-decoration: inherit;
+  gap: 0.35em;
+}
+
+.vc-discovery-trigger:has(.vc-discovery-label:only-child) {
+  gap: 0;
+}
+
+.vc-discovery-inline .vc-discovery-trigger:hover {
+  opacity: 0.85;
+}
+
+.vc-discovery-inline .vc-discovery-trigger svg {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.vc-discovery-floating .vc-discovery-trigger svg {
+  width: 20px;
+  height: 20px;
+}
+
+.vc-discovery-label {
+  white-space: nowrap;
+}
+
+.vc-discovery-close {
+  all: unset;
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  z-index: 10;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.vc-discovery-close:hover {
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.vc-discovery-close svg {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 768px) {
+  .vc-discovery-btn-bottom,
+  .vc-discovery-btn-right {
+    bottom: 16px;
+    right: 16px;
+  }
+
+  .vc-discovery-btn-left {
+    bottom: 16px;
+    left: 16px;
+  }
+
+  .vc-discovery-btn-top {
+    top: 16px;
+    right: 16px;
+  }
+}

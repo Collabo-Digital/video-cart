@@ -2,7 +2,7 @@
  * Default values for the feed editor form.
  * Single source of truth for all settings fields.
  */
-const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = {
     general: {
         buttonBehavior: "addToCart",
         autoPlay: "always",
@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = {
         buttonBackgroundColor: "#000080",
         buttonTextColor: "#ffffff",
         template: "default",
+        uniqueClassIdentifier: "",
+        customCss: "",
     },
     translation: {
         widgetHeading: "Check out these products",
@@ -28,17 +30,17 @@ const DEFAULT_SETTINGS = {
 };
 
 function getDefaultFeedName() {
-    const num = Date.now() % 100000; // last 5 digits
+    const num = Date.now() % 100000;
     return `Feed #${num}`;
 }
 
-/**
- * Returns defaultValues for useForm, merging saved feed data when editing.
- * @param {object|null} feed - Loader feed (null when creating).
- */
-export function getFeedFormDefaultValues(feed, widgetType, widgetPage) {
+export function getFeedFormDefaultValues(feed, widgetType, widgetPage, globalSettings) {
     const defaultWidgetType = widgetType || feed?.widgetType || "carousel";
     const defaultWidgetPage = widgetPage || feed?.widgetPage || "homePage";
+
+    const globalGeneral = globalSettings?.general ?? {};
+    const globalDesign = globalSettings?.design ?? {};
+    const globalTranslation = globalSettings?.translation ?? {};
 
     return {
         feedName: feed?.feedName ?? getDefaultFeedName(),
@@ -47,16 +49,20 @@ export function getFeedFormDefaultValues(feed, widgetType, widgetPage) {
         widgetPage: defaultWidgetPage,
         customPagePath: feed?.customPagePath || "",
         settings: {
-            general: { ...DEFAULT_SETTINGS.general, ...feed?.settings?.general },
-            design: { ...DEFAULT_SETTINGS.design, ...feed?.settings?.design },
+            general: {
+                ...DEFAULT_SETTINGS.general,
+                ...globalGeneral,
+                ...feed?.settings?.general,
+            },
+            design: {
+                ...DEFAULT_SETTINGS.design,
+                ...globalDesign,
+                ...feed?.settings?.design,
+            },
             translation: {
                 ...DEFAULT_SETTINGS.translation,
+                ...globalTranslation,
                 ...feed?.settings?.translation,
-                // Backfill legacy keys if you stored them at settings.carouselTitle etc.
-                ...(feed?.settings?.carouselTitle !== undefined && {
-                    carouselTitle: feed.settings.carouselTitle,
-                }),
-                // same for carouselDescription, addToCartText if needed
             },
         },
     };
