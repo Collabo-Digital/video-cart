@@ -42,7 +42,9 @@ export function buildDesignStyles(design, general) {
  * @returns {string} The unique class identifier.
  */
 export function getUniqueClassIdentifier(design) {
-    const id = design?.uniqueClassIdentifier?.trim();
+    const raw = design?.uniqueClassIdentifier?.trim();
+    if (!raw) return null;
+    const id = raw.replace(/^\./, '').replace(/[^a-zA-Z0-9_-]/g, '');
     return id || null;
 }
 
@@ -55,10 +57,32 @@ export function injectCustomCss(container, design) {
     const css = design?.customCss?.trim();
     if (!css || !container) return;
 
+    const marker = getUniqueClassIdentifier(design) || 'custom';
+    if (container.querySelector(`style[data-video-cart-feed-css="${marker}"]`)) return;
+
     const styleEl = document.createElement('style');
-    styleEl.setAttribute('data-video-cart-feed-css', design.uniqueClassIdentifier || 'custom');
-    // Scope CSS to this container (e.g. by container's unique class or ID)
-    // const scopeClass = design.uniqueClassIdentifier?.trim() || container.id || 'video-cart-scoped';
-    styleEl.textContent = css; // Or wrap: `${scopeClass} { ... }` if needed
+    styleEl.setAttribute('data-video-cart-feed-css', marker);
+    styleEl.textContent = css;
     container.appendChild(styleEl);
+}
+
+/**
+ * Injects global custom CSS from app settings into the document head.
+ * @param {Object} design - The design object from global settings.
+ */
+export function injectGlobalCustomCss(design) {
+    const css = design?.customCss?.trim();
+    if (!css || typeof document === 'undefined') return;
+
+    const marker = getUniqueClassIdentifier(design) || 'global';
+    const existing = document.querySelector(`[data-video-cart-global-css="${marker}"]`);
+    if (existing) {
+        existing.textContent = css;
+        return;
+    }
+
+    const styleEl = document.createElement('style');
+    styleEl.setAttribute('data-video-cart-global-css', marker);
+    styleEl.textContent = css;
+    document.head.appendChild(styleEl);
 }

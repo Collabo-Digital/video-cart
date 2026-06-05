@@ -34,9 +34,10 @@ import {
   isDuplicateVideoInWidget,
   prepareVideosPayload,
 } from "../../lib/utils/feed";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 import * as ShopModel from "../../models/shop.server";
 import * as VideoModel from "../../models/video.server";
+import * as GlobalSettingsModel from "../../models/globalSettings.server";
 import { createFeed, getFeedById, updateFeed } from "../../services/feed/feed.service.server";
 
 import { normaliseFeedVideo } from "../../lib/utils/common";
@@ -54,12 +55,14 @@ export const loader = async ({ params, request }) => {
   const { session } = await authenticate.admin(request);
   try {
 
-    const [totalVideos, shopData] = await Promise.all([
+    const [totalVideos, shopData, globalSettingsRecord] = await Promise.all([
       VideoModel.count(session.shop),
       ShopModel.findByDomain(session.shop),
+      GlobalSettingsModel.findByShopDomain(session.shop),
     ]);
     const uploadLimit = shopData?.planLimits?.videoUploadLimit ?? 0;
     const remaining = Math.max(0, uploadLimit - totalVideos);
+    const globalSettings = globalSettingsRecord?.settings ?? null;
 
     if (params.feedId === "new") {
       const url = new URL(request.url);
@@ -69,11 +72,12 @@ export const loader = async ({ params, request }) => {
         widgetType: url.searchParams.get("widgetType") ?? null,
         widgetPage: url.searchParams.get("widgetPage") ?? null,
         remaining,
+        globalSettings,
       });
     }
 
     const feed = await getFeedById(params.feedId, session.shop);
-    return apiSuccess({ mode: "edit", feed, shop: session.shop, remaining });
+    return apiSuccess({ mode: "edit", feed, shop: session.shop, remaining, globalSettings });
   } catch (error) {
     console.error("[FeedEditorPage] Loader error:", error);
     captureRouteError(error, {
@@ -170,8 +174,8 @@ const WIDGET_TABS = [
 
 
 export default function FeedEditorPage() {
-  const { data } = useLoaderData();
-  const { mode, feed, widgetType, widgetPage, remaining } = data;
+  const loaderData = useLoaderData();
+  const { mode, feed, widgetType, widgetPage, remaining, globalSettings } = loaderData?.data ?? {};
 
   const actionData = useActionData();
   const navigation = useNavigation();
@@ -188,8 +192,8 @@ export default function FeedEditorPage() {
   const previewModalRef = useRef(null);
 
   const formValues = useMemo(
-    () => getFeedFormDefaultValues(feed, widgetType, widgetPage),
-    [feed, widgetType, widgetPage]
+    () => getFeedFormDefaultValues(feed, widgetType, widgetPage, globalSettings),
+    [feed, widgetType, widgetPage, globalSettings]
   );
 
   const {

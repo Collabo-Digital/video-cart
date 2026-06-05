@@ -28,6 +28,7 @@ export default function AppLayout() {
           <s-link href="/app/feeds">Feeds</s-link>
           <s-link href="/app/videos">Videos</s-link>
           <s-link href="/app/analytics">Analytics</s-link>
+          <s-link href="/app/settings">Settings</s-link>
           <s-link href="/app/pricing">Pricing</s-link>
         </s-app-nav>
           <Outlet />

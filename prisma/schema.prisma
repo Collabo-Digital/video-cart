@@ -70,6 +70,7 @@ model Shop {
   appPlan       String?
   crispObject   Json?
   planLimits    Json?
+  globalSettings  GlobalSettings?
   // videoViewLimit Int?
   // videoViewCount Int?
   // videoUploadLimit Int? 
@@ -82,6 +83,15 @@ model Shop {
   feedAnalytics       FeedAnalytics[]
   videoAnalytics      VideoAnalytics[]
   videoCartOrderItems VideoCartOrderItem[]
+}
+
+model GlobalSettings {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopDomain String   @unique
+  settings   Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  shop       Shop     @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
 }
 
 model Video {
