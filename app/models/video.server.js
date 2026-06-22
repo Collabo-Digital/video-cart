@@ -152,9 +152,17 @@ export async function deleteVideoAndMuxAsset(id) {
   if (!id) throw new Error('Video ID is required');
   const video = await findById(id);
   if (!video) throw new Error('Video not found');
-  if (video.videoAssetId) {
-    await mux.video.assets.delete(video.videoAssetId);
+
+  const isPlaceholder = video.videoAssetId?.startsWith('pending-');
+  if (video.videoAssetId && !isPlaceholder) {
+    try {
+      await mux.video.assets.delete(video.videoAssetId);
+    } catch (err) {
+      const status = err?.status ?? err?.statusCode;
+      if (status !== 404) throw err;
+    }
   }
+
   return prisma.video.delete({ where: { id } });
 }
 

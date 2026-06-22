@@ -42,7 +42,7 @@ const GLOBAL_SETTINGS_TABS = [
         content: (
             <InlineStack gap="200" blockAlign="center">
                 <Icon source={AppsIcon} />
-                <span>Discovery</span>
+                <span>General</span>
             </InlineStack>
         ),
         panelID: "settings-general-content",

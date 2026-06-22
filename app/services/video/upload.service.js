@@ -24,10 +24,9 @@ function sanitizeFileName(name, shopDomain) {
 }
 
 /**
- * Create upload URL for client and create a Video record immediately so the feed can
- * link to it when the user saves (before the Mux webhook fires). Webhook will update
- * the same record with playbackId, duration, status READY.
- * Uses options.fileName for initial title, fileName, and fileUploadName (all same at creation).
+ * Create upload URL for client-side upload. Video DB record is created by the Mux
+ * webhook on video.asset.ready (not here), so failed/abandoned uploads leave no orphan rows.
+ * fileName/fileUploadName are stored in Mux passthrough for the webhook.
  * @param {Object} options - Upload options
  * @param {string} options.shopDomain - Shop domain (required for Video->Shop relation)
  * @param {string} [options.fileName] - Original file name (used for title, fileName, fileUploadName; required for duplicate check)
@@ -51,7 +50,7 @@ export async function createUploadUrl(options = {}) {
     throw err;
   }
 
-  const passthrough = JSON.stringify({ shopDomain });
+  const passthrough = JSON.stringify({ shopDomain, fileName: fileUploadName, fileUploadName });
   const upload = await mux.video.uploads.create({
     new_asset_settings: {
       playback_policy: ['public'],
@@ -60,18 +59,6 @@ export async function createUploadUrl(options = {}) {
     },
     cors_origin: options.corsOrigin || '*',
     test: process.env.NODE_ENV !== 'production',
-  });
-
-  const videoAssetIdPlaceholder = `pending-${upload.id}`;
-  await VideoModel.create({
-    title: fileUploadName,
-    fileName: fileUploadName,
-    fileUploadName,
-    serviceProvider: 'mux',
-    videoUploadId: upload.id,
-    videoAssetId: videoAssetIdPlaceholder,
-    status: 'PROCESSING',
-    shop: { connect: { shopDomain } },
   });
 
   return {
