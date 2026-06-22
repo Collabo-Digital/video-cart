@@ -61,10 +61,14 @@ async function handleVideoReady(data) {
   } = asset;
 
   let shopDomain = null;
+  let displayName = 'Untitled Video';
+  let fileUploadName = null;
   if (passthrough && typeof passthrough === 'string') {
     try {
       const parsed = JSON.parse(passthrough);
       shopDomain = parsed?.shopDomain;
+      displayName = parsed?.fileName || parsed?.fileUploadName || displayName;
+      fileUploadName = parsed?.fileUploadName || displayName;
     } catch (_) {}
   }
 
@@ -85,7 +89,9 @@ async function handleVideoReady(data) {
 
   const createPayload = {
     ...payload,
-    title: 'Untitled Video',
+    title: displayName,
+    fileName: displayName,
+    fileUploadName: fileUploadName || displayName,
   };
 
   try {

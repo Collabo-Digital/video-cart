@@ -15,12 +15,12 @@ export function TranslationSettings({ control, watch, errors = {}, mode = "widge
             <Box padding="400" background="bg-surface-secondary" borderRadius="200">
                 <BlockStack gap="400">
                     <BlockStack gap="100">
-                        <Text as="p" variant="bodyMd" fontWeight="semibold">Customer-facing text</Text>
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">More settings option will be available soon</Text>
                         <Text as="p" tone="subdued">
-                            Customize the messaging customers see when interacting with Video Discovery.
+                            More settings options will be available soon.
                         </Text>
                     </BlockStack>
-                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+                    {/* <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
                         <Controller
                             name="settings.translation.addToCartText"
                             control={control}
@@ -121,7 +121,7 @@ export function TranslationSettings({ control, watch, errors = {}, mode = "widge
                                 />
                             )}
                         />
-                    </InlineGrid>
+                    </InlineGrid> */}
                 </BlockStack>
             </Box>
         );

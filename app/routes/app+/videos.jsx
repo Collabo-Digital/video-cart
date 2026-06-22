@@ -238,6 +238,8 @@ export default function VideosPage() {
   const { mode, setMode } = useSetIndexFiltersMode("FILTERING");
 
   const [pendingDeleteVideo, setPendingDeleteVideo] = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
+  const deletingVideoIdRef = useRef(null);
 
   const isFirstRender = useRef(true);
 
@@ -316,15 +318,34 @@ export default function VideosPage() {
 
   const handleConfirmDelete = useCallback(() => {
     if (!pendingDeleteVideo) return;
+    deletingVideoIdRef.current = pendingDeleteVideo.id;
+    setDeleteError(null);
     fetcher.submit(
       { intent: "delete", videoId: pendingDeleteVideo.id },
       { method: "POST" }
     );
     setPendingDeleteVideo(null);
-    appBridge.toast.show("Video deleted successfully");
-  }, [pendingDeleteVideo, fetcher, appBridge]);
+  }, [pendingDeleteVideo, fetcher]);
 
   const handleCancelDelete = useCallback(() => setPendingDeleteVideo(null), []);
+
+  useEffect(() => {
+    if (fetcher.state !== "idle" || !fetcher.data) return;
+
+    if (fetcher.data.success) {
+      const deletedId = deletingVideoIdRef.current;
+      if (deletedId) {
+        setVideos((prev) => prev.filter((v) => v.id !== deletedId));
+        deletingVideoIdRef.current = null;
+      }
+      setDeleteError(null);
+      appBridge.toast.show("Video deleted successfully");
+    } else if (fetcher.data.error) {
+      deletingVideoIdRef.current = null;
+      setDeleteError(fetcher.data.error);
+      appBridge.toast.show(fetcher.data.error, { isError: true });
+    }
+  }, [fetcher.state, fetcher.data, appBridge]);
 
   const handleViewAnalytics = useCallback(
     () => navigate(`/app/analytics`),
@@ -358,9 +379,9 @@ export default function VideosPage() {
       }
     >
       <BlockStack gap="400">
-        {actionData?.error && (
-          <Banner tone="critical" onDismiss={() => { }}>
-            {actionData.error}
+        {(deleteError || actionData?.error) && (
+          <Banner tone="critical" onDismiss={() => setDeleteError(null)}>
+            {deleteError || actionData.error}
           </Banner>
         )}
 

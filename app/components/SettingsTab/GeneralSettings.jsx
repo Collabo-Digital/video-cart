@@ -14,6 +14,7 @@ import {
     Checkbox,
     Banner,
     Tabs,
+    Card,
 } from "@shopify/polaris";
 import {
     InfoIcon,
@@ -202,7 +203,7 @@ function DeviceSettings({ device, control }) {
                         )}
                     </InlineGrid>
 
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">Entry point styling</Text>
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">Storefront appearance</Text>
                     <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                         <Controller
                             name={`${prefix}.showNavIcon`}
@@ -230,7 +231,7 @@ function DeviceSettings({ device, control }) {
                                 <TextField
                                     label={
                                         <InlineStack gap="200">
-                                            <Text as="p">Entry point label</Text>
+                                            <Text as="p">Navigation label</Text>
                                             <Tooltip dismissOnMouseOut content="The text displayed on the floating button or navigation link.">
                                                 <Icon source={InfoIcon} />
                                             </Tooltip>
@@ -571,20 +572,21 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                 )} */}
 
                                 <Text as="p" variant="bodyMd" fontWeight="semibold">Device configuration</Text>
-                                <Box borderRadius="200" background="bg-fill-secondary">
+                                    <Card>
                                     <Tabs
                                         tabs={DEVICE_TABS}
                                         selected={deviceTab}
                                         onSelect={setDeviceTab}
                                         fitted
                                     />
-                                </Box>
-
+                                <Box borderRadius="200" background="bg-fill-secondary" padding="400">
                                 <DeviceSettings
                                     key={deviceTab === 0 ? "desktop" : "mobile"}
                                     device={deviceTab === 0 ? "desktop" : "mobile"}
                                     control={control}
-                                />
+                                    />
+                                    </Box>
+                                    </Card>
                             </BlockStack>
                         )}
                     </BlockStack>

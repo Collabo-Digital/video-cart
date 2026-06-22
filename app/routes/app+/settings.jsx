@@ -1,4 +1,4 @@
-import { Banner, BlockStack, Card, Page } from "@shopify/polaris";
+import { Banner, BlockStack, Card, Page, Icon } from "@shopify/polaris";
 import { useActionData, useLoaderData, useNavigation, useSubmit } from "react-router";
 import { SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { useCallback, useEffect, useState } from "react";
@@ -11,6 +11,7 @@ import { captureRouteError } from "../../lib/utils/observability/errorCapture.se
 import * as GlobalSettingsModel from "../../models/globalSettings.server";
 import * as FeedModel from "../../models/feed.server";
 import { SettingsTab } from "../../components/SettingsTab/Index";
+import { SettingsIcon } from '@shopify/polaris-icons';
 
 const SAVE_BAR_ID = "app-settings-save-bar";
 
@@ -100,6 +101,7 @@ export default function SettingsPage() {
     <>
       <Page
         title="Global Settings"
+        titleMetadata={<Icon source={SettingsIcon} />}
         subtitle="Manage Video Discovery, storefront presentation, and customer-facing messaging across your store."
       >
         <BlockStack gap="400">
