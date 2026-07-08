@@ -81,6 +81,7 @@ export function PricingCard({
   description,
   features,
   price,
+  onPlanChange,
 }) {
   const isFree = value === "free";
 
@@ -90,6 +91,7 @@ export function PricingCard({
 
   const handleCancelPlan = async () => {
     await cancelSubscription(title);
+    onPlanChange?.();
   };
 
   const onAction = isFree ? handleCancelPlan : handleSelectPlan;

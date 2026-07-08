@@ -1,5 +1,5 @@
 import { Grid, InlineStack, Page } from "@shopify/polaris";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useRevalidator } from "react-router";
 
 import { authenticate } from "../../config/shopify.server";
 import { PricingCard } from "../../components/Pricing/Pricing";
@@ -62,9 +62,13 @@ export const loader = async ({ request }) => {
 
 export default function PricingPage() {
   const { data } = useLoaderData();
+  const revalidator = useRevalidator();
   const { shopData } = data;
-
   const currentPlan = shopData?.appPlan ?? "Free";
+
+   const handlePlanChange = () => {
+    revalidator.revalidate(); 
+  };
 
   return (
     <Page title="Pricing" subtitle="Choose the plan that's right for you">
@@ -83,6 +87,7 @@ export default function PricingPage() {
                 price={plan.price}
                 frequency={plan.frequency}
                 featuredText={plan.name === currentPlan ? "Active Plan" : null}
+                onPlanChange={handlePlanChange}
               />
             </Grid.Cell>
           ))}
@@ -98,6 +103,7 @@ export default function PricingPage() {
               featuredText={
                 APP_FREE_PLAN.name === currentPlan ? "Active Plan" : null
               }
+              onPlanChange={handlePlanChange}
             />
           </Grid.Cell>
         </Grid>
