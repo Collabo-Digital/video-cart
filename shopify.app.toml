@@ -5,9 +5,6 @@ name = "video-cart"
 application_url = "https://qhvkwtn5-3000.inc1.devtunnels.ms"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-
 [webhooks]
 api_version = "2026-04"
 
