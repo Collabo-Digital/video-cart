@@ -6,13 +6,40 @@ export function productsForVideo(video) {
     return video?.productsTagged ?? [];
 }
 
+/** Storefront's active currency ISO code (INR, USD, ...) with safe fallbacks. */
+function activeCurrency() {
+    return (
+        window.Shopify?.currency?.active ||
+        window.__video_cart_config__?.currency ||
+        'USD'
+    );
+}
+
+/** Format an amount in the storefront's currency, e.g. ₹499, $12.50, ¥1,200 */
+export function formatMoney(num) {
+    const currency = activeCurrency();
+    // Multi-currency stores: tagged prices are in the shop's base currency;
+    // Shopify.currency.rate converts to the visitor's selected currency.
+    const rate = parseFloat(window.Shopify?.currency?.rate) || 1;
+    const amount = num * rate;
+    try {
+        return new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency,
+            trailingZeroDisplay: 'stripIfInteger',
+        }).format(amount);
+    } catch (_) {
+        return `${currency} ${amount.toFixed(2)}`;
+    }
+}
+
 /** Format price from first variant. Returns { raw, formatted } or null. */
 export function productPrice(product) {
     const priceVal = product?.variants?.[0]?.price;
     if (priceVal == null || priceVal === '') return null;
     const num = typeof priceVal === 'string' ? parseFloat(priceVal, 10) : Number(priceVal);
     if (Number.isNaN(num)) return null;
-    return { raw: priceVal, formatted: `$ ${num.toFixed(num % 1 === 0 ? 0 : 2)}` };
+    return { raw: priceVal, formatted: formatMoney(num) };
 }
 
 /** Variant id for cart: first variant or product id. */

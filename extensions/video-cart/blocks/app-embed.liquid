@@ -20,7 +20,8 @@
     shop: {{ shop.permanent_domain | json }},
     enabled: {{ block.settings.enabled | json }},
     isActive: true,
-    position: 'video-carousel'
+    position: 'video-carousel',
+    currency: {{ shop.currency | json }}
   };
 </script>
 

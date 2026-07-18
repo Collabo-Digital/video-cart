@@ -27,3 +27,6 @@ redirect_urls = [ "https://qhvkwtn5-3000.inc1.devtunnels.ms/api/auth" ]
 url = "https://qhvkwtn5-3000.inc1.devtunnels.ms/proxy"
 subpath = "video-widget"
 prefix = "apps"
+
+[build]
+automatically_update_urls_on_dev = true
