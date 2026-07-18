@@ -3,7 +3,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'so
 import { Portal } from 'solid-js/web';
 import Hls from 'hls.js';
 import mux from 'mux-embed';
-import { getPlaybackUrl, getThumbnailPreviewUrl } from '../../shared/mux';
+import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 import './videoOverlay.css';
 import CloseIcon from '../../assets/Icons/CloseIcon';
@@ -29,6 +29,7 @@ export function VideoOverlayPlayer({
   const [videoEl, setVideoEl] = createSignal(null);
   const [reelsTrackRef, setReelsTrackRef] = createSignal(null);
   const [isMuted, setIsMuted] = createSignal(true);
+  const [videoReady, setVideoReady] = createSignal(false);
   const [currentTime, setCurrentTime] = createSignal(0);
   const [duration, setDuration] = createSignal(0);
   const [isMobile, setIsMobile] = createSignal(
@@ -41,6 +42,8 @@ export function VideoOverlayPlayer({
     if (idx == null || idx < 0 || idx >= list.length) return null;
     return list[idx];
   });
+
+  const posterUrl = (v) => getThumbnailUrl(v?.playbackId, 560, 748) || undefined;
 
   const total = () => videos?.length ?? 0;
   const goPrev = () => {
@@ -156,26 +159,56 @@ export function VideoOverlayPlayer({
     }
   });
 
-  const [prevIndex, setPrevIndex] = createSignal(null);
-
-  /** On mobile reels: scroll track to the slide at expandedIndex (after layout) */
+  /** Reset the placeholder fade whenever the active video changes (before the ready listener runs) */
   createEffect(() => {
-    if (!isMobile() || expandedIndex() == null) return;
+    expandedIndex();
+    isMobile();
+    setVideoReady(false);
+  });
+
+  /** Mark the current video ready once it has a decodable frame (fades the slide placeholder out) */
+  createEffect(() => {
+    const el = videoEl();
+    if (!el) return;
+    const markReady = () => setVideoReady(true);
+    if (el.readyState >= 2) markReady();
+    el.addEventListener('loadeddata', markReady);
+    el.addEventListener('playing', markReady);
+    onCleanup(() => {
+      el.removeEventListener('loadeddata', markReady);
+      el.removeEventListener('playing', markReady);
+    });
+  });
+
+  let prevIdx = null;
+  let suppressScrollSync = false;
+
+  /** On mobile reels: scroll track to the slide at expandedIndex (after layout).
+   * Skipped when the index change originated from the user's own scroll, so the
+   * programmatic scrollTo never fights the native scroll-snap animation. */
+  createEffect(() => {
+    const idx = expandedIndex();
+    if (idx == null) {
+      prevIdx = null;
+      return;
+    }
+    if (!isMobile()) return;
     const track = reelsTrackRef();
     if (!track) return;
-    const idx = expandedIndex();
-    const prev = prevIndex();
-    setPrevIndex(idx);
+    const prev = prevIdx;
+    prevIdx = idx;
+    if (suppressScrollSync) return;
     const lastIdx = (videos?.length ?? 1) - 1;
     const isWrap = (prev === 0 && idx === lastIdx) || (prev === lastIdx && idx === 0);
-    const behavior = isWrap ? 'instant' : 'smooth';
+    const behavior = prev == null || isWrap ? 'instant' : 'smooth';
 
-    const slides = track.querySelectorAll('.video-carousel-reels-slide');
-    const slideEl = slides[idx];
     const scrollToSlide = () => {
-      if (slideEl) track.scrollTo({ top: slideEl.offsetTop, behavior });
+      const slideEl = track.querySelectorAll('.video-carousel-reels-slide')[idx];
+      if (slideEl && Math.abs(track.scrollTop - slideEl.offsetTop) >= 2) {
+        track.scrollTo({ top: slideEl.offsetTop, behavior });
+      }
     };
-    if (slideEl) scrollToSlide();
+    if (track.querySelectorAll('.video-carousel-reels-slide')[idx]) scrollToSlide();
     else {
       const raf = requestAnimationFrame(() => {
         requestAnimationFrame(scrollToSlide);
@@ -184,26 +217,63 @@ export function VideoOverlayPlayer({
     }
   });
 
-  /** On mobile reels: observe slides and sync expandedIndex when a slide is in view */
+  /** On mobile reels: commit expandedIndex only after the snap scroll settles,
+   * so native scroll-snap fully owns the gesture (no mid-swipe video remount). */
   createEffect(() => {
-    if (!isMobile() || expandedIndex() == null || !videos?.length) return;
+    if (!isMobile() || !videos?.length) return;
     const track = reelsTrackRef();
     if (!track) return;
-    const slides = track.querySelectorAll('.video-carousel-reels-slide');
-    if (!slides.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
-            const idx = Number(entry.target.dataset.reelsIndex);
-            if (!Number.isNaN(idx)) setExpandedIndex(idx);
-          }
+
+    const commitNearestSlide = () => {
+      const slides = track.querySelectorAll('.video-carousel-reels-slide');
+      if (!slides.length) return;
+      let best = null;
+      let bestDist = Infinity;
+      slides.forEach((el) => {
+        const dist = Math.abs(el.offsetTop - track.scrollTop);
+        const idx = Number(el.dataset.reelsIndex);
+        if (dist < bestDist && !Number.isNaN(idx)) {
+          bestDist = dist;
+          best = idx;
         }
-      },
-      { root: track, threshold: [0.25, 0.5, 0.75] }
-    );
-    slides.forEach((el) => observer.observe(el));
-    onCleanup(() => observer.disconnect());
+      });
+      if (best == null) return;
+      suppressScrollSync = true;
+      try {
+        setExpandedIndex(best);
+      } finally {
+        suppressScrollSync = false;
+      }
+    };
+
+    if ('onscrollend' in window) {
+      track.addEventListener('scrollend', commitNearestSlide);
+      onCleanup(() => track.removeEventListener('scrollend', commitNearestSlide));
+    } else {
+      // iOS Safari has no scrollend; treat 120ms of scroll silence as settled
+      let debounce = null;
+      const onScroll = () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(commitNearestSlide, 120);
+      };
+      track.addEventListener('scroll', onScroll, { passive: true });
+      onCleanup(() => {
+        if (debounce) clearTimeout(debounce);
+        track.removeEventListener('scroll', onScroll);
+      });
+    }
+  });
+
+  /** Warm the static posters for adjacent slides so a swipe never lands on an unloaded image */
+  createEffect(() => {
+    if (!isMobile()) return;
+    const idx = expandedIndex();
+    const n = videos?.length ?? 0;
+    if (idx == null || n < 2) return;
+    [(idx + 1) % n, (idx - 1 + n) % n].forEach((i) => {
+      const url = posterUrl(videos[i]);
+      if (url) new Image().src = url;
+    });
   });
 
   /** On mobile reels: circular swipe — intercept boundary gestures and wrap */
@@ -348,6 +418,9 @@ export function VideoOverlayPlayer({
                       id={`video-${currentVideo()?.id}`}
                       ref={setVideoEl}
                       className="video-carousel-overlay-video"
+                      poster={posterUrl(currentVideo())}
+                      preload="auto"
+                      playsInline
                       autoPlay
                       loop
                       muted
@@ -394,24 +467,6 @@ export function VideoOverlayPlayer({
 
         {/* Mobile: Reels-style vertical scroll (swipe up/down) */}
         <Show when={isMobile()}>
-          <Show when={total() > 1}>
-            <button
-              type="button"
-              className="video-carousel-reels-nav video-carousel-reels-nav-prev"
-              aria-label="Previous video"
-              onClick={goPrev}
-            >
-              <LeftToggleIcon />
-            </button>
-            <button
-              type="button"
-              className="video-carousel-reels-nav video-carousel-reels-nav-next"
-              aria-label="Next video"
-              onClick={goNext}
-            >
-              <RightToggleIcon />
-            </button>
-          </Show>
           <div
             className="video-carousel-overlay-reels-track"
             ref={setReelsTrackRef}
@@ -426,11 +481,21 @@ export function VideoOverlayPlayer({
                   role="listitem"
                 >
                   <div className="video-carousel-reels-slide-video">
+                    <span
+                      className={`video-carousel-reels-slide-placeholder${
+                        index() === expandedIndex() && videoReady() ? ' video-carousel-reels-slide-placeholder-hidden' : ''
+                      }`}
+                      style={{ 'background-image': `url(${getThumbnailPreviewUrl(video.playbackId, 560, 748) || ''})` }}
+                      aria-hidden
+                    />
                     <Show when={index() === expandedIndex()}>
                       <div className="video-carousel-overlay-video-wrap video-carousel-reels-video-wrap">
                         <video
                           ref={setVideoEl}
                           className="video-carousel-overlay-video"
+                          poster={posterUrl(video)}
+                          preload="auto"
+                          playsInline
                           autoPlay
                           loop
                           muted
@@ -459,13 +524,6 @@ export function VideoOverlayPlayer({
                           </div>
                         </div>
                       </div>
-                    </Show>
-                    <Show when={index() !== expandedIndex()}>
-                      <span
-                        className="video-carousel-reels-slide-placeholder"
-                        style={{ 'background-image': `url(${getThumbnailPreviewUrl(video.playbackId, 560, 748) || ''})` }}
-                        aria-hidden
-                      />
                     </Show>
                     <aside className="video-carousel-overlay-products video-carousel-overlay-products-reels">
                       <h3 className="video-carousel-overlay-products-title">Products tagged</h3>
