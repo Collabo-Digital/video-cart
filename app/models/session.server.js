@@ -29,3 +29,29 @@ export async function updateScope(sessionId, scope) {
     data: { scope },
   });
 }
+
+/**
+ * Keep only the latest session for a shop, delete the rest.
+ * "Latest" = newest token expiry, tie-broken by newest document
+ * (ObjectId timestamp). Deletes by Mongo _id (session_id) because
+ * duplicate rows can share the same Shopify session id.
+ * @param {string} shop - Shop domain
+ * @returns {Promise<{deleted: number}>} Number of duplicates removed
+ */
+export async function keepOnlyLatestSession(shop) {
+  const sessions = await prisma.session.findMany({ where: { shop } });
+  if (sessions.length <= 1) return { deleted: 0 };
+
+  const objectIdSeconds = (hex) => parseInt(hex.substring(0, 8), 16);
+  const ranked = [...sessions].sort((a, b) => {
+    const expDiff = (b.expires?.getTime() ?? 0) - (a.expires?.getTime() ?? 0);
+    if (expDiff !== 0) return expDiff;
+    return objectIdSeconds(b.session_id) - objectIdSeconds(a.session_id);
+  });
+
+  const [, ...duplicates] = ranked;
+  const res = await prisma.session.deleteMany({
+    where: { session_id: { in: duplicates.map((s) => s.session_id) } },
+  });
+  return { deleted: res.count };
+}

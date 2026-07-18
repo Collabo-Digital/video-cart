@@ -8,6 +8,7 @@ import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prism
 import prisma from "./database.server";
 import { doTaskAfterAuth } from "../services/shop/onboarding.service";
 import { APP_BILLING_PLANS } from "../lib/constants/common";
+import { keepOnlyLatestSession } from "../models/session.server";
 
 
 const shopify = shopifyApp({
@@ -22,6 +23,18 @@ const shopify = shopifyApp({
   billing: APP_BILLING_PLANS,
   hooks: {
     afterAuth: async ({ session, admin }) => {
+      try {
+        // Keep exactly one (the latest) session per shop — self-heals
+        // any duplicates created by concurrent auth requests.
+        const { deleted } = await keepOnlyLatestSession(session.shop);
+        if (deleted > 0) {
+          console.warn(
+            `Removed ${deleted} duplicate session(s) for ${session.shop}`,
+          );
+        }
+      } catch (e) {
+        console.error("Session dedup cleanup failed", e);
+      }
       await doTaskAfterAuth({ session, admin });
     },
   },
