@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types -- shared overlay used by widget variants */
 import { For, Show } from 'solid-js';
 import { productsForVideo, productPrice } from '../../../utils/widgetHelpers';
 import { PRODUCT_ITEM_GAP } from '../../../core/constant';
@@ -65,7 +66,7 @@ export function ProductOverlay({
                     <div className="vd-product-overlay-item-info-inner">
                       <Show when={productPrice(product)?.formatted}>
                         <span className="vd-product-overlay-item-price">
-                          {productPrice(product)?.formatted || '$0.00'}
+                          {productPrice(product)?.formatted}
                         </span>
                       </Show>
                       <button
