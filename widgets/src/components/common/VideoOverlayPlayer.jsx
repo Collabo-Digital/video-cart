@@ -526,7 +526,7 @@ export function VideoOverlayPlayer({
                       </div>
                     </Show>
                     <aside className="video-carousel-overlay-products video-carousel-overlay-products-reels">
-                      <h3 className="video-carousel-overlay-products-title">Products tagged</h3>
+                      {/* <h3 className="video-carousel-overlay-products-title">Products tagged</h3> */}
                       <div className="video-carousel-overlay-products-inner">
                         <For each={productsForVideo(video)}>
                           {(product) => (

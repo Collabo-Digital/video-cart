@@ -152,6 +152,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     let repositionTimer = null;
 
     const onScroll = () => {
+      if (hoverEffect() === 'expand') clearAccordion();
       const trackIdx = getTrackIndex();
       setCurrentIndex(toRealIndex(trackIdx));
 
@@ -212,8 +213,65 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     setExpandedIndex(toRealIndex(trackIdx));
   };
 
-  const handleCardMouseEnter = (trackIdx) => {
+  /** Accordion expand: grow the hovered card and compress only the other VISIBLE cards.
+   * Offscreen (cloned) cards keep their size, so the track's scroll layout and the
+   * surrounding page never shift. Sizes are inline; cleared on leave/scroll. */
+  const ACCORDION_GROW = 2.2;
+  const ACCORDION_MIN_SHRINK = 0.25;
+  let accordionResetTimer = null;
+
+  const accordionCards = () => [...(trackRef()?.querySelectorAll('.video-carousel-card') ?? [])];
+
+  const clearAccordion = () => {
+    // Collapse widths (animated by the CSS transition) but keep height/aspect
+    // locked until the animation ends — releasing them early lets the still-wide
+    // card recompute its 9/16 height and balloon the track (page jump).
+    accordionCards().forEach((c) => {
+      c.style.flexBasis = '';
+      c.classList.remove('video-carousel-card-expanded');
+    });
+    clearTimeout(accordionResetTimer);
+    accordionResetTimer = setTimeout(() => {
+      accordionCards().forEach((c) => {
+        c.style.height = '';
+        c.style.aspectRatio = '';
+      });
+    }, 400);
+  };
+
+  onCleanup(() => clearTimeout(accordionResetTimer));
+
+  const applyAccordion = (cardEl) => {
+    clearTimeout(accordionResetTimer);
+    const track = trackRef();
+    if (!track || !cardEl) return;
+    const cards = accordionCards();
+    const trackRect = track.getBoundingClientRect();
+    const visible = cards.filter((c) => {
+      const r = c.getBoundingClientRect();
+      return r.right > trackRect.left + 1 && r.left < trackRect.right - 1;
+    });
+    if (visible.length < 2 || !visible.includes(cardEl)) return;
+    // Measure from a card the accordion never touched so mid-animation sizes don't drift;
+    // getBoundingClientRect keeps fractions (offset* rounds, and rounded locks shift layout)
+    const untouchedRect = cards.find((c) => !visible.includes(c))?.getBoundingClientRect();
+    const baseW = untouchedRect ? untouchedRect.width : (track.clientWidth - (5 - 1) * 22) / 5;
+    const baseH = untouchedRect ? untouchedRect.height : (baseW * 16) / 9;
+    const others = visible.length - 1;
+    const maxGrow = baseW + others * baseW * (1 - ACCORDION_MIN_SHRINK);
+    const expandedW = Math.min(baseW * ACCORDION_GROW, track.clientWidth * 0.55, maxGrow);
+    const shrink = (expandedW - baseW) / others;
+    visible.forEach((c) => {
+      c.style.height = `${baseH}px`;
+      c.style.aspectRatio = 'auto';
+      c.style.flexBasis = `${c === cardEl ? expandedW : baseW - shrink}px`;
+      c.classList.toggle('video-carousel-card-expanded', c === cardEl);
+    });
+  };
+
+  const handleCardMouseEnter = (trackIdx, e) => {
     if (autoplay() === 'onHover') setHoveredIndex(toRealIndex(trackIdx));
+    if (hoverEffect() === 'expand') applyAccordion(e?.currentTarget);
   };
 
   const handleCardMouseLeave = () => {
@@ -290,7 +348,12 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
 
       <Show when={videos?.length > 0}>
         <div className="video-carousel-track-wrap">
-          <div className="video-carousel-track" ref={setTrackRef} role="list">
+          <div
+            className="video-carousel-track"
+            ref={setTrackRef}
+            role="list"
+            onMouseLeave={() => hoverEffect() === 'expand' && clearAccordion()}
+          >
             <For each={loopItems()}>
               {(video, trackIdx) => {
                 const realIndex = () => toRealIndex(trackIdx());
@@ -298,7 +361,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
                   <article
                     className="video-carousel-card"
                     role="listitem"
-                    onMouseEnter={() => handleCardMouseEnter(trackIdx())}
+                    onMouseEnter={(e) => handleCardMouseEnter(trackIdx(), e)}
                     onMouseLeave={handleCardMouseLeave}
                   >
                     <button
