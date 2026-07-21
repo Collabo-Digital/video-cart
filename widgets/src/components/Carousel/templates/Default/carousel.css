@@ -138,15 +138,14 @@
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
 }
 
-/* Hover effect: Expand — hovered card grows, siblings shrink */
-.hover-expand .video-carousel-track:hover .video-carousel-card {
-  flex: 0 0 calc((100% - (5 - 1) * 22px) / 5 * 0.95);
-  aspect-ratio: 9 / 16;
+/* Hover effect: Expand — accordion. Hovered card grows, visible siblings compress.
+   Sizes are applied inline by ClassicCarousel (visible cards only), so offscreen
+   clones and the surrounding page never move. */
+.hover-expand .video-carousel-card {
+  transition: flex-basis 0.35s ease, box-shadow 0.2s ease;
 }
 
-.hover-expand .video-carousel-track .video-carousel-card:hover {
-  flex: 0 0 calc((100% - (5 - 1) * 22px) / 5 * 1.2);
-  aspect-ratio: 9 / 16;
+.hover-expand .video-carousel-card.video-carousel-card-expanded {
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
 }
 
@@ -729,7 +728,7 @@
 .video-carousel-reels-slide-video .video-carousel-overlay-video {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .video-carousel-reels-slide-placeholder {
@@ -802,12 +801,18 @@
   min-width: 260px;
   max-width: 280px;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.55);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.1);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+
+.video-carousel-overlay-products-reels .video-carousel-overlay-product:only-child {
+  flex: 1 1 100%;
+  max-width: 100%;
 }
 
 .video-carousel-overlay-products-reels .video-carousel-overlay-product-image-wrap {

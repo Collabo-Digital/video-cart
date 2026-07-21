@@ -1,5 +1,5 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
-import { For, Show, createSignal, createEffect } from 'solid-js';
+import { For, Show, createSignal, createEffect, createMemo, onCleanup } from 'solid-js';
 import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './grid.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
@@ -40,6 +40,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   });
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
+  const hoverEffect = () => design?.hoverEffect || 'lift';
   const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
 
 
@@ -76,8 +77,86 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
     setExpandedIndex(index);
   };
 
-  const handleCardMouseEnter = (index) => {
+  /** Responsive column count — mirrors the CSS: --vdcrt-columns on desktop, 2 on mobile */
+  const [cols, setCols] = createSignal(2);
+  createEffect(() => {
+    const container = containerRef();
+    if (!container) return;
+    const mql = window.matchMedia('(max-width: 768px)');
+    const compute = () => {
+      if (mql.matches) {
+        setCols(2);
+        return;
+      }
+      const v = parseInt(getComputedStyle(container).getPropertyValue('--vdcrt-columns'), 10);
+      setCols(Number.isFinite(v) && v > 0 ? v : 2);
+    };
+    compute();
+    mql.addEventListener('change', compute);
+    onCleanup(() => mql.removeEventListener('change', compute));
+  });
+
+  /** Videos chunked into rows of cols() — each row is its own grid, so the
+   * accordion can resize one row without touching the rows below. */
+  const rows = createMemo(() => {
+    const n = cols();
+    const list = videos ?? [];
+    const out = [];
+    for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+    return out;
+  });
+
+  /** Accordion expand, scoped to the hovered card's ROW: its siblings in the same
+   * row compress; rows above/below never change. Heights are locked during the
+   * animation and released after it ends (no page jump). */
+  const GRID_ACCORDION_GROW = 2.2;
+  let gridResetTimer = null;
+
+  const allRows = () => [...(containerRef()?.querySelectorAll('.video-grid-row') ?? [])];
+
+  const clearGridAccordion = () => {
+    const cards = [...(containerRef()?.querySelectorAll('.video-grid-card') ?? [])];
+    allRows().forEach((r) => {
+      r.style.gridTemplateColumns = '';
+    });
+    cards.forEach((c) => c.classList.remove('video-grid-card-expanded'));
+    clearTimeout(gridResetTimer);
+    gridResetTimer = setTimeout(() => {
+      cards.forEach((c) => {
+        c.style.height = '';
+        c.style.aspectRatio = '';
+      });
+    }, 400);
+  };
+
+  onCleanup(() => clearTimeout(gridResetTimer));
+
+  const applyGridAccordion = (cardEl) => {
+    clearTimeout(gridResetTimer);
+    const row = cardEl?.closest('.video-grid-row');
+    if (!row) return;
+    const rowCards = [...row.querySelectorAll('.video-grid-card')];
+    const n = getComputedStyle(row).gridTemplateColumns.split(' ').length;
+    const col = rowCards.indexOf(cardEl);
+    if (n < 2 || rowCards.length < 2 || col < 0) return;
+    allRows().forEach((r) => {
+      if (r !== row) r.style.gridTemplateColumns = '';
+    });
+    // fractional measurement from an untouched card (rounded locks drift the layout)
+    const baseH = (rowCards.find((c) => !c.style.height) ?? cardEl).getBoundingClientRect().height;
+    // cap so the expanded column never exceeds ~55% of the row (matters at 2 columns)
+    const grow = Math.min(GRID_ACCORDION_GROW, (0.55 / 0.45) * (n - 1));
+    row.style.gridTemplateColumns = Array.from({ length: n }, (_, i) => (i === col ? `${grow}fr` : '1fr')).join(' ');
+    rowCards.forEach((c) => {
+      c.style.height = `${baseH}px`;
+      c.style.aspectRatio = 'auto';
+      c.classList.toggle('video-grid-card-expanded', c === cardEl);
+    });
+  };
+
+  const handleCardMouseEnter = (index, e) => {
     if (autoplay() === 'onHover') setHoveredIndex(index);
+    if (hoverEffect() === 'expand') applyGridAccordion(e?.currentTarget);
   };
 
   const handleCardMouseLeave = () => {
@@ -85,7 +164,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   };
 
   return (
-    <section className={`video-grid-container ${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
+    <section className={`video-grid-container hover-${hoverEffect()}${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
       <VideoOverlayPlayer
         videos={videos}
         expandedIndex={expandedIndex}
@@ -124,8 +203,16 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
         fallback={<p className="video-grid-empty">{EMPTY_VIDEOS}</p>}
       >
         <div className="video-grid-list" role="list">
-          <For each={videos}>
-            {(video, index) => {
+          <For each={rows()}>
+            {(rowVideos, rowIdx) => (
+              <div
+                className="video-grid-row"
+                role="presentation"
+                onMouseLeave={() => hoverEffect() === 'expand' && clearGridAccordion()}
+              >
+          <For each={rowVideos}>
+            {(video, colIdx) => {
+              const index = () => rowIdx() * cols() + colIdx();
               const staticThumbUrl = () => getThumbnailUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
               const animatedThumbUrl = () => getThumbnailPreviewUrl(video.playbackId, THUMB_CARD.width, THUMB_CARD.height);
               const isOnHoverMode = () => autoplay() === 'onHover';
@@ -139,7 +226,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
 
               return (
                 <article className="video-grid-card" role="listitem"
-                  onMouseEnter={() => handleCardMouseEnter(index())}
+                  onMouseEnter={(e) => handleCardMouseEnter(index(), e)}
                   onMouseLeave={handleCardMouseLeave}
                 >
                   <button
@@ -162,6 +249,9 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
                 </article>
               );
             }}
+          </For>
+              </div>
+            )}
           </For>
         </div>
       </Show>
