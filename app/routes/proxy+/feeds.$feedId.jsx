@@ -4,12 +4,8 @@ import * as VideoModel from "../../models/video.server";
 import * as ShopModel from "../../models/shop.server";
 
 export const loader = async ({ request, params }) => {
-  console.log('request of feeds $feedId hitted', request, params);
   try {
-    console.log('before appProxy');
     const { session } = await authenticate.public.appProxy(request);
-    console.log('session of feeds $feedId', session);
-    console.log('Check point #1');
     if (!session) {
       return Response.json({
         success: false,

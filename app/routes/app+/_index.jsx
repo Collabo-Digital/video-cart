@@ -54,8 +54,11 @@ export const loader = async ({ request }) => {
         const now = new Date();
         const limits = shopData.planLimits ?? {};
 
-        // Reset monthly view counts when the billing cycle rolls over
-        if (!limits.resetDate || limits.resetDate <= now) {
+        // Reset monthly view counts when the billing cycle rolls over.
+        // resetDate is stored as an ISO string, so parse it before comparing —
+        // comparing a string directly against a Date coerces to NaN (always false).
+        const resetAt = limits.resetDate ? new Date(limits.resetDate).getTime() : 0;
+        if (!limits.resetDate || Number.isNaN(resetAt) || resetAt <= now.getTime()) {
             limits.videoViewCount = 0;
             limits.videoViewLimitReached = false;
             limits.resetDate = getNextResetDate(now).toISOString();

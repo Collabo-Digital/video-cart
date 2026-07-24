@@ -23,8 +23,6 @@ import { getNextResetDate } from "../../lib/utils/common";
  * @returns {Promise<Object|null>} Saved shop object
  */
 export async function doTaskAfterAuth({ session, admin }) {
-  console.log("DO TASK AFTER AUTH PROCESS", session);
-
   if (!session || !session.shop) {
     console.error("Invalid session: missing shop domain");
     return null;

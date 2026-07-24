@@ -31,9 +31,8 @@ export const action = async ({ request }) => {
   }
 
   try {
-    let body;
     try {
-      body = await request.json();
+      await request.json();
     } catch (e) {
       return Response.json(
         { success: false, error: "Invalid JSON body" },
@@ -44,10 +43,6 @@ export const action = async ({ request }) => {
       return Response.json({ success: false, error: "Unauthorized" }, { status: 401, headers: JSON_HEADERS });
     }
 
-    const order = body?.order || null;
-    console.log('order ----->', order);
-
-    
     return Response.json(
       { status: 200, headers: JSON_HEADERS }
     );

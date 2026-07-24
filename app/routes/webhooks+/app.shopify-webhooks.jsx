@@ -14,7 +14,6 @@ export const action = async ({ request }) => {
       const { shop, topic } = await authenticate.webhook(requestClone);
 
       console.log(`Received ${topic} webhook from ${shop}`);
-      console.log("Payload:", JSON.stringify(payload, null, 2));
 
       switch (topic) {
         case "customers/data_request":

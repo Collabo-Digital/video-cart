@@ -24,7 +24,6 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 export default function VideoUploader({
   setUploadedVideo,
   onVideosFromLibrary,
-  shopData,
   remaining = 0,
 }) {
   const appBridge = useAppBridge();
@@ -34,9 +33,6 @@ export default function VideoUploader({
   const [libraryOpen, setLibraryOpen] = useState(false);
 
   const isAtLimit = remaining <= 0;
-
-  console.log("shopData ----->", shopData);
-  console.log("shopData?.planLimits?.videoUploadLimitReached ----->", shopData?.planLimits?.videoUploadLimitReached);
 
   const handleLibrarySelected = useCallback(
     (videosOrSingle) => {

@@ -125,7 +125,7 @@ export const action = async ({ params, request }) => {
       isEnabled: data.isEnabled === "true",
       settings: parsedSettings,
       videos: parsedVideos,
-    });
+    }, session.shop);
 
     return redirect(`/app/feeds/${params.feedId}`);
   } catch (error) {

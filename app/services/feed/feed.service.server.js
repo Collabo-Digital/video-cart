@@ -134,12 +134,21 @@ export async function createFeed(data) {
  * Update feed
  * @param {string} feedId - Feed ID
  * @param {Object} data - Update data
+ * @param {string} shopDomain - Owning shop (required; enforces tenant isolation)
  * @returns {Promise<Object>} Updated feed
+ * @throws {Error} If feed not found or does not belong to shopDomain
  */
-export async function updateFeed(feedId, data) {
+export async function updateFeed(feedId, data, shopDomain) {
   if (!feedId) {
     throw new Error('Feed ID is required');
   }
+  if (!shopDomain) {
+    throw new Error('Shop domain is required');
+  }
+
+  // Ownership guard: throws "Feed not found" if the feed is not owned by this shop.
+  // Prevents cross-tenant feed takeover regardless of the calling route.
+  await getFeedById(feedId, shopDomain);
 
   const { feedName, widgetType, widgetPage, customPagePath, isEnabled, settings, videos } = data;
 
