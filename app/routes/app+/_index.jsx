@@ -21,11 +21,11 @@ import {
     PlusIcon,
 } from "@shopify/polaris-icons";
 import { Crisp } from "crisp-sdk-web";
-import { onCLS, onINP, onLCP } from "web-vitals";
 import { useLoaderData, useNavigate } from "react-router";
 
 import { authenticate } from "../../config/shopify.server";
 import { WIDGET_TYPES } from "../../lib/constants/common";
+import { toClientShop } from "../../lib/dto/shop";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import { getNextResetDate, getPercentage } from "../../lib/utils/common";
@@ -93,7 +93,9 @@ export const loader = async ({ request }) => {
             });
         }
 
-        return apiSuccess({ feeds: [], session, shopData, muxMetrics });
+        // Never return `session` or the raw shop record — both carry the Admin
+        // API access token, which would be serialized into the client HTML.
+        return apiSuccess({ feeds: [], shopData: toClientShop(shopData), muxMetrics });
     } catch (error) {
         console.error("Error fetching feeds:", error);
 
@@ -363,12 +365,9 @@ export default function IndexPage() {
     }, []);
 
     useEffect(() => {
-        onCLS(console.log);
-        onINP(console.log);
-        onLCP(console.log);
-
         if (shopData) {
             initCrisp(shopData);
+            // shopData is the token-free DTO (see loader); safe to cache.
             setShopDataLocalStorage(shopData);
         }
     }, [shopData]); // eslint-disable-line react-hooks/exhaustive-deps

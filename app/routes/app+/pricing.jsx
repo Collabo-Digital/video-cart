@@ -4,6 +4,7 @@ import { useLoaderData, useRevalidator } from "react-router";
 import { authenticate } from "../../config/shopify.server";
 import { PricingCard } from "../../components/Pricing/Pricing";
 import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { toClientShop } from "../../lib/dto/shop";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import {
   APP_BILLING_PLANS_NAMES,
@@ -39,7 +40,8 @@ export const loader = async ({ request }) => {
         });
       }
     }
-    return apiSuccess({ shopData });
+    // Strip the access token before it crosses to the client.
+    return apiSuccess({ shopData: toClientShop(shopData) });
   } catch (error) {
     console.error("Error fetching pricing:", error);
 
