@@ -58,6 +58,7 @@ export const loader = async ({ request }) => {
         // resetDate is stored as an ISO string, so parse it before comparing —
         // comparing a string directly against a Date coerces to NaN (always false).
         const resetAt = limits.resetDate ? new Date(limits.resetDate).getTime() : 0;
+        let didReset = false;
         if (!limits.resetDate || Number.isNaN(resetAt) || resetAt <= now.getTime()) {
             limits.videoViewCount = 0;
             limits.videoViewLimitReached = false;
@@ -65,6 +66,7 @@ export const loader = async ({ request }) => {
             shopData = await ShopModel.updateByDomain(session.shop, {
                 planLimits: limits,
             });
+            didReset = true;
         }
 
         const resetDate = new Date(shopData.planLimits.resetDate);
@@ -77,7 +79,9 @@ export const loader = async ({ request }) => {
         );
 
         let muxMetrics = null;
-        if (shopVideos.length > 0) {
+        // Skip Mux on the request where the cycle just reset: the window is
+        // [now, now] (0 views this cycle) and Mux rejects a zero-length timeframe.
+        if (shopVideos.length > 0 && !didReset) {
             muxMetrics = await getOverallDataMetricsForVideoIds(
                 shopVideos,
                 30,

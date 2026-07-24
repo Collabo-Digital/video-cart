@@ -154,7 +154,7 @@ export async function doTaskAfterAuth({ session, admin }) {
       // - isActive: keep existing, default to true on first install
       // - installedAt: never overwrite once set
       // - appPlan: preserve DB plan (user upgrades) and only set "Free" initially
-      isActive: existingShop?.isActive ?? true,
+      isActive: true,
       installedAt: existingShop?.installedAt ?? new Date(),
       appPlan: existingShop?.appPlan ?? "Free",
       planLimits,
