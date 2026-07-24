@@ -133,9 +133,6 @@ export async function doTaskAfterAuth({ session, admin }) {
       email: shop.email || existingShop?.email || null,
       contactEmail: shop.contactEmail || existingShop?.contactEmail || null,
 
-      // Always keep access token fresh from the current session
-      accessToken: session.accessToken,
-
       // Plan info: Shopify → existing DB → fallback
       planDisplayName:
         shop.plan?.displayName || existingShop?.planDisplayName || null,
