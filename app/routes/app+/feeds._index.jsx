@@ -170,7 +170,7 @@ function FeedRow({ feed, index, fetcher, onToggle, onEdit, onDeleteClick }) {
       </IndexTable.Cell>
 
       <IndexTable.Cell>
-        <Text variant="bodyMd">{feed.videos?.length ?? 0}</Text>
+        <Text variant="bodyMd">{feed._count?.videos ?? 0}</Text>
       </IndexTable.Cell>
 
       <IndexTable.Cell>

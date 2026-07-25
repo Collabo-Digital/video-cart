@@ -306,7 +306,9 @@ export async function getFeedsWithPaginationAndFilters(shopDomain, filters = {})
 
 
   const include = {
-
+    _count: {
+      select: { videos: true },
+    },
   };
 
   // --- First page (no cursor) ---
