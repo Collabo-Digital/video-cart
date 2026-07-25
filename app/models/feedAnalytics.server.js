@@ -50,63 +50,51 @@ export async function findByFeedAndDateRange(feedId, { startDate, endDate }) {
  */
 export async function upsertIncrement(feedId, date, increments) {
   const dateOnly = toDateOnly(date);
-  const existing = await prisma.feedAnalytics.findUnique({
-    where: {
-      feedId_date: { feedId, date: dateOnly },
-    },
-  });
 
-  const add = (a, b) => (a ?? 0) + (b ?? 0);
-
-  const data = {
-    widgetImpressions: add(existing?.widgetImpressions, increments.widgetImpressions),
-    widgetClicks: add(existing?.widgetClicks, increments.widgetClicks),
-    widgetVideoPlays: add(existing?.widgetVideoPlays, increments.widgetVideoPlays),
-    widgetViews: add(existing?.widgetViews, increments.widgetViews),
-    widgetProductClicks: add(existing?.widgetProductClicks, increments.widgetProductClicks),
-    widgetAddToCart: add(existing?.widgetAddToCart, increments.widgetAddToCart),
-    widgetOrders: add(existing?.widgetOrders, increments.widgetOrders),
-    widgetRevenue: (existing?.widgetRevenue != null ? Number(existing.widgetRevenue) : 0) + (increments.widgetRevenue ?? 0),
-  };
-
-  let shopDomain = existing?.shopDomain;
-  if (!shopDomain) {
-    const feed = await prisma.feed.findUnique({
-      where: { id: feedId },
-      select: { shopDomain: true },
-    });
-    if (!feed) throw new Error(`Feed not found: ${feedId}`);
-    shopDomain = feed.shopDomain;
+  // Atomic increment ops: { field: { increment: n } } → MongoDB $inc, which is
+  // safe when many events land at once (no read-modify-write, so nothing is lost).
+  const incOps = {};
+  for (const [key, value] of Object.entries(increments)) {
+    if (value != null) incOps[key] = { increment: value };
   }
 
-
-  let createPayload = {
-    feed: { connect: { id: feedId } },
-    shop: { connect: { shopDomain: shopDomain } },
-    date: dateOnly,
-    ...data,
-  };
-  if (!existing) {
-    const feed = await prisma.feed.findUnique({
-      where: { id: feedId },
-      select: { shopDomain: true },
+  // Fast path: today's row already exists → atomically add to it (a single op).
+  try {
+    return await prisma.feedAnalytics.update({
+      where: { feedId_date: { feedId, date: dateOnly } },
+      data: incOps,
     });
-    if (!feed) throw new Error(`Feed not found: ${feedId}`);
-    createPayload = {
-      feed: { connect: { id: feedId } },
-      shop: { connect: { shopDomain: feed.shopDomain } },
-      date: dateOnly,
-      ...data,
-    };
+  } catch (error) {
+    if (error.code !== "P2025") throw error; // P2025 = row doesn't exist yet
   }
 
-  return prisma.feedAnalytics.upsert({
-    where: {
-      feedId_date: { feedId, date: dateOnly },
-    },
-    create: createPayload,
-    update: data,
+  // First event of the day → create the row.
+  const feed = await prisma.feed.findUnique({
+    where: { id: feedId },
+    select: { shopDomain: true },
   });
+  if (!feed) throw new Error(`Feed not found: ${feedId}`);
+
+  try {
+    return await prisma.feedAnalytics.create({
+      data: {
+        feed: { connect: { id: feedId } },
+        shop: { connect: { shopDomain: feed.shopDomain } },
+        date: dateOnly,
+        ...increments,
+      },
+    });
+  } catch (error) {
+    // A concurrent request created the row a split-second earlier — the unique
+    // index rejects us with P2002; just add to the row that now exists.
+    if (error.code === "P2002") {
+      return prisma.feedAnalytics.update({
+        where: { feedId_date: { feedId, date: dateOnly } },
+        data: incOps,
+      });
+    }
+    throw error;
+  }
 }
 
 /**

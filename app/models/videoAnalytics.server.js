@@ -69,66 +69,61 @@ export async function findByVideoAndDateRange(videoId, { startDate, endDate }) {
  */
 export async function upsertIncrement(videoId, feedId, date, updates) {
   const dateOnly = toDateOnly(date);
-  const existing = await prisma.videoAnalytics.findUnique({
-    where: {
-      videoId_feedId_date: { videoId, feedId, date: dateOnly },
-    },
-  });
 
-  const add = (a, b) => (a ?? 0) + (b ?? 0);
-
-  const data = {
-    videoImpressions: add(existing?.videoImpressions, updates.videoImpressions),
-    videoViews: add(existing?.videoViews, updates.videoViews),
-    videoProductClicks: add(existing?.videoProductClicks, updates.videoProductClicks),
-    videoAtcClicks: add(existing?.videoAtcClicks, updates.videoAtcClicks),
-    videoAddToCart: add(existing?.videoAddToCart, updates.videoAddToCart),
-    videoOrders: add(existing?.videoOrders, updates.videoOrders),
-    videoRevenue: (existing?.videoRevenue != null ? Number(existing.videoRevenue) : 0) + (updates.videoRevenue ?? 0),
-  };
-
-  let shopDomain;
-  if (existing) {
-    shopDomain = existing.shopDomain;
-  } else {
-    // When creating a new row, ensure both Feed and Video exist (Video may have been removed)
-    const [feed, video] = await Promise.all([
-      prisma.feed.findUnique({
-        where: { id: feedId },
-        select: { shopDomain: true },
-      }),
-      prisma.video.findUnique({
-        where: { id: videoId },
-      }),
-    ]);
-    if (!feed) throw new Error(`Feed not found: ${feedId}`);
-    if (!video) {
-      const feedVideo = await prisma.feedVideo.findUnique({
-        where: { id: videoId },
-        select: { videoId: true },
-      });
-      if (!feedVideo) throw new Error(`Feed video not found: ${feedId}`);
-      videoId = feedVideo.videoId;
-      // return null;
-    }
-    shopDomain = feed.shopDomain;
+  // Atomic increment ops (MongoDB $inc) — concurrency-safe, no lost updates.
+  const incOps = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value != null) incOps[key] = { increment: value };
   }
 
-  const createPayload = {
-    video: { connect: { id: videoId } },
-    feed: { connect: { id: feedId } },
-    shop: { connect: { shopDomain } },
-    date: dateOnly,
-    ...data,
-  };
+  // Fast path: today's row exists → atomically add to it.
+  try {
+    return await prisma.videoAnalytics.update({
+      where: { videoId_feedId_date: { videoId, feedId, date: dateOnly } },
+      data: incOps,
+    });
+  } catch (error) {
+    if (error.code !== "P2025") throw error; // P2025 = row doesn't exist yet
+  }
 
-  return prisma.videoAnalytics.upsert({
-    where: {
-      videoId_feedId_date: { videoId, feedId, date: dateOnly },
-    },
-    create: createPayload,
-    update: data,
-  });
+  // First event of the day → resolve shopDomain + confirm the video exists, then create.
+  const [feed, video] = await Promise.all([
+    prisma.feed.findUnique({ where: { id: feedId }, select: { shopDomain: true } }),
+    prisma.video.findUnique({ where: { id: videoId }, select: { id: true } }),
+  ]);
+  if (!feed) throw new Error(`Feed not found: ${feedId}`);
+  let resolvedVideoId = videoId;
+  if (!video) {
+    // Fallback: caller may have passed a FeedVideo id instead of a Video id.
+    const feedVideo = await prisma.feedVideo.findUnique({
+      where: { id: videoId },
+      select: { videoId: true },
+    });
+    if (!feedVideo) throw new Error(`Video not found: ${videoId}`);
+    resolvedVideoId = feedVideo.videoId;
+  }
+
+  try {
+    return await prisma.videoAnalytics.create({
+      data: {
+        video: { connect: { id: resolvedVideoId } },
+        feed: { connect: { id: feedId } },
+        shop: { connect: { shopDomain: feed.shopDomain } },
+        date: dateOnly,
+        ...updates,
+      },
+    });
+  } catch (error) {
+    // Lost the create race — the unique index rejects us with P2002; add to the
+    // row that now exists.
+    if (error.code === "P2002") {
+      return prisma.videoAnalytics.update({
+        where: { videoId_feedId_date: { videoId: resolvedVideoId, feedId, date: dateOnly } },
+        data: incOps,
+      });
+    }
+    throw error;
+  }
 }
 
 /**
