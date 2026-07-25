@@ -25,9 +25,10 @@ export const loader = async ({ request }) => {
     const videoId = url.searchParams.get("videoId") || undefined;
     const eventType = url.searchParams.get("eventType");
     const watchTimeSeconds = url.searchParams.get("watchTimeSeconds");
-    const salesAmount = url.searchParams.get("salesAmount");
-    const revenueAmount = url.searchParams.get("revenueAmount");
-    const orderCount = url.searchParams.get("orderCount");
+    // Revenue/order values are NEVER read from the client here. Orders and revenue
+    // are recorded only via the authenticated pixel → conversion endpoint (which
+    // validates the order). Accepting them from a signed storefront GET would let
+    // anyone forge a shop's revenue and order counts.
 
     if (!feedId || !eventType) {
       return Response.json(
@@ -35,9 +36,15 @@ export const loader = async ({ request }) => {
         { status: 400, headers: JSON_HEADERS }
       );
     }
-    if (!Object.values(EVENT_TYPES).includes(eventType)) {
+    // Only non-monetary engagement events are allowed on this public endpoint.
+    // Order events (revenue) must come from the pixel conversion path.
+    if (
+      !Object.values(EVENT_TYPES).includes(eventType) ||
+      eventType === EVENT_TYPES.WIDGET_ORDER ||
+      eventType === EVENT_TYPES.VIDEO_ORDER
+    ) {
       return Response.json(
-        { success: false, error: `eventType must be one of: ${Object.values(EVENT_TYPES).join(", ")}` },
+        { success: false, error: "Unsupported event type" },
         { status: 400, headers: JSON_HEADERS }
       );
     }
@@ -51,9 +58,6 @@ export const loader = async ({ request }) => {
       videoId,
       eventType,
       watchTimeSeconds: watchTimeSeconds != null ? Number(watchTimeSeconds) : 0,
-      salesAmount: salesAmount != null ? Number(salesAmount) : 0,
-      revenueAmount: revenueAmount != null ? Number(revenueAmount) : 0,
-      orderCount: orderCount != null ? Number(orderCount) : 1,
     });
 
     return Response.json({ success: true }, { status: 200, headers: JSON_HEADERS });

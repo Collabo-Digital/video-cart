@@ -42,7 +42,7 @@ export async function createUploadUrl(options = {}) {
   const rawName = options.fileName;
   const fileUploadName = sanitizeFileName(rawName || 'Untitled Video', shopDomain);
 
-  const existing = await VideoModel.findByFileUploadName(fileUploadName);
+  const existing = await VideoModel.findByFileUploadName(fileUploadName, shopDomain);
   if (existing) {
     const err = new Error('This video is already in your library. A video with the same name has already been uploaded.');
     err.code = 'DUPLICATE_VIDEO';
@@ -128,7 +128,7 @@ export async function createVideoForImportedAsset({ assetId, playbackId, title, 
   const name = fileUploadName || fileName || title || 'Imported Video';
   const uploadName = sanitizeFileName(fileUploadName || fileName || title || 'Imported Video', shopDomain);
   if (uploadName) {
-    const duplicate = await VideoModel.findByFileUploadName(uploadName);
+    const duplicate = await VideoModel.findByFileUploadName(uploadName, shopDomain);
     if (duplicate) {
       const err = new Error('This video is already in your library. It has already been imported.');
       err.code = 'DUPLICATE_VIDEO';

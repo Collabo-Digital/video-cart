@@ -84,13 +84,14 @@ export async function findByPlaybackId(playbackId) {
  * @param {string} fileUploadName - Original file or URL-derived name
  * @returns {Promise<Object|null>} Video object or null
  */
-export async function findByFileUploadName(fileUploadName) {
+export async function findByFileUploadName(fileUploadName, shopDomain) {
   if (!fileUploadName || typeof fileUploadName !== 'string') return null;
   const name = fileUploadName.trim();
   if (!name) return null;
-  return prisma.video.findFirst({
-    where: { fileUploadName: name }
-  });
+  const where = { fileUploadName: name };
+  // Scope to the shop so one merchant's filename can't collide with another's.
+  if (shopDomain) where.shopDomain = shopDomain;
+  return prisma.video.findFirst({ where });
 }
 
 /**
