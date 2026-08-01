@@ -1,5 +1,4 @@
 import { Crisp } from "crisp-sdk-web";
-import { decryptCrispToken, generateCrispToken } from "./crispTokenEncrypter";
 
 async function generateCrispTokenClient(shopId) {
     if (!shopId) return null;

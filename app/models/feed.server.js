@@ -173,15 +173,18 @@ export async function deleteById(id) {
 }
 
 /**
- * Count feeds with optional filtering
- * @param {Object} filters - Optional filters
- * @returns {Promise<number>} Count of feeds
+ * Count feeds for a shop. Takes the shop domain as a string (matches
+ * VideoModel.count). Always scoped — never counts across merchants.
+ * @param {string} shopDomain - Shop domain
+ * @returns {Promise<number>} Count of the shop's non-deleted feeds
  */
-export async function count(filters = {}) {
-  const { shopDomain } = filters;
+export async function count(shopDomain) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required and must be a string');
+  }
 
   return prisma.feed.count({
-    where: shopDomain ? { shopDomain } : undefined,
+    where: { shopDomain: shopDomain.trim(), isDeleted: false },
   });
 }
 
