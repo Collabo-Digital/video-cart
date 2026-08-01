@@ -17,7 +17,11 @@ export const action = async ({ request }) => {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const { feedId, videoId, eventType, watchTimeSeconds, salesAmount, revenueAmount, orderCount, shop } = body;
+    // `shop` is NEVER read from the body — the authenticated session is the only
+    // trustworthy source of tenancy. Money values (salesAmount/revenueAmount/
+    // orderCount) are not client-writable either; revenue is recorded solely via
+    // the verified pixel conversion path.
+    const { feedId, videoId, eventType, watchTimeSeconds } = body;
 
     if (!feedId || !eventType) {
       return apiError(new Error('feedId and eventType are required'), {
@@ -36,19 +40,16 @@ export const action = async ({ request }) => {
       });
     }
 
-    if (shop) {
-      try {
-        if (!shop) throw new Error('Shop domain is required');
-        const feed = await FeedModel.findById(feedId, shop);
-        if (!feed) throw new Error('Feed not found');
-      } catch {
-        return apiError(new Error('Feed not found or access denied'), {
-          route: "analytics-event",
-          code: "FEED_NOT_FOUND_OR_ACCESS_DENIED",
-          statusCode: 404,
-          requestId: request.id,
-        });
-      }
+    // Unconditional ownership check against the AUTHENTICATED shop — prevents
+    // one merchant writing analytics into another merchant's feed.
+    const feed = await FeedModel.findById(feedId, session.shop);
+    if (!feed) {
+      return apiError(new Error('Feed not found or access denied'), {
+        route: "analytics-event",
+        code: "FEED_NOT_FOUND_OR_ACCESS_DENIED",
+        statusCode: 404,
+        requestId: request.id,
+      });
     }
 
     await recordEvent({
@@ -56,9 +57,6 @@ export const action = async ({ request }) => {
       videoId: videoId || undefined,
       eventType,
       watchTimeSeconds: watchTimeSeconds ?? 0,
-      salesAmount: salesAmount ?? 0,
-      revenueAmount: revenueAmount ?? 0,
-      orderCount: orderCount ?? 1,
     });
 
     return apiSuccess({ success: true }, {

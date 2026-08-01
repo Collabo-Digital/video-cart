@@ -30,6 +30,7 @@ import useLocalStorage from "../../lib/hooks/useLocalStorage";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import { getNextResetDate, getPercentage } from "../../lib/utils/common";
 import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
+import { generateCrispEmailHmac, generateCrispTokenId } from "../../lib/utils/crispToken.server";
 import { initCrisp } from "../../lib/utils/intiCrisp";
 import * as ShopModel from "../../models/shop.server";
 import * as VideoModel from "../../models/video.server";
@@ -102,7 +103,16 @@ export const loader = async ({ request }) => {
 
         // Never return `session` or the raw shop record — both carry the Admin
         // API access token, which would be serialized into the client HTML.
-        return apiSuccess({ feeds: [], shopData: toClientShop(shopData), muxMetrics });
+        return apiSuccess({
+            feeds: [],
+            shopData: toClientShop(shopData),
+            // Generated server-side so they can't be forged in the browser.
+            crisp: {
+                tokenId: generateCrispTokenId(shopData.id),
+                emailHmac: generateCrispEmailHmac(shopData.email),
+            },
+            muxMetrics,
+        });
     } catch (error) {
         console.error("Error fetching feeds:", error);
 
@@ -334,7 +344,7 @@ function SupportCard({ onChatClick }) {
 
 export default function IndexPage() {
     const loaderData = useLoaderData();
-    const { shopData, muxMetrics } = loaderData?.data ?? {};
+    const { shopData, muxMetrics, crisp } = loaderData?.data ?? {};
 
     const totalViews = muxMetrics?.aggregate?.views ?? 0;
 
@@ -373,11 +383,11 @@ export default function IndexPage() {
 
     useEffect(() => {
         if (shopData) {
-            initCrisp(shopData);
+            initCrisp(shopData, crisp);
             // shopData is the token-free DTO (see loader); safe to cache.
             setShopDataLocalStorage(shopData);
         }
-    }, [shopData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [shopData, crisp]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <Page
