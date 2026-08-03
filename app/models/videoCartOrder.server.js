@@ -167,11 +167,19 @@ export async function getOrderStatsByShop(shopDomain, options = {}) {
     if (startDate) where.createdAt.gte = startDate;
     if (endDate) where.createdAt.lte = endDate;
   }
-  const orders = await prisma.videoCartOrder.findMany({
+  // Aggregate in the database. This previously pulled every matching order
+  // document into memory just to count them and sum one float, so cost scaled
+  // linearly with the merchant's order history — and it runs twice per
+  // Analytics page load (current period + previous period).
+  const result = await prisma.videoCartOrder.aggregate({
     where,
-    select: { totalRevenue: true },
+    _count: { _all: true },
+    _sum: { totalRevenue: true },
   });
-  const orderCount = orders.length;
-  const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.totalRevenue) || 0), 0);
-  return { orderCount, totalRevenue };
+
+  return {
+    orderCount: result._count?._all ?? 0,
+    // Mongo returns null for a sum over zero rows; keep the previous 0 contract.
+    totalRevenue: Number(result._sum?.totalRevenue ?? 0) || 0,
+  };
 }
