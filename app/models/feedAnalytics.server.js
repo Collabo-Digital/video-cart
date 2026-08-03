@@ -9,8 +9,6 @@ import prisma from '../config/database.server';
 const FEEDS_PAGE_SIZE = 10;
 const MIN_TAKE = 1;
 const MAX_TAKE = 100;
-const ORDER_DESC = [{ widgetRevenue: 'desc' }, { id: 'asc' }];
-const ORDER_ASC = [{ widgetRevenue: 'asc' }, { id: 'desc' }];
 
 /**
  * Normalize to UTC start-of-day for date bucketing
@@ -196,68 +194,75 @@ export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
     where.date = { gte: toDateOnly(startDate), lte: toDateOnly(endDate) };
   }
 
-  const include = {
-    feed: {
-      select: {
-        id: true,
-        feedName: true,
-        widgetId: true,
-        widgetType: true,
-        isEnabled: true,
-        shopDomain: true,
-      },
-    },
-  };
-
-  if (!cursor) {
-    const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
-      where,
-      orderBy: ORDER_DESC,
-      take: safeTake + 1,
-      include,
-    });
-    const hasMore = feedsWithAnalyticsItems.length > safeTake;
-    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, safeTake) : feedsWithAnalyticsItems;
-    return {
-      feedsWithAnalytics,
-      nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
-      previousCursor: null,
-    };
-  }
-
-  if (direction === 'next') {
-    const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
-      where,
-      orderBy: ORDER_DESC,
-      cursor: { id: cursor },
-      skip: 1,
-      take: safeTake + 1,
-      include,
-    });
-    const hasMore = feedsWithAnalyticsItems.length > safeTake;
-    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, safeTake) : feedsWithAnalyticsItems;
-    return {
-      feedsWithAnalytics,
-      nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
-      previousCursor: cursor,
-    };
-  }
-
-  const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
+  // Aggregate the daily snapshots per feed. Without this the same feed appears
+  // once per day, each row showing only that day's revenue — so the table was
+  // really "top days across all feeds", not "top feeds".
+  const grouped = await prisma.feedAnalytics.groupBy({
+    by: ['feedId'],
     where,
-    orderBy: ORDER_ASC,
-    cursor: { id: cursor },
-    skip: 1,
-    take: safeTake + 1,
-    include,
+    _sum: {
+      widgetImpressions: true,
+      widgetClicks: true,
+      widgetVideoPlays: true,
+      widgetViews: true,
+      widgetProductClicks: true,
+      widgetAddToCart: true,
+      widgetOrders: true,
+      widgetRevenue: true,
+    },
   });
-  const hasMore = feedsWithAnalyticsItems.length > safeTake;
-  const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, safeTake) : feedsWithAnalyticsItems;
-  feedsWithAnalytics.reverse();
+
+  if (!grouped.length) {
+    return { feedsWithAnalytics: [], nextCursor: null, previousCursor: null };
+  }
+
+  // Highest total revenue first; tie-break on feedId so the order is stable.
+  const sorted = grouped
+    .map((g) => ({
+      feedId: g.feedId,
+      widgetImpressions: g._sum.widgetImpressions ?? 0,
+      widgetClicks: g._sum.widgetClicks ?? 0,
+      widgetVideoPlays: g._sum.widgetVideoPlays ?? 0,
+      widgetViews: g._sum.widgetViews ?? 0,
+      widgetProductClicks: g._sum.widgetProductClicks ?? 0,
+      widgetAddToCart: g._sum.widgetAddToCart ?? 0,
+      widgetOrders: g._sum.widgetOrders ?? 0,
+      widgetRevenue: g._sum.widgetRevenue ?? 0,
+    }))
+    .sort((a, b) => (b.widgetRevenue - a.widgetRevenue) || a.feedId.localeCompare(b.feedId));
+
+  // Cursor is now a feedId (previously an analytics-row id).
+  let start = 0;
+  if (cursor) {
+    const idx = sorted.findIndex((r) => r.feedId === cursor);
+    if (idx !== -1) {
+      start = direction === 'next' ? idx + 1 : Math.max(0, idx - safeTake);
+    }
+  }
+  const page = sorted.slice(start, start + safeTake);
+
+  const feeds = await prisma.feed.findMany({
+    where: { id: { in: page.map((r) => r.feedId) } },
+    select: {
+      id: true,
+      feedName: true,
+      widgetId: true,
+      widgetType: true,
+      isEnabled: true,
+      shopDomain: true,
+    },
+  });
+  const feedById = new Map(feeds.map((f) => [f.id, f]));
+
+  const feedsWithAnalytics = page.map((r) => ({
+    id: r.feedId,
+    ...r,
+    feed: feedById.get(r.feedId) ?? null,
+  }));
 
   return {
     feedsWithAnalytics,
-    nextCursor: cursor,
-    previousCursor: hasMore ? feedsWithAnalytics[0].id : null,
+    nextCursor: start + safeTake < sorted.length ? page[page.length - 1]?.feedId ?? null : null,
+    previousCursor: start > 0 ? page[0]?.feedId ?? null : null,
   };
 }
