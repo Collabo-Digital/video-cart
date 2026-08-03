@@ -244,7 +244,12 @@
   transition: background 0.2s;
 }
 
-.video-carousel-overlay-product-add:hover {
+.video-carousel-overlay-product-add:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.video-carousel-overlay-product-add:hover:not(:disabled) {
   background: #333;
 }
 

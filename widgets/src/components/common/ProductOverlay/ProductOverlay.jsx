@@ -1,10 +1,52 @@
 /* eslint-disable react/prop-types -- shared overlay used by widget variants */
 import { For, Show } from 'solid-js';
-import { productsForVideo, productPrice } from '../../../utils/widgetHelpers';
+import { productsForVideo } from '../../../utils/widgetHelpers';
+import { useLiveProduct } from '../../../hooks/useLiveProduct';
+import { LABEL_SOLD_OUT } from '../../../constants/strings';
 import { PRODUCT_ITEM_GAP } from '../../../core/constant';
 import LeftToggleIcon from '../../../assets/Icons/LeftToggleIcon';
 import RightToggleIcon from '../../../assets/Icons/RightToggleIcon';
 import './productOverlay.css';
+
+/**
+ * One tagged product. Renders the stored title/image immediately (no layout
+ * shift), then replaces price/availability with live data from Shopify so
+ * shoppers never see a stale price.
+ */
+function ProductItem({ product, video, addToCartButtonLabel, addToCartButtonStyle, onProductClick }) {
+  const { price, available } = useLiveProduct(product);
+
+  return (
+    <div className="vd-product-overlay-item">
+      <img src={product.image} alt={product.title} loading="lazy" />
+      <div className="vd-product-overlay-item-info">
+        <span className="vd-product-overlay-item-title">
+          {product.title}
+        </span>
+        <div className="vd-product-overlay-item-info-inner">
+          <Show when={price()}>
+            <span className="vd-product-overlay-item-price">
+              {price()}
+            </span>
+          </Show>
+          <button
+            type="button"
+            className="vd-product-overlay-item-button"
+            style={addToCartButtonStyle()}
+            disabled={!available()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!available()) return;
+              onProductClick(product, video);
+            }}
+          >
+            {available() ? addToCartButtonLabel() : LABEL_SOLD_OUT}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function ProductOverlay({
   video,
@@ -57,32 +99,13 @@ export function ProductOverlay({
           <div className="vd-product-overlay-products-inner" ref={stripRef}>
             <For each={products()}>
               {(product) => (
-                <div className="vd-product-overlay-item">
-                  <img src={product.image} alt={product.title} loading="lazy" />
-                  <div className="vd-product-overlay-item-info">
-                    <span className="vd-product-overlay-item-title">
-                      {product.title}
-                    </span>
-                    <div className="vd-product-overlay-item-info-inner">
-                      <Show when={productPrice(product)?.formatted}>
-                        <span className="vd-product-overlay-item-price">
-                          {productPrice(product)?.formatted}
-                        </span>
-                      </Show>
-                      <button
-                        type="button"
-                        className="vd-product-overlay-item-button"
-                        style={addToCartButtonStyle()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onProductClick(product, video);
-                        }}
-                      >
-                        {addToCartButtonLabel()}
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                <ProductItem
+                  product={product}
+                  video={video}
+                  addToCartButtonLabel={addToCartButtonLabel}
+                  addToCartButtonStyle={addToCartButtonStyle}
+                  onProductClick={onProductClick}
+                />
               )}
             </For>
           </div>

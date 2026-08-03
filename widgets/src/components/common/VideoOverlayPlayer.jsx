@@ -6,6 +6,8 @@ import { Portal } from 'solid-js/web';
 import Hls from 'hls.js/light';
 import mux from 'mux-embed';
 import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
+import { useLiveProduct } from '../../hooks/useLiveProduct';
+import { LABEL_SOLD_OUT } from '../../constants/strings';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 import './videoOverlay.css';
 import CloseIcon from '../../assets/Icons/CloseIcon';
@@ -16,12 +18,45 @@ import MuteIcon from '../../assets/Icons/MuteIcon';
 
 const MOBILE_BREAKPOINT = 768;
 
+/**
+ * One tagged product in the fullscreen player. Shows the stored title/image
+ * immediately, then live price/availability from Shopify so shoppers never see
+ * a price that changed after the merchant tagged the product.
+ */
+function OverlayProductItem({ product, video, addToCartButtonLabel, addToCartButtonStyle, handleProductClick }) {
+  const { price, available } = useLiveProduct(product);
+
+  return (
+    <div className="video-carousel-overlay-product">
+      <div className="video-carousel-overlay-product-image-wrap">
+        <img src={product.image} alt={product.title} loading="lazy" />
+      </div>
+      <div className="video-carousel-overlay-product-info">
+        <span className="video-carousel-overlay-product-title">{product.title}</span>
+        <Show when={price()}>
+          <span className="video-carousel-overlay-product-price">{price()}</span>
+        </Show>
+        <button
+          type="button"
+          className="video-carousel-overlay-product-add video-carousel-overlay-product-shop"
+          style={addToCartButtonStyle()}
+          disabled={!available()}
+          onClick={(e) => {
+            e.preventDefault();
+            if (!available()) return;
+            handleProductClick(product, video);
+          }}
+        >{available() ? addToCartButtonLabel() : LABEL_SOLD_OUT}</button>
+      </div>
+    </div>
+  );
+}
+
 export function VideoOverlayPlayer({
   videos,
   expandedIndex,
   setExpandedIndex,
   productsForVideo,
-  productPrice,
   addToCartButtonLabel,
   addToCartButtonStyle,
   handleProductClick,
@@ -532,27 +567,13 @@ export function VideoOverlayPlayer({
                       <div className="video-carousel-overlay-products-inner">
                         <For each={productsForVideo(video)}>
                           {(product) => (
-                            <div className="video-carousel-overlay-product">
-                              <div className="video-carousel-overlay-product-image-wrap">
-                                <img src={product.image} alt={product.title} loading="lazy" />
-                              </div>
-                              <div className="video-carousel-overlay-product-info">
-                                <span className="video-carousel-overlay-product-title">{product.title}</span>
-                                <Show when={productPrice(product)?.formatted}>
-                                  <span className="video-carousel-overlay-product-price">{productPrice(product).formatted}</span>
-                                </Show>
-                                <button
-                                  type="button"
-                                  className="video-carousel-overlay-product-add video-carousel-overlay-product-shop"
-                                  style={addToCartButtonStyle()}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleProductClick(product, video);
-                                  }}
-                                >{addToCartButtonLabel()}</button>
-
-                              </div>
-                            </div>
+                            <OverlayProductItem
+                              product={product}
+                              video={video}
+                              addToCartButtonLabel={addToCartButtonLabel}
+                              addToCartButtonStyle={addToCartButtonStyle}
+                              handleProductClick={handleProductClick}
+                            />
                           )}
                         </For>
                       </div>

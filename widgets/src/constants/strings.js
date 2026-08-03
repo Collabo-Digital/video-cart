@@ -1,4 +1,5 @@
 export const DEFAULT_ADD_TO_CART = 'Check this out';
+export const LABEL_SOLD_OUT = 'Sold out';
 
 export const TOAST_ADDED = 'Added to cart';
 export const TOAST_ADD_FAILED = 'Could not add to cart';
