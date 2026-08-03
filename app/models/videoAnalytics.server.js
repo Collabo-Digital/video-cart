@@ -7,6 +7,8 @@
 import prisma from '../config/database.server';
 
 const VIDEOS_PAGE_SIZE = 10;
+const MIN_TAKE = 1;
+const MAX_TAKE = 100;
 const VIDEO_ORDER_DESC = [{ videoRevenue: 'desc' }, { id: 'asc' }];
 const VIDEO_ORDER_ASC = [{ videoRevenue: 'asc' }, { id: 'desc' }];
 
@@ -212,6 +214,9 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
  */
 export async function getListofVideosWithAnalytics(shopDomain, options = {}) {
   const { cursor, direction = 'next', take = VIDEOS_PAGE_SIZE, startDate, endDate } = options;
+  // `take` arrives from a JSON body, so it can be a string ("5" + 1 === "51") or
+  // an absurd number. Coerce and clamp — same pattern as video.server.js.
+  const safeTake = Math.min(MAX_TAKE, Math.max(MIN_TAKE, Number(take) || VIDEOS_PAGE_SIZE));
 
   const where = { shopDomain, isDeleted: false };
   if (startDate != null && endDate != null) {
@@ -232,11 +237,11 @@ export async function getListofVideosWithAnalytics(shopDomain, options = {}) {
     const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
       where,
       orderBy: VIDEO_ORDER_DESC,
-      take: take + 1,
+      take: safeTake + 1,
       include,
     });
-    const hasMore = videosWithAnalyticsItems.length > take;
-    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
+    const hasMore = videosWithAnalyticsItems.length > safeTake;
+    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, safeTake) : videosWithAnalyticsItems;
 
     return {
       videosWithAnalytics,
@@ -251,11 +256,11 @@ export async function getListofVideosWithAnalytics(shopDomain, options = {}) {
       orderBy: VIDEO_ORDER_DESC,
       cursor: { id: cursor },
       skip: 1,
-      take: take + 1,
+      take: safeTake + 1,
       include,
     });
-    const hasMore = videosWithAnalyticsItems.length > take;
-    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
+    const hasMore = videosWithAnalyticsItems.length > safeTake;
+    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, safeTake) : videosWithAnalyticsItems;
 
     return {
       videosWithAnalytics,
@@ -269,11 +274,11 @@ export async function getListofVideosWithAnalytics(shopDomain, options = {}) {
     orderBy: VIDEO_ORDER_ASC,
     cursor: { id: cursor },
     skip: 1,
-    take: take + 1,
+    take: safeTake + 1,
     include,
   });
-  const hasMore = videosWithAnalyticsItems.length > take;
-  const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
+  const hasMore = videosWithAnalyticsItems.length > safeTake;
+  const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, safeTake) : videosWithAnalyticsItems;
   videosWithAnalytics.reverse();
 
   return {

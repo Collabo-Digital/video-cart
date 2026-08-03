@@ -27,7 +27,7 @@ export const loader = async ({ request, params }) => {
   }
 
   try {
-    const uploadData = await getUploadStatus(uploadId);
+    const uploadData = await getUploadStatus(uploadId, session.shop);
 
     return new Response(
       JSON.stringify({
@@ -57,7 +57,8 @@ export const loader = async ({ request, params }) => {
         code: 'UPLOAD_STATUS_FAILED',
       }),
       {
-        status: 500,
+        // Ownership failures surface as 404, not 500.
+        status: error.statusCode ?? 500,
         headers: {
           'Content-Type': 'application/json',
         },

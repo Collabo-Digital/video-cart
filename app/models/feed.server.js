@@ -100,6 +100,21 @@ export async function updateVideosProductsTagged(feedId, videos) {
 }
 
 /**
+ * Find the FeedVideo junction row for a (feed, video) pair.
+ * Used to prove a video genuinely belongs to a feed before recording analytics
+ * against it — otherwise anyone could write events for another shop's video.
+ * @param {string} feedId - Feed ID
+ * @param {string} videoId - Video ID
+ * @returns {Promise<Object|null>} FeedVideo row or null
+ */
+export async function findFeedVideo(feedId, videoId) {
+  if (!feedId || !videoId) return null;
+  return prisma.feedVideo.findUnique({
+    where: { feedId_videoId: { feedId, videoId } },
+  });
+}
+
+/**
  * Sync feed videos: create or update FeedVideo for each resolved video, remove others.
  * Used when saving feed so new uploads (resolved by playbackId/assetId) appear in the feed.
  * @param {string} feedId - Feed ID

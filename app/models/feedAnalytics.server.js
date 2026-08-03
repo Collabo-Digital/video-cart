@@ -7,6 +7,8 @@
 import prisma from '../config/database.server';
 
 const FEEDS_PAGE_SIZE = 10;
+const MIN_TAKE = 1;
+const MAX_TAKE = 100;
 const ORDER_DESC = [{ widgetRevenue: 'desc' }, { id: 'asc' }];
 const ORDER_ASC = [{ widgetRevenue: 'asc' }, { id: 'desc' }];
 
@@ -185,6 +187,9 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
  */
 export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
   const { cursor, direction = 'next', take = FEEDS_PAGE_SIZE, startDate, endDate } = options;
+  // `take` arrives from a JSON body, so it can be a string ("5" + 1 === "51") or
+  // an absurd number. Coerce and clamp — same pattern as video.server.js.
+  const safeTake = Math.min(MAX_TAKE, Math.max(MIN_TAKE, Number(take) || FEEDS_PAGE_SIZE));
 
   const where = { shopDomain, isDeleted: false };
   if (startDate != null && endDate != null) {
@@ -208,11 +213,11 @@ export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
     const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
       where,
       orderBy: ORDER_DESC,
-      take: take + 1,
+      take: safeTake + 1,
       include,
     });
-    const hasMore = feedsWithAnalyticsItems.length > take;
-    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
+    const hasMore = feedsWithAnalyticsItems.length > safeTake;
+    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, safeTake) : feedsWithAnalyticsItems;
     return {
       feedsWithAnalytics,
       nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
@@ -226,11 +231,11 @@ export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
       orderBy: ORDER_DESC,
       cursor: { id: cursor },
       skip: 1,
-      take: take + 1,
+      take: safeTake + 1,
       include,
     });
-    const hasMore = feedsWithAnalyticsItems.length > take;
-    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
+    const hasMore = feedsWithAnalyticsItems.length > safeTake;
+    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, safeTake) : feedsWithAnalyticsItems;
     return {
       feedsWithAnalytics,
       nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
@@ -243,11 +248,11 @@ export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
     orderBy: ORDER_ASC,
     cursor: { id: cursor },
     skip: 1,
-    take: take + 1,
+    take: safeTake + 1,
     include,
   });
-  const hasMore = feedsWithAnalyticsItems.length > take;
-  const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
+  const hasMore = feedsWithAnalyticsItems.length > safeTake;
+  const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, safeTake) : feedsWithAnalyticsItems;
   feedsWithAnalytics.reverse();
 
   return {

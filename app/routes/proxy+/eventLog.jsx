@@ -53,6 +53,19 @@ export const loader = async ({ request }) => {
     const feed = await FeedModel.findById(feedId, session.shop);
     if (!feed) throw new Error('Feed not found');
 
+    // videoId must actually belong to this feed. feedId is already proven to be
+    // this shop's, so a matching FeedVideo row proves the video is theirs too —
+    // otherwise anyone could record analytics against another merchant's video.
+    if (videoId) {
+      const feedVideo = await FeedModel.findFeedVideo(feedId, videoId);
+      if (!feedVideo) {
+        return Response.json(
+          { success: false, error: "Video not in feed" },
+          { status: 404, headers: JSON_HEADERS }
+        );
+      }
+    }
+
     await recordEvent({
       feedId,
       videoId,
@@ -62,6 +75,10 @@ export const loader = async ({ request }) => {
 
     return Response.json({ success: true }, { status: 200, headers: JSON_HEADERS });
   } catch (err) {
+    // authenticate.public.appProxy throws a Response (400) on an invalid
+    // signature — framework control flow, not an error. Let it through.
+    if (err instanceof Response) throw err;
+
     if (err.message === "Feed not found") {
       return Response.json(
         { success: false, error: "Feed not found" },

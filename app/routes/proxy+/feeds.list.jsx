@@ -35,6 +35,10 @@ export const loader = async ({ request }) => {
       data: feedList,
     });
   } catch (error) {
+    // authenticate.public.appProxy throws a Response (400) on an invalid
+    // signature — framework control flow, not an error. Let it through.
+    if (error instanceof Response) throw error;
+
     console.error('Proxy list feeds error:', error);
 
     return Response.json({

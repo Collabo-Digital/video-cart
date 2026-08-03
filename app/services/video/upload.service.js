@@ -68,20 +68,47 @@ export async function createUploadUrl(options = {}) {
 }
 
 /**
- * Get upload status from Mux
+ * Get upload status from Mux, scoped to the owning shop.
+ * Ownership comes from the passthrough written at createUploadUrl time, which
+ * works even before the Mux asset (and our Video row) exists.
  * @param {string} uploadId - Mux upload ID
+ * @param {string} shopDomain - Authenticated shop (ownership is enforced)
  * @returns {Promise<Object>} Upload status
  */
-export async function getUploadStatus(uploadId) {
+export async function getUploadStatus(uploadId, shopDomain) {
+  if (!shopDomain || typeof shopDomain !== 'string') {
+    throw new Error('shopDomain is required');
+  }
+
   const upload = await mux.video.uploads.retrieve(uploadId);
-  const asset = await mux.video.assets.retrieve(upload.asset_id);
+
+  let owner = null;
+  try {
+    owner = JSON.parse(upload?.new_asset_settings?.passthrough ?? '{}')?.shopDomain ?? null;
+  } catch {
+    owner = null;
+  }
+  if (owner !== shopDomain) {
+    // Same response as "doesn't exist" so we don't leak which uploads are real.
+    const err = new Error('Upload not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // asset_id only exists once Mux has created the asset; fetching before then
+  // makes Mux 404 and turns every early poll into a 500.
+  let playbackId = null;
+  if (upload.asset_id) {
+    const asset = await mux.video.assets.retrieve(upload.asset_id);
+    playbackId = asset.playback_ids ?? null;
+  }
 
   return {
     id: upload.id,
     status: upload.status,
-    assetId: upload.asset_id,
+    assetId: upload.asset_id ?? null,
     error: upload.error,
-    playbackId: asset.playback_ids,
+    playbackId,
   };
 }
 

@@ -18,6 +18,10 @@ export const loader = async ({ request }) => {
       data: { settings },
     });
   } catch (error) {
+    // authenticate.public.appProxy throws a Response (400) on an invalid
+    // signature — framework control flow, not an error. Let it through.
+    if (error instanceof Response) throw error;
+
     console.error("[Proxy Settings] Error:", error);
     return Response.json(
       { success: false, error: error.message || "Failed to fetch settings" },
