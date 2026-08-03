@@ -16,7 +16,7 @@ export async function findAll(filters = {}) {
   const { status, limit = 50, offset = 0 } = filters;
 
   return prisma.video.findMany({
-    where: status ? { status } : undefined,
+    where: { isDeleted: false, ...(status ? { status } : {}) },
     orderBy: { createdAt: 'desc' },
     take: limit,
     skip: offset,
@@ -88,7 +88,8 @@ export async function findByFileUploadName(fileUploadName, shopDomain) {
   if (!fileUploadName || typeof fileUploadName !== 'string') return null;
   const name = fileUploadName.trim();
   if (!name) return null;
-  const where = { fileUploadName: name };
+  // Retired videos must not block re-uploading the same file.
+  const where = { fileUploadName: name, isDeleted: false };
   // Scope to the shop so one merchant's filename can't collide with another's.
   if (shopDomain) where.shopDomain = shopDomain;
   return prisma.video.findFirst({ where });
@@ -135,19 +136,17 @@ export async function upsertByUploadId(data) {
 }
 
 /**
- * Delete video by ID (database only)
+ * Retire a video: delete the Mux asset, remove it from every feed, and soft
+ * delete the DB record.
+ *
+ * The row is kept (isDeleted) rather than hard deleted because Video ->
+ * VideoAnalytics is onDelete: Cascade — a hard delete would destroy the video's
+ * entire history and retroactively change past reports, while the matching
+ * VideoCartOrderItem revenue rows (which have no Video relation) would survive
+ * and leave the two sources permanently inconsistent.
+ *
  * @param {string} id - Video ID
- * @returns {Promise<Object>} Deleted video object
- */
-export async function deleteById(id) {
-  return prisma.video.delete({ where: { id } });
-}
-
-/**
- * Delete video from Mux and database. Removes Mux asset first, then DB record.
- * Cascade deletes FeedVideo and VideoAnalytics for this video.
- * @param {string} id - Video ID
- * @returns {Promise<Object>} Deleted video object
+ * @returns {Promise<Object>} Soft-deleted video object
  */
 export async function deleteVideoAndMuxAsset(id) {
   if (!id) throw new Error('Video ID is required');
@@ -164,7 +163,14 @@ export async function deleteVideoAndMuxAsset(id) {
     }
   }
 
-  return prisma.video.delete({ where: { id } });
+  // Remove from feeds so it stops rendering on the storefront (this is the part
+  // that SHOULD be destructive), but keep the analytics history intact.
+  await prisma.feedVideo.deleteMany({ where: { videoId: id } });
+
+  return prisma.video.update({
+    where: { id },
+    data: { isDeleted: true, videoPlaybackId: null },
+  });
 }
 
 /**
@@ -177,7 +183,7 @@ export async function count(shopDomain) {
     throw new Error('shopDomain is required and must be a string');
   }
   return prisma.video.count({
-    where: { shopDomain: shopDomain.trim() },
+    where: { shopDomain: shopDomain.trim(), isDeleted: false },
   });
 }
 
@@ -242,6 +248,7 @@ export async function findAllPaginatedWithWidgets(shopDomain, filters = {}) {
 
   const where = {
     shopDomain: shopDomain.trim(),
+    isDeleted: false,
   };
 
   // if (startDate != null || endDate != null) {
@@ -364,9 +371,8 @@ export async function findAllPaginatedWithWidgets(shopDomain, filters = {}) {
  * @returns {Promise<Array>} Array of video objects with id and videoPlaybackId
  */
 export async function findVideoIdsAndPlaybackIdsByShop(shopDomain) {
-  console.log("shopDomain form video.server.js -->", shopDomain);
   const videos = await prisma.video.findMany({
-    where: { shopDomain },
+    where: { shopDomain, isDeleted: false },
     select: { id: true, videoPlaybackId: true },
   });
   return videos.map((v) => ({ videoId: v.id, playbackId: v.videoPlaybackId }));

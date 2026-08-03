@@ -110,6 +110,9 @@ model Video {
   status          String   @default("PROCESSING")
   duration        Float?
   aspectRatio     String?
+  // Soft delete: retiring a video must NOT cascade-destroy its historical
+  // VideoAnalytics rows (which would retroactively change past reports).
+  isDeleted       Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -119,6 +122,7 @@ model Video {
   shop           Shop             @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
 
   @@index([fileUploadName])
+  @@index([shopDomain, isDeleted])
   @@index([shopDomain])
 }
 
