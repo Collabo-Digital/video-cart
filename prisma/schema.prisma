@@ -217,6 +217,8 @@ model FeedAnalytics {
   @@index([date])
   @@index([isDeleted])
   @@index([shopDomain])
+  // Serves the shop-wide analytics reads: equality on shopDomain + range on date.
+  @@index([shopDomain, date])
 }
 
 // Video-in-feed analytics: one row per (video, feed) per day
@@ -246,6 +248,11 @@ model VideoAnalytics {
   @@index([date])
   @@index([isDeleted])
   @@index([shopDomain])
+  // Serves the shop-wide analytics reads: equality on shopDomain + range on date.
+  @@index([shopDomain, date])
+  // findByFeedAndDateRange filters on feedId, which is NOT the prefix of
+  // @@unique([videoId, feedId, date]) — so that index cannot serve it.
+  @@index([feedId, date])
 }
 
 // Orders that had at least one line item attributed to the video-cart widget (from pixel).

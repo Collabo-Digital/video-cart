@@ -137,7 +137,10 @@ export async function getAggregatedByShop(shopDomain, { startDate, endDate }) {
   const end = toDateOnly(endDate);
   const rows = await prisma.videoAnalytics.findMany({
     where: {
-      feed: { shopDomain, isDeleted: false },
+      // Filter on the denormalized column (indexed) rather than through the
+      // relation; keep feed.isDeleted so deleted feeds stay excluded.
+      shopDomain,
+      feed: { isDeleted: false },
       isDeleted: false,
       date: { gte: start, lte: end },
     },
@@ -174,7 +177,10 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   const end = toDateOnly(endDate);
   const rows = await prisma.videoAnalytics.findMany({
     where: {
-      feed: { shopDomain, isDeleted: false },
+      // Filter on the denormalized column (indexed) rather than through the
+      // relation; keep feed.isDeleted so deleted feeds stay excluded.
+      shopDomain,
+      feed: { isDeleted: false },
       isDeleted: false,
       date: { gte: start, lte: end },
     },
