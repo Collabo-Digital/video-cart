@@ -14,7 +14,9 @@ export const loader = async ({ request }) => {
     const vd = globalRecord?.settings?.general?.videoDiscovery;
 
     if (!vd?.isEnabled) {
-      return Response.json({ success: true, data: { videos: [] } });
+      return Response.json({ success: true, data: { videos: [] } }, {
+        headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=600" },
+      });
     }
 
     const feedWhere = { shopDomain: session.shop, isDeleted: false, isEnabled: true };
@@ -62,7 +64,16 @@ export const loader = async ({ request }) => {
       }
     }
 
-    return Response.json({ success: true, data: { videos } });
+    // Per-shop data — safe to cache briefly, EXCEPT when the merchant asked for a
+    // random order: caching would freeze one shuffle for every visitor in the window.
+    const cacheable = vd.sortOrder !== "random";
+    return Response.json({ success: true, data: { videos } }, {
+      headers: {
+        "Cache-Control": cacheable
+          ? "public, max-age=300, stale-while-revalidate=600"
+          : "no-store",
+      },
+    });
   } catch (error) {
     // authenticate.public.appProxy throws a Response (400) on an invalid
     // signature — framework control flow, not an error. Let it through.

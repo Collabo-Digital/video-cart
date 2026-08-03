@@ -15,17 +15,24 @@ async function init() {
   if (window.__video_cart_config__?.__initialized) return;
   window.__video_cart_config__.__initialized = true;
 
-  try {
-    const { settings } = await api.settings.fetchSettings();
-    window.__video_cart_config__.settings = settings;
-    injectGlobalCustomCss(settings?.design);
-  } catch (err) {
-    console.error('Failed to load global settings:', err);
-  }
+  // Global settings and the per-feed fetches are independent (initFeeds uses each
+  // feed's own settings), so run them together instead of making every widget wait
+  // a full uncached proxy round-trip for the settings call.
+  const settingsPromise = api.settings
+    .fetchSettings()
+    .then(({ settings }) => {
+      window.__video_cart_config__.settings = settings;
+      injectGlobalCustomCss(settings?.design);
+      return settings;
+    })
+    .catch((err) => {
+      console.error('Failed to load global settings:', err);
+      return null;
+    });
 
-  await initFeeds();
+  const [settings] = await Promise.all([settingsPromise, initFeeds()]);
 
-  const vd = window.__video_cart_config__?.settings?.general?.videoDiscovery;
+  const vd = settings?.general?.videoDiscovery;
   if (vd?.isEnabled) {
     try {
       const { videos } = await api.settings.fetchDiscoveryVideos();

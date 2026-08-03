@@ -1,7 +1,9 @@
 /* eslint-disable react/prop-types -- shared overlay used by widget variants */
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
 import { Portal } from 'solid-js/web';
-import Hls from 'hls.js';
+// Light build: drops alternate-audio, subtitles and DRM/EME — none of which a
+// short-form shoppable video widget uses. ~54 KB gzip smaller than 'hls.js'.
+import Hls from 'hls.js/light';
 import mux from 'mux-embed';
 import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { MUX_DATA_ENV_KEY } from '../../core/config';

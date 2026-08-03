@@ -73,7 +73,14 @@ export async function initFeeds() {
   }
 
   const widgets = window.__video_cart_config__?.widgets || [];
+  const logError = (err) => {
+    if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console?.error === 'function') {
+      console.error('Video feed error:', err);
+    }
+  };
 
+  // Collect the containers that still need mounting.
+  const jobs = [];
   for (const container of containers) {
     if (container.dataset.videoCartInitialized === 'true') continue;
     const feedId = container.dataset.feedId;
@@ -85,28 +92,53 @@ export async function initFeeds() {
     const mountEl = document.getElementById(containerId);
     if (!mountEl) continue;
 
-    const cached = widgets.find((entry) => entry.containerId === containerId);
+    jobs.push({ container, feedId, containerId, shop, mountEl });
+  }
+  if (!jobs.length) return;
+
+  // Fetch every feed in parallel. Previously this awaited inside the loop, so N
+  // widgets on a page cost N sequential uncached proxy round-trips.
+  const feeds = await Promise.all(
+    jobs.map((job) => {
+      const cached = widgets.find((entry) => entry.containerId === job.containerId);
+      if (cached) return Promise.resolve(cached);
+
+      return api.feeds
+        .fetchFeed(job.feedId, job.shop)
+        .then((feed) => {
+          const alreadyStored = widgets.some((entry) => entry.containerId === job.containerId);
+          if (!alreadyStored && window.__video_cart_config__?.widgets) {
+            window.__video_cart_config__.widgets.push({
+              feedId: job.feedId,
+              containerId: job.containerId,
+              shop: job.shop,
+              ...feed,
+            });
+          }
+          return feed;
+        })
+        .catch((err) => {
+          // Isolate failures so one bad feed can't stop the others rendering.
+          logError(err);
+          return null;
+        });
+    })
+  );
+
+  const currentPage = window.__video_cart_config__?.store_page || 'other';
+
+  jobs.forEach((job, i) => {
+    const feed = feeds[i];
+    if (!feed) return;
 
     try {
-      let feed;
-      if (cached) {
-        feed = cached;
-      } else {
-        feed = await api.feeds.fetchFeed(feedId, shop);
-        const widgetEntry = { feedId, containerId, shop, ...feed };
-        const alreadyStored = widgets.some((entry) => entry.containerId === containerId);
-        if (!alreadyStored && window.__video_cart_config__?.widgets) {
-          window.__video_cart_config__.widgets.push(widgetEntry);
-        }
-      }
-      if (!feed.shop) feed.shop = shop;
+      if (!feed.shop) feed.shop = job.shop;
 
-      const currentPage = window.__video_cart_config__?.store_page || 'other';
       const feedPage = feed.widgetPage || 'homePage';
       if (feedPage === 'custom') {
-        if (window.location.pathname !== feed.customPagePath) continue;
-      } else {
-        if (currentPage !== feedPage) continue;
+        if (window.location.pathname !== feed.customPagePath) return;
+      } else if (currentPage !== feedPage) {
+        return;
       }
 
       const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;
@@ -115,7 +147,7 @@ export async function initFeeds() {
         throw new Error(`Unknown widget type: ${widgetType}`);
       }
 
-      mountEl.innerHTML = '';
+      job.mountEl.innerHTML = '';
       render(
         () =>
           widgetDef.component({
@@ -123,15 +155,11 @@ export async function initFeeds() {
             videos: feed.videos || [],
             settings: feed.settings || {},
           }),
-        mountEl
+        job.mountEl
       );
-      container.dataset.videoCartInitialized = 'true';
-
+      job.container.dataset.videoCartInitialized = 'true';
     } catch (err) {
-      if (typeof import.meta !== 'undefined' && import.meta.env?.DEV && typeof console?.error === 'function') {
-        console.error('Video feed error:', err);
-      }
-      // mountEl.innerHTML = '<p style="text-align:center;padding:1rem;color:#6b7280;">Error loading video feed.</p>';
+      logError(err);
     }
-  }
+  });
 }

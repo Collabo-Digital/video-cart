@@ -90,7 +90,7 @@
        data-shop="{{ shop.permanent_domain }}">
     <div id="video-carousel-{{ block.id }}" data-widget-id="{{ block.settings.feed_id  }}" ></div>
   </div>
-  <script src="{{ 'bundle-video-cart.iife.js' | asset_url }}" defer></script>
+  {% comment %} The bundle is loaded once by the app embed (app-embed.liquid). {% endcomment %}
 {% else %}
   {% if request.design_mode %}
     <div style="padding: 40px; text-align: center; background: #f6f6f7; border: 2px dashed #d1d5db; border-radius: 8px; color: #6d7175;">
