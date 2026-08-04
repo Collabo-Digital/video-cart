@@ -92,7 +92,10 @@ export const loader = async ({ request, params }) => {
         widgetPage: feed.widgetPage,
         customPagePath: feed.customPagePath || null,
         isEnabled: feed.isEnabled,
-        videos: feed.videos,
+        // readyVideos, NOT feed.videos: the raw junction rows expose FeedVideo
+        // ids (breaking video analytics, which expect a Video id) and include
+        // PROCESSING/ERRORED videos that render as broken players on the store.
+        videos: readyVideos,
         settings: {
           autoplay: feed.autoplay,
           showControls: feed.showControls,

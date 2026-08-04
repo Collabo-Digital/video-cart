@@ -41,6 +41,18 @@ async function resolveVideoId(videoPayload) {
 }
 
 /**
+ * Persist a display-name edit that arrived with the feed payload.
+ * Shared by createFeed and updateFeed so a rename made before a feed's first
+ * save is no longer silently discarded.
+ * @param {string} videoId - Resolved Video.id
+ * @param {{fileName?: string}} entry - Payload video
+ */
+async function applyFileName(videoId, entry) {
+  const name = typeof entry.fileName === 'string' ? entry.fileName.trim() : '';
+  if (name) await VideoModel.updateById(videoId, { fileName: name });
+}
+
+/**
  * Get all feeds for a shop
  * @param {string} shopDomain - Shop domain
  * @returns {Promise<Array>} Array of feeds
@@ -105,6 +117,31 @@ export async function createFeed(data) {
     throw new Error('Shop domain is required');
   }
 
+  // Resolve every payload video to a real Video.id BEFORE building the nested
+  // create. The upload flow hands the client a MUX UPLOAD id (not a Video id),
+  // so connecting by the raw value made every new-feed-with-a-fresh-upload save
+  // fail. resolveVideoId accepts a Video id, playbackId, assetId or upload id —
+  // the same resolution updateFeed already relies on.
+  const resolvedVideos = [];
+  for (let i = 0; i < videos.length; i++) {
+    const entry = videos[i];
+    const videoId = await resolveVideoId(entry);
+    if (!videoId) {
+      // Don't silently drop the merchant's video — tell them which one.
+      throw new Error(
+        `"${entry.fileName || 'A video'}" is still processing. Wait a few seconds, then save again.`,
+      );
+    }
+    await applyFileName(videoId, entry);
+    resolvedVideos.push({
+      video: { connect: { id: videoId } },
+      shop: { connect: { shopDomain } },
+      playbackId: entry.playbackId,
+      position: entry.position ?? i,
+      productsTagged: entry.productsTagged || [],
+    });
+  }
+
   const feedData = {
     feedName: feedName.trim(),
     shop: { connect: { shopDomain } },
@@ -113,18 +150,7 @@ export async function createFeed(data) {
     customPagePath: widgetPage === 'custom' ? (customPagePath || null) : null,
     isEnabled: isEnabled !== false,
     settings: settings || undefined,
-    videos: {
-      create: videos.map((video, index) => {
-        const videoId = video.videoId ?? video.id;
-        return {
-          video: { connect: { id: videoId } },
-          shop: { connect: { shopDomain } },
-          playbackId: video.playbackId,
-          position: video.position ?? index,
-          productsTagged: video.productsTagged || [],
-        };
-      }),
-    },
+    videos: { create: resolvedVideos },
   };
 
   return FeedModel.create(feedData);
@@ -178,28 +204,47 @@ export async function updateFeed(feedId, data, shopDomain) {
     updateData.settings = settings || null;
   }
 
-  const result = await FeedModel.updateById(feedId, updateData);
-
-  let feedForSync = null;
-  if (videos && Array.isArray(videos) && videos.length > 0) {
-    feedForSync = await FeedModel.findById(feedId);
-    const resolvedVideos = [];
+  // Resolve and validate EVERY video before touching the feed, exactly as
+  // createFeed does. Updating first and throwing afterwards left the feed's
+  // scalars committed while the UI reported a failed save.
+  const hasVideos = videos && Array.isArray(videos) && videos.length > 0;
+  const resolvedVideos = [];
+  if (hasVideos) {
     for (let i = 0; i < videos.length; i++) {
       const videoEntry = videos[i];
       const videoId = await resolveVideoId(videoEntry);
-      if (videoId && videoEntry.playbackId) {
-        if (videoEntry.fileName != null && typeof videoEntry.fileName === 'string' && videoEntry.fileName.trim()) {
-          await VideoModel.updateById(videoId, { fileName: videoEntry.fileName.trim() });
-        }
-        resolvedVideos.push({
-          videoId,
-          playbackId: videoEntry.playbackId,
-          position: videoEntry.position ?? i,
-          productsTagged: videoEntry.productsTagged ?? [],
-        });
+      // Mirror createFeed: skipping silently here meant syncFeedVideos never saw
+      // the video, so a just-uploaded clip vanished behind a "saved" toast.
+      if (!videoId || !videoEntry.playbackId) {
+        throw new Error(
+          `"${videoEntry.fileName || 'A video'}" is still processing. Wait a few seconds, then save again.`,
+        );
       }
+      resolvedVideos.push({
+        videoId,
+        entry: videoEntry,
+        playbackId: videoEntry.playbackId,
+        position: videoEntry.position ?? i,
+        productsTagged: videoEntry.productsTagged ?? [],
+      });
     }
-    await syncFeedVideos(feedId, resolvedVideos, feedForSync?.shopDomain);
+  }
+
+  const result = await FeedModel.updateById(feedId, updateData);
+
+  if (hasVideos) {
+    const feedForSync = await FeedModel.findById(feedId);
+    for (const v of resolvedVideos) await applyFileName(v.videoId, v.entry);
+    await syncFeedVideos(
+      feedId,
+      resolvedVideos.map(({ videoId, playbackId, position, productsTagged }) => ({
+        videoId,
+        playbackId,
+        position,
+        productsTagged,
+      })),
+      feedForSync?.shopDomain,
+    );
   }
 
   return result;
