@@ -1,13 +1,20 @@
 /* eslint-disable react/prop-types -- shared overlay used by widget variants */
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
-// Light build: drops alternate-audio, subtitles and DRM/EME — none of which a
-// short-form shoppable video widget uses. ~54 KB gzip smaller than 'hls.js'.
-import Hls from 'hls.js/light';
+// Full build, NOT 'hls.js/light'. The light build omits AudioTrackController, so
+// `altAudioEnabled = !!(config.audioStreamController && config.audioTrackController)`
+// (hls.light.js:20363) is permanently false and it never fetches a separate audio
+// rendition. Mux delivers CMAF, where audio is its own EXT-X-MEDIA:TYPE=AUDIO
+// rendition — so the light build played video with silence, no error and nothing
+// for the mute fallback to catch. Costs ~54 KB gzip; audio is not optional for a
+// shoppable video widget.
+import Hls from 'hls.js';
 import mux from 'mux-embed';
 import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { useLiveProduct } from '../../hooks/useLiveProduct';
 import { OverlayProductPanel } from './OverlayProducts/OverlayProductPanel';
+import { VideoProgressBar } from './VideoProgressBar/VideoProgressBar';
+import { formatTime } from '../../utils/widgetHelpers';
 import { EMPTY_PRODUCTS, LABEL_SOLD_OUT } from '../../constants/strings';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 import './videoOverlay.css';
@@ -21,6 +28,9 @@ const MOBILE_BREAKPOINT = 768;
 
 /** Must match the video-carousel-sally-out keyframe duration in videoOverlay.css. */
 const CLOSE_ANIMATION_MS = 400;
+
+/** Must match the video-carousel-slide-* keyframe duration in videoOverlay.css. */
+const SLIDE_ANIMATION_MS = 400;
 
 /**
  * One tagged product in the fullscreen player. Shows the stored title/image
@@ -70,7 +80,7 @@ export function VideoOverlayPlayer({
 }) {
   const [videoEl, setVideoEl] = createSignal(null);
   const [reelsTrackRef, setReelsTrackRef] = createSignal(null);
-  const [isMuted, setIsMuted] = createSignal(true);
+  const [isMuted, setIsMuted] = createSignal(false);
   const [videoReady, setVideoReady] = createSignal(false);
   const [currentTime, setCurrentTime] = createSignal(0);
   const [duration, setDuration] = createSignal(0);
@@ -88,14 +98,35 @@ export function VideoOverlayPlayer({
   const posterUrl = (v) => getThumbnailUrl(v?.playbackId, 560, 748) || undefined;
 
   const total = () => videos?.length ?? 0;
-  const goPrev = () => {
-    if (!total()) return;
-    setExpandedIndex((i) => (i - 1 + total()) % total());
+
+  /* --- prev/next: slide the outgoing video out, the incoming one in -------- */
+
+  /** The video that's leaving, and which way it goes. null when idle.
+   *  Direction comes from the button pressed rather than from index arithmetic,
+   *  so wrapping last -> first still slides forward instead of sweeping back. */
+  const [outgoing, setOutgoing] = createSignal(null);
+
+  const slideTo = (dir) => {
+    if (total() < 2) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    // Mobile navigates by scroll-snap, not by these buttons; reduced motion
+    // skips the animation. Both cases just move the index.
+    if (!isMobile() && !reduced) setOutgoing({ video: currentVideo(), dir });
+    setExpandedIndex((i) => (dir === 'next'
+      ? (i + 1) % total()
+      : (i - 1 + total()) % total()));
   };
-  const goNext = () => {
-    if (!total()) return;
-    setExpandedIndex((i) => (i + 1) % total());
-  };
+
+  const goPrev = () => slideTo('prev');
+  const goNext = () => slideTo('next');
+
+  /** Drop the ghost once its animation is done. Re-running on every change means
+   *  rapid clicks replace the pending ghost instead of stacking timers. */
+  createEffect(() => {
+    if (!outgoing()) return;
+    const timer = setTimeout(() => setOutgoing(null), SLIDE_ANIMATION_MS + 60);
+    onCleanup(() => clearTimeout(timer));
+  });
 
   /* --- closing: hold the unmount open so the exit animation can play ------ */
 
@@ -103,6 +134,8 @@ export function VideoOverlayPlayer({
 
   const finishClose = () => {
     setIsClosing(false);
+    // Otherwise a stale ghost replays a phantom slide on the next open.
+    setOutgoing(null);
     setExpandedIndex(null);
   };
 
@@ -203,6 +236,12 @@ export function VideoOverlayPlayer({
 
     if (Hls.isSupported()) {
       hls = new Hls();
+      // Readable from the storefront console: if audio is ever silent again,
+      // this says whether the manifest carries an audio track at all, which
+      // separates a player bug from a silently-encoded source asset.
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        window.__videoCartAudio = { tracks: hls.audioTracks?.length ?? 0 };
+      });
       hls.loadSource(url);
       hls.attachMedia(el);
 
@@ -452,11 +491,63 @@ export function VideoOverlayPlayer({
     });
   });
 
-  /** Sync mute state and track currentTime/duration for custom controls */
+  /** Mirror the shopper's mute choice onto whichever element is live. */
+  createEffect(() => {
+    const el = videoEl();
+    if (el) el.muted = isMuted();
+  });
+
+  /** Start with sound. Browsers refuse sound-on autoplay unless they trust the
+   *  gesture; opening this overlay is a click, so it usually passes. Where it
+   *  doesn't, fall back to muted playback rather than leaving a dead frame, and
+   *  let the button reflect reality.
+   *  Depends on videoEl() only — untrack keeps a mute toggle from re-running an
+   *  autoplay attempt. */
   createEffect(() => {
     const el = videoEl();
     if (!el) return;
-    el.muted = isMuted();
+    el.muted = untrack(isMuted);
+
+    const attempt = () => {
+      el.play()?.catch((err) => {
+        // AbortError just means a pending play was interrupted — routinely
+        // hls.js swapping the source in underneath us. That is not a refusal of
+        // sound, and muting on it would silence a video nobody blocked; the
+        // canplay retry below picks it up instead.
+        if (err?.name !== 'NotAllowedError') return;
+        if (el.muted) return; // already muted and still refused, nothing left to try
+        // Readable from the console: storefront builds have no DEV logging, and
+        // this is the one thing worth knowing when audio comes up silent.
+        window.__videoCartAudioBlocked = true;
+        setIsMuted(true);
+        el.muted = true;
+        el.play()?.catch(() => {});
+      });
+    };
+
+    // Call it NOW, while the click that opened the overlay is still the current
+    // task. Permission is decided when play() is invoked, not when playback
+    // starts, and Safari only grants it while the gesture is live — deferring
+    // this to loadeddata is what got audio refused. Calling before any data is
+    // buffered is fine: the promise simply settles once playback begins.
+    attempt();
+
+    // Retry once media is actually ready, in case the first call was
+    // interrupted rather than refused.
+    const retry = () => { if (el.paused) attempt(); };
+    el.addEventListener('loadeddata', retry);
+    el.addEventListener('canplay', retry);
+    onCleanup(() => {
+      el.removeEventListener('loadeddata', retry);
+      el.removeEventListener('canplay', retry);
+    });
+  });
+
+  /** Clock for the mobile control bar. The desktop scrubber reads the media
+   *  element directly instead, so it never sets a signal during playback. */
+  createEffect(() => {
+    const el = videoEl();
+    if (!el) return;
     const onTimeUpdate = () => setCurrentTime(el.currentTime);
     const onLoadedMetadata = () => setDuration(el.duration);
     const onDurationChange = () => setDuration(el.duration);
@@ -471,13 +562,6 @@ export function VideoOverlayPlayer({
       el.removeEventListener('durationchange', onDurationChange);
     });
   });
-
-  function formatTime(seconds) {
-    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, '0')}`;
-  }
 
   function handleSeek(e) {
     const el = videoEl();
@@ -536,72 +620,108 @@ export function VideoOverlayPlayer({
             onAnimationEnd={() => { if (isClosing()) finishClose(); }}
           >
             <div className="video-carousel-overlay-center">
-              <Show when={currentVideo()}>
-                {() => (
-                  <div className="video-carousel-overlay-video-wrap">
-                    <button
-                      type="button"
-                      className="video-carousel-overlay-close"
-                      aria-label="Close"
-                      onClick={requestClose}
-                    >
-                      <CloseIcon />
-                    </button>
+              {/* The leaving video, frozen to its thumbnail. Rendered before the
+                  live pane so the incoming video paints on top. */}
+              <Show when={outgoing()} keyed>
+                {(out) => (
+                  <div
+                    className={`video-carousel-overlay-video-wrap video-carousel-overlay-slide-out-${out.dir}`}
+                    aria-hidden
+                  >
+                    <span
+                      className="video-carousel-overlay-slide-poster"
+                      style={{ 'background-image': `url(${getThumbnailPreviewUrl(out.video?.playbackId, 560, 748) || ''})` }}
+                    />
+                  </div>
+                )}
+              </Show>
+
+              {/* keyed: without it Solid reuses this node, the class string stays
+                  identical across next->next, and the enter animation never
+                  restarts. Remounting the <video> is safe — the HLS effect's
+                  onCleanup closes over the element it attached to. */}
+              <Show when={currentVideo()} keyed>
+                {(video) => (
+                  <div
+                    className={`video-carousel-overlay-video-wrap${
+                      outgoing() ? ` video-carousel-overlay-slide-in-${outgoing().dir}` : ''
+                    }`}
+                  >
+                    {/* Merchant videos come from Mux and the app stores no text
+                        tracks, so there is nothing to attach. A real gap now
+                        that playback is unmuted. */}
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                     <video
-                      id={`video-${currentVideo()?.id}`}
+                      id={`video-${video.id}`}
                       ref={setVideoEl}
                       className="video-carousel-overlay-video"
-                      poster={posterUrl(currentVideo())}
+                      poster={posterUrl(video)}
                       preload="auto"
                       playsInline
                       autoPlay
                       loop
-                      muted
                     />
-                    <div className="video-carousel-custom-controls">
-                      <button
-                        type="button"
-                        className="video-carousel-control-mute"
-                        aria-label={isMuted() ? 'Unmute' : 'Mute'}
-                        onClick={() => setIsMuted((m) => !m)}
-                      >
-                        {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
-                      </button>
-                      <div className="video-carousel-progress-wrap">
-                        <span className="video-carousel-time">{formatTime(currentTime())}</span>
-                        <input
-                          type="range"
-                          className="video-carousel-progress"
-                          min="0"
-                          max={duration() > 0 ? 1 : 0}
-                          step="any"
-                          value={duration() > 0 ? currentTime() / duration() : 0}
-                          onInput={handleSeek}
-                        />
-                        <span className="video-carousel-time">{formatTime(duration())}</span>
-                      </div>
-                    </div>
                   </div>
                 )}
               </Show>
+
+              {/* Chrome sits outside the sliding layers so it stays put, and so
+                  it isn't duplicated across the two panes. Both are absolutely
+                  positioned: this pane is a single-cell grid, so an in-flow
+                  child would be auto-placed into a new implicit row. */}
+              <button
+                type="button"
+                className="video-carousel-control-mute"
+                aria-label={isMuted() ? 'Unmute' : 'Mute'}
+                onClick={() => setIsMuted((m) => !m)}
+              >
+                {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
+              </button>
+              <VideoProgressBar
+                videoEl={videoEl}
+                accent={() => addToCartButtonStyle()?.['background-color'] || '#fff'}
+              />
             </div>
 
-            {/* An empty white panel reads as broken — show the video alone. */}
-            <Show when={products().length}>
-              <OverlayProductPanel
-                products={products}
-                video={currentVideo}
-                selectedIndex={activeProductIndex}
-                onSelect={setSelectedProductIndex}
-                onBack={() => setSelectedProductIndex(null)}
-                buttonBehavior={buttonBehavior ?? (() => undefined)}
-                videoNumber={() => (expandedIndex() ?? 0) + 1}
-                videoTotal={total}
-                addToCartButtonLabel={addToCartButtonLabel}
-                addToCartButtonStyle={addToCartButtonStyle}
-                handleProductClick={handleProductClick}
-              />
+            {/* keyed on the video so the panel remounts per navigation and its
+                cross-fade replays. Cheap: fetchProduct caches per handle.
+                The child MUST take a parameter: Solid's Show only invokes the
+                children function when its arity is > 0, so a `() =>` child
+                returns the same reference forever and keyed never remounts. */}
+            <Show when={currentVideo()} keyed>
+              {(video) => (
+                /* An empty white panel reads as broken — show the video alone. */
+                <Show when={products().length}>
+                  <OverlayProductPanel
+                    products={products}
+                    video={() => video}
+                    selectedIndex={activeProductIndex}
+                    onSelect={setSelectedProductIndex}
+                    onBack={() => setSelectedProductIndex(null)}
+                    buttonBehavior={buttonBehavior ?? (() => undefined)}
+                    videoNumber={() => (expandedIndex() ?? 0) + 1}
+                    videoTotal={total}
+                    addToCartButtonLabel={addToCartButtonLabel}
+                    addToCartButtonStyle={addToCartButtonStyle}
+                    handleProductClick={handleProductClick}
+                  />
+                </Show>
+              )}
             </Show>
+
+            {/* Top-right of the CARD, so it sits over the products panel when
+                there is one and over the video when there isn't. Last child, so
+                it paints above the panel. */}
+            <button
+              type="button"
+              className={`video-carousel-overlay-close${
+                products().length ? ' video-carousel-overlay-close-on-panel' : ''
+              }`}
+              aria-label="Close"
+              onClick={requestClose}
+            >
+              <CloseIcon />
+            </button>
           </div>
 
           <Show when={total() > 1}>
@@ -641,6 +761,9 @@ export function VideoOverlayPlayer({
                     />
                     <Show when={index() === expandedIndex()}>
                       <div className="video-carousel-overlay-video-wrap video-carousel-reels-video-wrap">
+                        {/* No text tracks available from Mux — see the desktop
+                            player above for the same gap. */}
+                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                         <video
                           ref={setVideoEl}
                           className="video-carousel-overlay-video"
@@ -649,7 +772,6 @@ export function VideoOverlayPlayer({
                           playsInline
                           autoPlay
                           loop
-                          muted
                         />
                         <div className="video-carousel-custom-controls">
                           <button

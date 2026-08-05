@@ -45,13 +45,14 @@
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
-/* Anchored to .video-carousel-overlay-video-wrap on desktop; the reels rule
+/* Anchored to the card's top-right on desktop, so it sits over the products
+   panel when there is one and over the video when there isn't; the reels rule
    below re-pins it to the viewport on mobile. */
 .video-carousel-overlay-close {
   position: absolute;
   top: 12px;
-  left: 12px;
-  right: auto;
+  right: 12px;
+  left: auto;
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -73,6 +74,19 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* Over the white products panel the translucent-white chip above would be
+   invisible. Same specificity as the base rules, so these must stay below. */
+.video-carousel-overlay-close-on-panel {
+  background: rgba(0, 0, 0, 0.55);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #fff;
+}
+
+.video-carousel-overlay-close-on-panel:hover {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
 /* CloseIcon hardcodes width="64" and is shared with the Floating widget, so
    constrain it here rather than editing the icon. */
 .video-carousel-overlay-close svg {
@@ -80,10 +94,31 @@
   height: 20px;
 }
 
+/* Desktop only: the mute button floats at the video's top-left, mirroring the
+   close button. Scoped by parent so the mobile mute, still inside
+   .video-carousel-custom-controls, keeps its inline placement. The base rule's
+   `border: none; background: transparent` is deliberately overridden — standing
+   alone over video it needs the same chip treatment the close button gets. */
+.video-carousel-overlay-center > .video-carousel-control-mute {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.video-carousel-overlay-center > .video-carousel-control-mute:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
 .video-carousel-overlay-nav {
   flex-shrink: 0;
-  width: 56px;
-  height: 56px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -112,12 +147,22 @@
   margin-left: 1.25rem;
 }
 
+/* Single-cell grid so the outgoing and incoming panes stack in exactly the same
+   box without absolute positioning — which keeps the wrap contributing its
+   height to the card, as it did when there was only one. */
 .video-carousel-overlay-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  grid-template-areas: 'stack';
+  place-items: center;
+  position: relative; /* containing block for the hoisted close button + controls */
+  overflow: hidden; /* clips the slide */
   flex: 0 0 clamp(280px, 32vw, 420px);
   min-width: 0;
+}
+
+.video-carousel-overlay-center > .video-carousel-overlay-video-wrap {
+  grid-area: stack;
+  width: 100%;
 }
 
 .video-carousel-overlay-video-wrap {
@@ -139,6 +184,8 @@
 }
 
 /* Custom controls: mute + progress bar */
+/* Mobile reels only — the desktop pane renders VideoProgressBar instead, which
+   brings its own styles. */
 .video-carousel-custom-controls {
   position: absolute;
   bottom: 0;
@@ -222,8 +269,13 @@
   background: #fff;
   border-left: 1px solid #e5e5e5;
   color: #111;
-  padding: 1.5rem 1.25rem;
-  scrollbar-gutter: stable;
+  /* Reset the base rule's flex/scroll/padding — the drill-down page owns those
+     now, so the list and the detail can stack and slide past each other. */
+  display: grid;
+  grid-template-areas: 'stack';
+  gap: 0;
+  padding: 0;
+  overflow: hidden; /* clips the slide */
 }
 
 .video-carousel-overlay-products-title {
@@ -322,8 +374,6 @@
 .video-carousel-overlay-reels .video-carousel-overlay-close {
   position: fixed;
   top: 1rem;
-  /* left: auto undoes the desktop rule above, which otherwise wins over right. */
-  left: auto;
   right: 1rem;
   z-index: 11;
 }
@@ -619,12 +669,79 @@
   pointer-events: none;
 }
 
+/* ---------------------------------------------------------------------------
+   Prev/next slide — desktop only. Two layers: the leaving video (frozen to its
+   Mux thumbnail) and the arriving one. Direction comes from the button pressed,
+   so wrapping last -> first still reads as "forward".
+   --------------------------------------------------------------------------- */
+
+/* The leaving pane is a still — same thumbnail source as the reels placeholder. */
+.video-carousel-overlay-slide-poster {
+  position: absolute;
+  inset: 0;
+  background-color: #000;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@keyframes video-carousel-slide-in-next {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes video-carousel-slide-out-next {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes video-carousel-slide-in-prev {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes video-carousel-slide-out-prev {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.video-carousel-overlay-slide-in-next {
+  animation: video-carousel-slide-in-next 0.4s cubic-bezier(0.6, 0, 0.4, 1);
+}
+
+.video-carousel-overlay-slide-in-prev {
+  animation: video-carousel-slide-in-prev 0.4s cubic-bezier(0.6, 0, 0.4, 1);
+}
+
+/* The ghost needs `forwards`, or it snaps back to centre for the frame between
+   the animation ending and the signal clearing. */
+.video-carousel-overlay-slide-out-next {
+  animation: video-carousel-slide-out-next 0.4s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+}
+
+.video-carousel-overlay-slide-out-prev {
+  animation: video-carousel-slide-out-prev 0.4s cubic-bezier(0.6, 0, 0.4, 1) forwards;
+}
+
+/* Products panel cross-fade. The panel is keyed on the current video, so this
+   replays per navigation and also rides along with the sally open. */
+@keyframes video-carousel-panel-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.video-carousel-overlay-products:not(.video-carousel-overlay-products-reels) {
+  animation: video-carousel-panel-fade-in 0.4s ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* !important because the .video-carousel-overlay-closing selectors above are
      more specific, and media queries add no specificity of their own. */
   .video-carousel-overlay::before,
   .video-carousel-overlay-card,
-  .video-carousel-overlay-nav {
+  .video-carousel-overlay-nav,
+  .video-carousel-overlay-video-wrap,
+  .video-carousel-overlay-products {
     animation: none !important;
   }
 }

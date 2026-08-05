@@ -55,6 +55,15 @@ export function htmlToText(html, maxChars = 220) {
     return text.length > maxChars ? `${text.slice(0, maxChars - 1).trimEnd()}…` : text;
 }
 
+/** Media clock as m:ss, e.g. 0:07. Shared by the desktop scrubber and the
+ *  mobile control bar. */
+export function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 /** Format price from first variant. Returns { raw, formatted } or null. */
 export function productPrice(product) {
     const priceVal = product?.variants?.[0]?.price;

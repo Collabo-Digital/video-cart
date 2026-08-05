@@ -2,6 +2,28 @@
    the detail view for one of them. Desktop only — the mobile reels bottom sheet
    keeps its own card strip, styled in common/videoOverlay.css. */
 
+/* One drill-down page. The list and the detail are both pages; during a
+   transition both are mounted in the same grid cell and slide past each other,
+   reusing the video pane's slide keyframes. */
+.video-carousel-overlay-panel-page {
+  grid-area: stack;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  padding: 20px 15px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  /* Opaque, so the page underneath never shows through mid-slide. */
+  background: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-carousel-overlay-panel-page {
+    animation: none !important;
+  }
+}
+
 /* ---------------------------------- list --------------------------------- */
 
 .video-carousel-overlay-plist {
