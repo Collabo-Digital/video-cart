@@ -773,15 +773,18 @@ export function VideoOverlayPlayer({
                           autoPlay
                           loop
                         />
+                        {/* Outside the control bar: the products sheet is a
+                            later sibling at bottom:0 with no z-index, so it
+                            paints over that bar and buried this button. */}
+                        <button
+                          type="button"
+                          className="video-carousel-control-mute"
+                          aria-label={isMuted() ? 'Unmute' : 'Mute'}
+                          onClick={() => setIsMuted((m) => !m)}
+                        >
+                          {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
+                        </button>
                         <div className="video-carousel-custom-controls">
-                          <button
-                            type="button"
-                            className="video-carousel-control-mute"
-                            aria-label={isMuted() ? 'Unmute' : 'Mute'}
-                            onClick={() => setIsMuted((m) => !m)}
-                          >
-                            {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
-                          </button>
                           <div className="video-carousel-progress-wrap">
                             <span className="video-carousel-time">{formatTime(currentTime())}</span>
                             <input

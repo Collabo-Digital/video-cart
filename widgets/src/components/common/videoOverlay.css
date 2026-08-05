@@ -115,6 +115,27 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+/* Mobile: mirrors the fixed close button at the opposite corner. `fixed` rather
+   than `absolute` so it stays put while the reels track scrolls between slides —
+   only the active slide renders it, so there is never more than one. z-index 11
+   matches the reels close button and clears the products sheet, which is a later
+   sibling at bottom:0 and was painting over the old control-bar placement. */
+.video-carousel-reels-video-wrap > .video-carousel-control-mute {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 11;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.video-carousel-reels-video-wrap > .video-carousel-control-mute:hover {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
 .video-carousel-overlay-nav {
   flex-shrink: 0;
   width: 40px;
