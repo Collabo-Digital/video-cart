@@ -7,7 +7,8 @@ import Hls from 'hls.js/light';
 import mux from 'mux-embed';
 import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { useLiveProduct } from '../../hooks/useLiveProduct';
-import { LABEL_SOLD_OUT } from '../../constants/strings';
+import { OverlayProductPanel } from './OverlayProducts/OverlayProductPanel';
+import { EMPTY_PRODUCTS, LABEL_SOLD_OUT } from '../../constants/strings';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 import './videoOverlay.css';
 import CloseIcon from '../../assets/Icons/CloseIcon';
@@ -17,6 +18,9 @@ import UnMuteIcon from '../../assets/Icons/UnmuteIcon';
 import MuteIcon from '../../assets/Icons/MuteIcon';
 
 const MOBILE_BREAKPOINT = 768;
+
+/** Must match the video-carousel-sally-out keyframe duration in videoOverlay.css. */
+const CLOSE_ANIMATION_MS = 400;
 
 /**
  * One tagged product in the fullscreen player. Shows the stored title/image
@@ -59,6 +63,7 @@ export function VideoOverlayPlayer({
   productsForVideo,
   addToCartButtonLabel,
   addToCartButtonStyle,
+  buttonBehavior,
   handleProductClick,
   onVideoChange,
   onFirstPlay,
@@ -91,6 +96,76 @@ export function VideoOverlayPlayer({
     if (!total()) return;
     setExpandedIndex((i) => (i + 1) % total());
   };
+
+  /* --- closing: hold the unmount open so the exit animation can play ------ */
+
+  const [isClosing, setIsClosing] = createSignal(false);
+
+  const finishClose = () => {
+    setIsClosing(false);
+    setExpandedIndex(null);
+  };
+
+  /** Desktop plays the sally exit before unmounting. Mobile has no exit
+   *  animation, and neither does reduced-motion, so both close immediately —
+   *  which keeps the JS and the CSS media query agreeing instead of stalling on
+   *  a timer waiting for keyframes that will never run. */
+  const requestClose = () => {
+    if (isClosing()) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (isMobile() || reduced) {
+      setExpandedIndex(null);
+      return;
+    }
+    setIsClosing(true);
+  };
+
+  /** Backstop for animationend, which never fires in a hidden tab. */
+  createEffect(() => {
+    if (!isClosing()) return;
+    const timer = setTimeout(finishClose, CLOSE_ANIMATION_MS + 60);
+    onCleanup(() => clearTimeout(timer));
+  });
+
+  /* --- desktop products panel: list <-> detail ---------------------------- */
+
+  const [selectedProductIndex, setSelectedProductIndex] = createSignal(null);
+
+  const products = () => productsForVideo(currentVideo() ?? {});
+  // Derived rather than seeded, so the reset effect below can't clobber the
+  // single-product case.
+  const activeProductIndex = () => (products().length === 1 ? 0 : selectedProductIndex());
+
+  /** Back to the list whenever the shopper moves to another video, and on close
+   *  — expandedIndex() covers both, since closing sets it to null. */
+  createEffect(() => {
+    expandedIndex();
+    setSelectedProductIndex(null);
+  });
+
+  /** Escape backs out one level at a time. selectedProductIndex() is read inside
+   *  the handler, not the effect body, so this doesn't re-subscribe on every
+   *  detail toggle. */
+  createEffect(() => {
+    if (expandedIndex() == null) return;
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      // A dialog that is already leaving shouldn't pop its detail back to the list.
+      if (isClosing()) return;
+      if (selectedProductIndex() != null) setSelectedProductIndex(null);
+      else requestClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    onCleanup(() => document.removeEventListener('keydown', onKeyDown));
+  });
+
+  /** The page scrolls behind the modal otherwise. */
+  createEffect(() => {
+    if (expandedIndex() == null) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    onCleanup(() => { document.body.style.overflow = previous; });
+  });
 
   createEffect(() => {
     if (typeof window === 'undefined') return;
@@ -419,38 +494,59 @@ export function VideoOverlayPlayer({
   return (
     <Show when={expandedIndex() != null && videos?.length > 0}>
       <Portal>
+      {/* Backdrop click dismisses. Keyboard users get the same exit from the
+          Escape handler above and from the close button, so this needs no key
+          listener of its own. */}
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
       <div
-        className={`video-carousel-overlay${isMobile() ? ' video-carousel-overlay-reels' : ''}`}
+        className={`video-carousel-overlay${isMobile() ? ' video-carousel-overlay-reels' : ''}${isClosing() ? ' video-carousel-overlay-closing' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label="Video view"
+        onClick={(e) => { if (e.target === e.currentTarget) requestClose(); }}
       >
-        <button
-          type="button"
-          className="video-carousel-overlay-close"
-          aria-label="Close"
-          onClick={() => setExpandedIndex(null)}
-        >
-          <CloseIcon />
-        </button>
+        {/* Mobile keeps a root-level close button — the reels rule re-pins it fixed. */}
+        <Show when={isMobile()}>
+          <button
+            type="button"
+            className="video-carousel-overlay-close"
+            aria-label="Close"
+            onClick={requestClose}
+          >
+            <CloseIcon />
+          </button>
+        </Show>
 
-        {/* Desktop: horizontal nav with center video */}
+        {/* Desktop: nav arrows on the backdrop, either side of the card */}
         <Show when={!isMobile()}>
-          <div className="video-carousel-overlay-body">
-            <Show when={total() > 1}>
-              <button
-                type="button"
-                className="video-carousel-overlay-nav video-carousel-overlay-nav-prev"
-                aria-label="Previous video"
-                onClick={goPrev}
-              >
-                <LeftToggleIcon />
-              </button>
-            </Show>
+          <Show when={total() > 1}>
+            <button
+              type="button"
+              className="video-carousel-overlay-nav video-carousel-overlay-nav-prev"
+              aria-label="Previous video"
+              onClick={goPrev}
+            >
+              <LeftToggleIcon />
+            </button>
+          </Show>
+
+          <div
+            className="video-carousel-overlay-card"
+            /* Also fires when the OPEN animation ends, hence the guard. */
+            onAnimationEnd={() => { if (isClosing()) finishClose(); }}
+          >
             <div className="video-carousel-overlay-center">
               <Show when={currentVideo()}>
                 {() => (
                   <div className="video-carousel-overlay-video-wrap">
+                    <button
+                      type="button"
+                      className="video-carousel-overlay-close"
+                      aria-label="Close"
+                      onClick={requestClose}
+                    >
+                      <CloseIcon />
+                    </button>
                     <video
                       id={`video-${currentVideo()?.id}`}
                       ref={setVideoEl}
@@ -489,17 +585,35 @@ export function VideoOverlayPlayer({
                 )}
               </Show>
             </div>
-            <Show when={total() > 1}>
-              <button
-                type="button"
-                className="video-carousel-overlay-nav video-carousel-overlay-nav-next"
-                aria-label="Next video"
-                onClick={goNext}
-              >
-                <RightToggleIcon />
-              </button>
+
+            {/* An empty white panel reads as broken — show the video alone. */}
+            <Show when={products().length}>
+              <OverlayProductPanel
+                products={products}
+                video={currentVideo}
+                selectedIndex={activeProductIndex}
+                onSelect={setSelectedProductIndex}
+                onBack={() => setSelectedProductIndex(null)}
+                buttonBehavior={buttonBehavior ?? (() => undefined)}
+                videoNumber={() => (expandedIndex() ?? 0) + 1}
+                videoTotal={total}
+                addToCartButtonLabel={addToCartButtonLabel}
+                addToCartButtonStyle={addToCartButtonStyle}
+                handleProductClick={handleProductClick}
+              />
             </Show>
           </div>
+
+          <Show when={total() > 1}>
+            <button
+              type="button"
+              className="video-carousel-overlay-nav video-carousel-overlay-nav-next"
+              aria-label="Next video"
+              onClick={goNext}
+            >
+              <RightToggleIcon />
+            </button>
+          </Show>
         </Show>
 
         {/* Mobile: Reels-style vertical scroll (swipe up/down) */}
@@ -578,7 +692,7 @@ export function VideoOverlayPlayer({
                         </For>
                       </div>
                       <Show when={!productsForVideo(video).length}>
-                        <p className="video-carousel-overlay-products-empty">No products linked to this video.</p>
+                        <p className="video-carousel-overlay-products-empty">{EMPTY_PRODUCTS}</p>
                       </Show>
                     </aside>
                   </div>
@@ -588,36 +702,6 @@ export function VideoOverlayPlayer({
           </div>
         </Show>
 
-        {/* Desktop: products sidebar */}
-        <Show when={!isMobile()}>
-          <aside className="video-carousel-overlay-products">
-            <h3 className="video-carousel-overlay-products-title">Frequently bought</h3>
-            <div className="video-carousel-overlay-products-inner">
-              <For each={productsForVideo(currentVideo() ?? {})}>
-                {(product) => (
-                  <div className="video-carousel-overlay-product">
-                    <img src={product.image} alt={product.title} loading="lazy" />
-                    <div className="video-carousel-overlay-product-info">
-                      <span className="video-carousel-overlay-product-title">{product.title}</span>
-                      <button
-                        type="button"
-                        className="video-carousel-overlay-product-add"
-                        style={addToCartButtonStyle()}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleProductClick(product, currentVideo());
-                        }}
-                      >{addToCartButtonLabel()}</button>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
-            <Show when={!productsForVideo(currentVideo() ?? {}).length}>
-              <p className="video-carousel-overlay-products-empty">No products linked to this video.</p>
-            </Show>
-          </aside>
-        </Show>
       </div>
       </Portal>
     </Show>

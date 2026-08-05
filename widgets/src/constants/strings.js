@@ -17,3 +17,12 @@ export const LABEL_SHOP_PRODUCT = 'Shop product';
 export const LABEL_VIEW_PRODUCT = 'View product';
 export const LABEL_PRODUCTS_TAGGED = 'Products tagged';
 export const LABEL_FREQUENTLY_BOUGHT = 'Frequently bought';
+
+export const LABEL_BACK_TO_PRODUCTS = 'All products';
+export const LABEL_VIEW_FULL_DETAILS = 'View full details';
+export const LABEL_QUANTITY = 'Quantity';
+export const LABEL_DECREASE_QTY = 'Decrease quantity';
+export const LABEL_INCREASE_QTY = 'Increase quantity';
+
+/** Overlay detail footer, e.g. "Video 2 of 5". */
+export const labelVideoCounter = (n, total) => `Video ${n} of ${total}`;

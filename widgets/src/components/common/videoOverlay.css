@@ -2,20 +2,58 @@
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.95);
+  background: transparent;
   display: flex;
   flex-direction: row;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
   padding: 0;
 }
 
+/* Backdrop layer. Kept off the root so it can fade on its own timing while the
+   card scales. Absolutely positioned, so it is not a flex item, and being a
+   pseudo-element it is never an event target — the backdrop-click check
+   (e.target === e.currentTarget) behaves exactly as before. */
+.video-carousel-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* Required, not cosmetic: ::before is positioned, and these are static flex
+   children, which paint below positioned descendants. Without this they all
+   vanish behind the backdrop. (The nav already declared z-index but had no
+   position, so that declaration was inert until now.) */
+.video-carousel-overlay-card,
+.video-carousel-overlay-nav,
+.video-carousel-overlay-reels-track {
+  position: relative;
+  z-index: 1;
+}
+
+/* Rounded card holding the video and the products panel. The nav arrows are
+   siblings of this, so they float on the backdrop outside it. */
+.video-carousel-overlay-card {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #fff;
+  max-height: min(88vh, 860px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+/* Anchored to .video-carousel-overlay-video-wrap on desktop; the reels rule
+   below re-pins it to the viewport on mobile. */
 .video-carousel-overlay-close {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 48px;
-  height: 48px;
+  top: 12px;
+  left: 12px;
+  right: auto;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.15);
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -35,15 +73,11 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.video-carousel-overlay-body {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  min-width: 0;
-  padding: 2rem 1rem;
+/* CloseIcon hardcodes width="64" and is shared with the Floating widget, so
+   constrain it here rather than editing the icon. */
+.video-carousel-overlay-close svg {
+  width: 20px;
+  height: 20px;
 }
 
 .video-carousel-overlay-nav {
@@ -71,30 +105,30 @@
 }
 
 .video-carousel-overlay-nav-prev {
-  margin-right: 0.5rem;
+  margin-right: 1.25rem;
 }
 
 .video-carousel-overlay-nav-next {
-  margin-left: 0.5rem;
+  margin-left: 1.25rem;
 }
 
 .video-carousel-overlay-center {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: min(90vw, 560px);
+  flex: 0 0 clamp(280px, 32vw, 420px);
   min-width: 0;
 }
 
 .video-carousel-overlay-video-wrap {
   position: relative;
   width: 100%;
-  border-radius: 16px;
+  /* The card clips its own corners now. */
+  border-radius: 0;
   overflow: hidden;
   background: #000;
-  aspect-ratio: 3 / 4;
-  max-height: 85vh;
+  aspect-ratio: 9 / 16;
+  max-height: 100%;
 }
 
 .video-carousel-overlay-video {
@@ -178,7 +212,18 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 1rem;
+}
+
+/* Desktop panel is a white card face. Scoped away from the reels sheet, which
+   re-declares `background` but not `border-left` or the text colours — without
+   the :not() those would leak into the mobile glassmorphic sheet. */
+.video-carousel-overlay-products:not(.video-carousel-overlay-products-reels) {
+  background: #fff;
+  border-left: 1px solid #e5e5e5;
+  color: #111;
+  padding: 1.5rem 1.25rem;
+  scrollbar-gutter: stable;
 }
 
 .video-carousel-overlay-products-title {
@@ -186,6 +231,16 @@
   font-weight: 700;
   color: #fff;
   margin: 0 0 0.5rem 0;
+}
+
+.video-carousel-overlay-products:not(.video-carousel-overlay-products-reels)
+  .video-carousel-overlay-products-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a8a8a;
+  margin: 0;
 }
 
 .video-carousel-overlay-products-inner {
@@ -267,6 +322,8 @@
 .video-carousel-overlay-reels .video-carousel-overlay-close {
   position: fixed;
   top: 1rem;
+  /* left: auto undoes the desktop rule above, which otherwise wins over right. */
+  left: auto;
   right: 1rem;
   z-index: 11;
 }
@@ -500,5 +557,74 @@
   .video-carousel-overlay-product {
     flex: 0 0 auto;
     min-width: 180px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   "Sally" open/close effect — desktop only. The backdrop fades while the card
+   scales up from nothing, and on dismiss it fades out shrinking to 0.5.
+   The exit only gets a chance to play because VideoOverlayPlayer holds the
+   unmount open for CLOSE_ANIMATION_MS via its `isClosing` signal.
+   --------------------------------------------------------------------------- */
+
+@keyframes video-carousel-sally-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes video-carousel-sally-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes video-carousel-sally-in {
+  0% { opacity: 0; transform: scale3d(0, 0, 1); }
+  100% { opacity: 1; transform: scale3d(1, 1, 1); }
+}
+
+@keyframes video-carousel-sally-out {
+  0% { opacity: 1; transform: scale3d(1, 1, 1); }
+  100% { opacity: 0; transform: scale3d(0.5, 0.5, 1); }
+}
+
+.video-carousel-overlay:not(.video-carousel-overlay-reels)::before,
+.video-carousel-overlay:not(.video-carousel-overlay-reels) .video-carousel-overlay-nav {
+  animation: video-carousel-sally-backdrop-in 0.4s ease;
+}
+
+.video-carousel-overlay:not(.video-carousel-overlay-reels) .video-carousel-overlay-card {
+  animation: video-carousel-sally-in 0.4s cubic-bezier(0.6, 0, 0.4, 1);
+}
+
+/* The exit needs `forwards`; the entry deliberately does not. An entry animation
+   ends on the element's natural state (opacity 1, no transform), so leaving
+   fill-mode off avoids parking a permanent transform on the card — which would
+   otherwise keep it a containing block and its own stacking context for the
+   rest of the session. */
+/* These must out-specify the entry rules above, which sit at (0,3,0) because
+   :not() contributes its argument's specificity. Repeating the base class and
+   the :not() puts the exit at (0,3,0)/(0,4,0) — matching the entry structure
+   exactly, plus the state class. */
+.video-carousel-overlay.video-carousel-overlay-closing:not(.video-carousel-overlay-reels)::before,
+.video-carousel-overlay.video-carousel-overlay-closing:not(.video-carousel-overlay-reels) .video-carousel-overlay-nav {
+  animation: video-carousel-sally-backdrop-out 0.4s ease forwards;
+}
+
+.video-carousel-overlay.video-carousel-overlay-closing:not(.video-carousel-overlay-reels) .video-carousel-overlay-card {
+  animation: video-carousel-sally-out 0.4s forwards;
+}
+
+/* Nothing should be clickable mid-exit. */
+.video-carousel-overlay-closing {
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* !important because the .video-carousel-overlay-closing selectors above are
+     more specific, and media queries add no specificity of their own. */
+  .video-carousel-overlay::before,
+  .video-carousel-overlay-card,
+  .video-carousel-overlay-nav {
+    animation: none !important;
   }
 }

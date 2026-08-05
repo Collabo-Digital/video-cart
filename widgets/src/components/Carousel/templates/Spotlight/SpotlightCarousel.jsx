@@ -158,6 +158,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
         productPrice={productPrice}
         addToCartButtonLabel={addToCartButtonLabel}
         addToCartButtonStyle={addToCartButtonStyle}
+        buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
         handleProductClick={handleProductClick}
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });

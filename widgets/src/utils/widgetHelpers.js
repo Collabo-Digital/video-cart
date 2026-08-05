@@ -33,6 +33,28 @@ export function formatMoney(num) {
     }
 }
 
+/**
+ * Plain-text excerpt from Shopify's HTML product description.
+ * DOMParser yields an inert document — unlike innerHTML it neither runs scripts
+ * nor fetches <img> URLs, so untrusted merchant HTML is safe here.
+ */
+export function htmlToText(html, maxChars = 220) {
+    if (typeof html !== 'string' || !html) return '';
+    let text;
+    try {
+        const body = new DOMParser().parseFromString(html, 'text/html').body;
+        // textContent runs blocks together ("…2-3 days.Each piece…"), so give
+        // every block boundary an explicit separator first.
+        body?.querySelectorAll('p, div, br, li, tr, h1, h2, h3, h4, h5, h6')
+            .forEach((el) => el.insertAdjacentText('beforebegin', ' '));
+        text = body?.textContent || '';
+    } catch (_) {
+        text = html.replace(/<[^>]*>/g, ' ');
+    }
+    text = text.replace(/\s+/g, ' ').trim();
+    return text.length > maxChars ? `${text.slice(0, maxChars - 1).trimEnd()}…` : text;
+}
+
 /** Format price from first variant. Returns { raw, formatted } or null. */
 export function productPrice(product) {
     const priceVal = product?.variants?.[0]?.price;
