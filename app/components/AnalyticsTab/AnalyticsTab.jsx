@@ -115,7 +115,7 @@ function AnalyticsTab({ feedId }) {
               )}
             </BlockStack>
           </Card>
-          <Card sectioned padding="500">
+          {/* <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
                 Widget clicks
@@ -128,7 +128,7 @@ function AnalyticsTab({ feedId }) {
                 </Text>
               )}
             </BlockStack>
-          </Card>
+          </Card> */}
           <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
@@ -143,20 +143,7 @@ function AnalyticsTab({ feedId }) {
               )}
             </BlockStack>
           </Card>
-          <Card sectioned padding="500">
-            <BlockStack gap="200">
-              <Text as="h2" variant="bodyLg">
-                Revenue
-              </Text>
-              {loading ? (
-                <SkeletonBodyText lines={1} />
-              ) : (
-                <Text as="h3" variant="headingMd">
-                  {widgetStats ? formatSales(widgetStats.revenue) : "—"}
-                </Text>
-              )}
-            </BlockStack>
-          </Card>
+          
           <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
@@ -171,7 +158,22 @@ function AnalyticsTab({ feedId }) {
               )}
             </BlockStack>
           </Card>
+          
         </InlineGrid>
+        <Card sectioned padding="500">
+            <BlockStack gap="200">
+              <Text as="h2" variant="bodyLg">
+                Revenue
+              </Text>
+              {loading ? (
+                <SkeletonBodyText lines={1} />
+              ) : (
+                <Text as="h3" variant="headingMd">
+                  {widgetStats ? formatSales(widgetStats.revenue) : "—"}
+                </Text>
+              )}
+            </BlockStack>
+          </Card>
 
         {/* <Text as="h2" variant="headingMd">
           Per video
