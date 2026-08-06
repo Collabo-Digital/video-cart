@@ -7,8 +7,8 @@
 import prisma from '../config/database.server';
 
 const VIDEOS_PAGE_SIZE = 10;
-const VIDEO_ORDER_DESC = [{ videoRevenue: 'desc' }, { id: 'asc' }];
-const VIDEO_ORDER_ASC = [{ videoRevenue: 'asc' }, { id: 'desc' }];
+const MIN_TAKE = 1;
+const MAX_TAKE = 100;
 
 /**
  * Normalize to UTC start-of-day for date bucketing
@@ -69,66 +69,61 @@ export async function findByVideoAndDateRange(videoId, { startDate, endDate }) {
  */
 export async function upsertIncrement(videoId, feedId, date, updates) {
   const dateOnly = toDateOnly(date);
-  const existing = await prisma.videoAnalytics.findUnique({
-    where: {
-      videoId_feedId_date: { videoId, feedId, date: dateOnly },
-    },
-  });
 
-  const add = (a, b) => (a ?? 0) + (b ?? 0);
-
-  const data = {
-    videoImpressions: add(existing?.videoImpressions, updates.videoImpressions),
-    videoViews: add(existing?.videoViews, updates.videoViews),
-    videoProductClicks: add(existing?.videoProductClicks, updates.videoProductClicks),
-    videoAtcClicks: add(existing?.videoAtcClicks, updates.videoAtcClicks),
-    videoAddToCart: add(existing?.videoAddToCart, updates.videoAddToCart),
-    videoOrders: add(existing?.videoOrders, updates.videoOrders),
-    videoRevenue: (existing?.videoRevenue != null ? Number(existing.videoRevenue) : 0) + (updates.videoRevenue ?? 0),
-  };
-
-  let shopDomain;
-  if (existing) {
-    shopDomain = existing.shopDomain;
-  } else {
-    // When creating a new row, ensure both Feed and Video exist (Video may have been removed)
-    const [feed, video] = await Promise.all([
-      prisma.feed.findUnique({
-        where: { id: feedId },
-        select: { shopDomain: true },
-      }),
-      prisma.video.findUnique({
-        where: { id: videoId },
-      }),
-    ]);
-    if (!feed) throw new Error(`Feed not found: ${feedId}`);
-    if (!video) {
-      const feedVideo = await prisma.feedVideo.findUnique({
-        where: { id: videoId },
-        select: { videoId: true },
-      });
-      if (!feedVideo) throw new Error(`Feed video not found: ${feedId}`);
-      videoId = feedVideo.videoId;
-      // return null;
-    }
-    shopDomain = feed.shopDomain;
+  // Atomic increment ops (MongoDB $inc) — concurrency-safe, no lost updates.
+  const incOps = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (value != null) incOps[key] = { increment: value };
   }
 
-  const createPayload = {
-    video: { connect: { id: videoId } },
-    feed: { connect: { id: feedId } },
-    shop: { connect: { shopDomain } },
-    date: dateOnly,
-    ...data,
-  };
+  // Fast path: today's row exists → atomically add to it.
+  try {
+    return await prisma.videoAnalytics.update({
+      where: { videoId_feedId_date: { videoId, feedId, date: dateOnly } },
+      data: incOps,
+    });
+  } catch (error) {
+    if (error.code !== "P2025") throw error; // P2025 = row doesn't exist yet
+  }
 
-  return prisma.videoAnalytics.upsert({
-    where: {
-      videoId_feedId_date: { videoId, feedId, date: dateOnly },
-    },
-    create: createPayload,
-    update: data,
-  });
+  // First event of the day → resolve shopDomain + confirm the video exists, then create.
+  const [feed, video] = await Promise.all([
+    prisma.feed.findUnique({ where: { id: feedId }, select: { shopDomain: true } }),
+    prisma.video.findUnique({ where: { id: videoId }, select: { id: true } }),
+  ]);
+  if (!feed) throw new Error(`Feed not found: ${feedId}`);
+  let resolvedVideoId = videoId;
+  if (!video) {
+    // Fallback: caller may have passed a FeedVideo id instead of a Video id.
+    const feedVideo = await prisma.feedVideo.findUnique({
+      where: { id: videoId },
+      select: { videoId: true },
+    });
+    if (!feedVideo) throw new Error(`Video not found: ${videoId}`);
+    resolvedVideoId = feedVideo.videoId;
+  }
+
+  try {
+    return await prisma.videoAnalytics.create({
+      data: {
+        video: { connect: { id: resolvedVideoId } },
+        feed: { connect: { id: feedId } },
+        shop: { connect: { shopDomain: feed.shopDomain } },
+        date: dateOnly,
+        ...updates,
+      },
+    });
+  } catch (error) {
+    // Lost the create race — the unique index rejects us with P2002; add to the
+    // row that now exists.
+    if (error.code === "P2002") {
+      return prisma.videoAnalytics.update({
+        where: { videoId_feedId_date: { videoId: resolvedVideoId, feedId, date: dateOnly } },
+        data: incOps,
+      });
+    }
+    throw error;
+  }
 }
 
 /**
@@ -142,7 +137,10 @@ export async function getAggregatedByShop(shopDomain, { startDate, endDate }) {
   const end = toDateOnly(endDate);
   const rows = await prisma.videoAnalytics.findMany({
     where: {
-      feed: { shopDomain, isDeleted: false },
+      // Filter on the denormalized column (indexed) rather than through the
+      // relation; keep feed.isDeleted so deleted feeds stay excluded.
+      shopDomain,
+      feed: { isDeleted: false },
       isDeleted: false,
       date: { gte: start, lte: end },
     },
@@ -179,7 +177,10 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   const end = toDateOnly(endDate);
   const rows = await prisma.videoAnalytics.findMany({
     where: {
-      feed: { shopDomain, isDeleted: false },
+      // Filter on the denormalized column (indexed) rather than through the
+      // relation; keep feed.isDeleted so deleted feeds stay excluded.
+      shopDomain,
+      feed: { isDeleted: false },
       isDeleted: false,
       date: { gte: start, lte: end },
     },
@@ -217,73 +218,79 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
  */
 export async function getListofVideosWithAnalytics(shopDomain, options = {}) {
   const { cursor, direction = 'next', take = VIDEOS_PAGE_SIZE, startDate, endDate } = options;
+  // `take` arrives from a JSON body, so it can be a string ("5" + 1 === "51") or
+  // an absurd number. Coerce and clamp — same pattern as video.server.js.
+  const safeTake = Math.min(MAX_TAKE, Math.max(MIN_TAKE, Number(take) || VIDEOS_PAGE_SIZE));
 
   const where = { shopDomain, isDeleted: false };
   if (startDate != null && endDate != null) {
     where.date = { gte: toDateOnly(startDate), lte: toDateOnly(endDate) };
   }
 
-  const include = {
-    video: {
-      select: {
-        id: true,
-        title: true,
-        videoPlaybackId: true,
-      },
-    },
-  };
-
-  if (!cursor) {
-    const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
-      where,
-      orderBy: VIDEO_ORDER_DESC,
-      take: take + 1,
-      include,
-    });
-    const hasMore = videosWithAnalyticsItems.length > take;
-    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
-
-    return {
-      videosWithAnalytics,
-      nextCursor: hasMore ? videosWithAnalytics[videosWithAnalytics.length - 1].id : null,
-      previousCursor: null,
-    };
-  }
-
-  if (direction === 'next') {
-    const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
-      where,
-      orderBy: VIDEO_ORDER_DESC,
-      cursor: { id: cursor },
-      skip: 1,
-      take: take + 1,
-      include,
-    });
-    const hasMore = videosWithAnalyticsItems.length > take;
-    const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
-
-    return {
-      videosWithAnalytics,
-      nextCursor: hasMore ? videosWithAnalytics[videosWithAnalytics.length - 1].id : null,
-      previousCursor: cursor,
-    };
-  }
-
-  const videosWithAnalyticsItems = await prisma.videoAnalytics.findMany({
+  // Aggregate the daily snapshots per video. Without this the same video appears
+  // once per day (per feed), each row showing only that day's revenue — so the
+  // table was really "top days across all videos", not "top videos".
+  const grouped = await prisma.videoAnalytics.groupBy({
+    by: ['videoId'],
     where,
-    orderBy: VIDEO_ORDER_ASC,
-    cursor: { id: cursor },
-    skip: 1,
-    take: take + 1,
-    include,
+    _sum: {
+      videoImpressions: true,
+      videoViews: true,
+      videoProductClicks: true,
+      videoAtcClicks: true,
+      videoAddToCart: true,
+      videoOrders: true,
+      videoRevenue: true,
+    },
   });
-  const hasMore = videosWithAnalyticsItems.length > take;
-  const videosWithAnalytics = hasMore ? videosWithAnalyticsItems.slice(0, take) : videosWithAnalyticsItems;
-  videosWithAnalytics.reverse();
+
+  if (!grouped.length) {
+    return { videosWithAnalytics: [], nextCursor: null, previousCursor: null };
+  }
+
+  // Highest total revenue first; tie-break on videoId so the order is stable.
+  const sorted = grouped
+    .map((g) => ({
+      videoId: g.videoId,
+      videoImpressions: g._sum.videoImpressions ?? 0,
+      videoViews: g._sum.videoViews ?? 0,
+      videoProductClicks: g._sum.videoProductClicks ?? 0,
+      videoAtcClicks: g._sum.videoAtcClicks ?? 0,
+      videoAddToCart: g._sum.videoAddToCart ?? 0,
+      videoOrders: g._sum.videoOrders ?? 0,
+      videoRevenue: g._sum.videoRevenue ?? 0,
+    }))
+    .sort((a, b) => (b.videoRevenue - a.videoRevenue) || a.videoId.localeCompare(b.videoId));
+
+  // Cursor is now a videoId (previously an analytics-row id).
+  let start = 0;
+  if (cursor) {
+    const idx = sorted.findIndex((r) => r.videoId === cursor);
+    if (idx !== -1) {
+      start = direction === 'next' ? idx + 1 : Math.max(0, idx - safeTake);
+    }
+  }
+  const page = sorted.slice(start, start + safeTake);
+
+  const videos = await prisma.video.findMany({
+    where: { id: { in: page.map((r) => r.videoId) } },
+    select: {
+      id: true,
+      title: true,
+      videoPlaybackId: true,
+    },
+  });
+  const videoById = new Map(videos.map((v) => [v.id, v]));
+
+  const videosWithAnalytics = page.map((r) => ({
+    id: r.videoId,
+    ...r,
+    video: videoById.get(r.videoId) ?? null,
+  }));
 
   return {
     videosWithAnalytics,
-    nextCursor: cursor,
-    previousCursor: hasMore ? videosWithAnalytics[0].id : null,
+    nextCursor: start + safeTake < sorted.length ? page[page.length - 1]?.videoId ?? null : null,
+    previousCursor: start > 0 ? page[0]?.videoId ?? null : null,
   };
 }

@@ -42,7 +42,6 @@ model Shop {
   contactEmail  String?
   customerEmail String?
   shopOwner     String?
-  accessToken   String
 
   // Plan Info
   planName           String?
@@ -72,6 +71,11 @@ model Shop {
   appPlan       String?
   crispObject   Json?
   planLimits    Json?
+  // Opened by an authenticated "Configure in theme" click. /blocks/assign is a
+  // storefront-reachable write, and app-proxy signing only proves the request
+  // came through this shop — not that it came from staff. This window is what
+  // stops an anonymous visitor remapping a block's feed.
+  themeSetupUntil DateTime?
   globalSettings  GlobalSettings?
   // videoViewLimit Int?
   // videoViewCount Int?
@@ -85,6 +89,7 @@ model Shop {
   feedAnalytics       FeedAnalytics[]
   videoAnalytics      VideoAnalytics[]
   videoCartOrderItems VideoCartOrderItem[]
+  themeBlockFeeds     ThemeBlockFeed[]
 }
 
 model GlobalSettings {
@@ -111,6 +116,9 @@ model Video {
   status          String   @default("PROCESSING")
   duration        Float?
   aspectRatio     String?
+  // Soft delete: retiring a video must NOT cascade-destroy its historical
+  // VideoAnalytics rows (which would retroactively change past reports).
+  isDeleted       Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -120,6 +128,7 @@ model Video {
   shop           Shop             @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
 
   @@index([fileUploadName])
+  @@index([shopDomain, isDeleted])
   @@index([shopDomain])
 }
 
@@ -214,6 +223,8 @@ model FeedAnalytics {
   @@index([date])
   @@index([isDeleted])
   @@index([shopDomain])
+  // Serves the shop-wide analytics reads: equality on shopDomain + range on date.
+  @@index([shopDomain, date])
 }
 
 // Video-in-feed analytics: one row per (video, feed) per day
@@ -243,6 +254,11 @@ model VideoAnalytics {
   @@index([date])
   @@index([isDeleted])
   @@index([shopDomain])
+  // Serves the shop-wide analytics reads: equality on shopDomain + range on date.
+  @@index([shopDomain, date])
+  // findByFeedAndDateRange filters on feedId, which is NOT the prefix of
+  // @@unique([videoId, feedId, date]) — so that index cannot serve it.
+  @@index([feedId, date])
 }
 
 // Orders that had at least one line item attributed to the video-cart widget (from pixel).
@@ -283,5 +299,26 @@ model VideoCartOrderItem {
   @@index([feedId])
   @@index([videoId])
   @@index([feedId, isDeleted])
+  @@index([shopDomain])
+}
+
+// Which feed a given theme app block renders.
+//
+// Keyed by Shopify's block id, which is stable in the theme's template JSON.
+// This exists because a theme block setting cannot be written by JavaScript —
+// the schema is static and the theme-editor channel is one-directional — so the
+// merchant's choice is stored here instead of in the theme.
+model ThemeBlockFeed {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopDomain String
+  blockId    String
+  feedId     String   @db.ObjectId
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  shop Shop @relation(fields: [shopDomain], references: [shopDomain], onDelete: Cascade)
+
+  // One feed per block: re-picking overwrites instead of accumulating rows.
+  @@unique([shopDomain, blockId])
   @@index([shopDomain])
 }

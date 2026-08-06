@@ -14,9 +14,27 @@ export const action = async ({ request }) => {
                 requestId: request.id,
             });
         }
-        const data = await request.json();
-        const updatedShopData = await updateByDomain(session.shop, data);
-        return apiSuccess({ updatedShopData }, {
+        const body = await request.json();
+
+        // Allow-list: the only field a client may write here is the Crisp chat
+        // token id (set by initCrisp). Plan, limits, isActive, shopDomain, etc.
+        // must NEVER be client-writable — those are driven by billing/onboarding.
+        const allowed = {};
+        if (body?.crispObject && typeof body.crispObject === "object") {
+            allowed.crispObject = { crispTokenId: String(body.crispObject.crispTokenId ?? "") };
+        }
+
+        if (Object.keys(allowed).length === 0) {
+            return apiError(new Error("No permitted fields to update"), {
+                route: "shop-updateShopData",
+                code: "NO_PERMITTED_FIELDS",
+                statusCode: 400,
+                requestId: request.id,
+            });
+        }
+
+        await updateByDomain(session.shop, allowed);
+        return apiSuccess({ ok: true }, {
             route: "shop-updateShopData",
             requestId: request.id,
         });

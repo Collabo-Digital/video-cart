@@ -17,7 +17,7 @@ import {
   getProductHandle,
 } from '../../../../utils/widgetHelpers';
 import { createProductClickHandler } from '../../../../utils/productClickHandler';
-import { THUMB_CARD, CARD_GAP, PRODUCT_ITEM_GAP } from '../../../../core/constant';
+import { THUMB_CARD, PRODUCT_ITEM_GAP } from '../../../../core/constant';
 import { LABEL_WATCH, EMPTY_VIDEOS } from '../../../../constants/strings';
 
 import LeftToggleIcon from '../../../../assets/Icons/LeftToggleIcon';
@@ -39,6 +39,9 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
   const [currentIndex, setCurrentIndex] = createSignal(0);
+  // Measured, not assumed: carousel.css changes the card basis at 768px and the
+  // merchant controls the gap, so neither can be hardcoded.
+  const [perView, setPerView] = createSignal(0);
 
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
 
@@ -63,14 +66,18 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   });
 
   const total = () => videos?.length ?? 0;
-  const cloneCount = () => Math.min(CLONE_COUNT, total());
+
+  // Clones only work once the real videos overflow the viewport. Below that the
+  // clones sit INSIDE the visible track — the shopper sees the same video two or
+  // three times, and the track is too short to reach the wrap trigger.
+  const shouldLoop = () => perView() > 0 && total() > perView();
+  const cloneCount = () => (shouldLoop() ? Math.min(CLONE_COUNT, total()) : 0);
 
   const loopItems = createMemo(() => {
     if (!videos?.length) return [];
     const n = cloneCount();
-    const tail = videos.slice(-n);
-    const head = videos.slice(0, n);
-    return [...tail, ...videos, ...head];
+    if (!n) return videos.slice();
+    return [...videos.slice(-n), ...videos, ...videos.slice(0, n)];
   });
 
   const toTrackIndex = (realIdx) => realIdx + cloneCount();
@@ -114,32 +121,55 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     onCleanup(() => observer.disconnect());
   });
 
-  const getCardWidth = () => {
+  // Distance between two card origins captures width AND the real gap in one
+  // measurement. CARD_GAP (20) disagrees with the CSS gap (12px default,
+  // merchant-configurable) and with the flex-basis calc (22px).
+  const getStep = () => {
     const el = trackRef();
-    const card = el?.querySelector('.video-carousel-card');
-    return card?.offsetWidth ?? 0;
+    const cards = el?.querySelectorAll('.video-carousel-card');
+    if (!cards?.length) return 0;
+    return cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : cards[0].offsetWidth;
   };
+
+  const measurePerView = () => {
+    const el = trackRef();
+    const step = getStep();
+    if (!el || !step) return;
+    setPerView(Math.max(1, Math.round(el.clientWidth / step)));
+  };
+
+  createEffect(() => {
+    const el = trackRef();
+    // Re-measure when the rendered card list changes (async feed load, clone on/off).
+    loopItems();
+    if (!el) return;
+    measurePerView();
+    const ro = new ResizeObserver(measurePerView);
+    ro.observe(el);
+    onCleanup(() => ro.disconnect());
+  });
 
   const scrollToTrackIndex = (idx, behavior = 'smooth') => {
     const el = trackRef();
-    const cardW = getCardWidth();
-    if (!el || !cardW) return;
-    el.scrollTo({ left: idx * (cardW + CARD_GAP), behavior });
+    const step = getStep();
+    if (!el || !step) return;
+    el.scrollTo({ left: idx * step, behavior });
   };
 
   const getTrackIndex = () => {
     const el = trackRef();
-    const cardW = getCardWidth();
-    if (!el || !cardW) return cloneCount();
-    return Math.round(el.scrollLeft / (cardW + CARD_GAP));
+    const step = getStep();
+    if (!el || !step) return cloneCount();
+    return Math.round(el.scrollLeft / step);
   };
 
-  /** Position track at the first real card on mount */
+  /** Re-centre whenever cloning switches on or off (and on first paint). */
   createEffect(() => {
     const el = trackRef();
+    const n = cloneCount();
     if (!el || !total()) return;
     requestAnimationFrame(() => {
-      scrollToTrackIndex(cloneCount(), 'instant');
+      scrollToTrackIndex(n, 'instant');
       setCurrentIndex(0);
     });
   });
@@ -147,7 +177,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   /** Track scroll position and silently reposition when entering cloned region */
   createEffect(() => {
     const el = trackRef();
-    if (!el || !total()) return;
+    if (!el || !total() || !shouldLoop()) return;
 
     let repositionTimer = null;
 
@@ -180,20 +210,22 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   });
 
   const handleNav = (direction) => {
-    if (!total()) return;
+    if (!total() || !shouldLoop()) return;
     const trackIdx = getTrackIndex();
     const nextTrack = direction === 'next' ? trackIdx + 1 : trackIdx - 1;
     scrollToTrackIndex(nextTrack);
   };
 
+  // Autoplaying a track that cannot loop just jitters it against its end stop.
   createEffect(() => {
-    if (!autoLoop() || !total() || total() <= 1) return;
+    if (!autoLoop() || !shouldLoop()) return;
     const interval = setInterval(() => handleNav('next'), 4000);
     onCleanup(() => clearInterval(interval));
   });
 
-  const isPrevDisabled = () => !videos?.length;
-  const isNextDisabled = () => !videos?.length;
+  // Nothing to page through when everything already fits.
+  const isPrevDisabled = () => !shouldLoop();
+  const isNextDisabled = () => !shouldLoop();
 
   const scrollProducts = (e, direction) => {
     e.preventDefault();
@@ -302,6 +334,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
         productPrice={productPrice}
         addToCartButtonLabel={addToCartButtonLabel}
         addToCartButtonStyle={addToCartButtonStyle}
+        buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
         handleProductClick={handleProductClick}
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });

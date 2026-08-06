@@ -79,7 +79,7 @@ export const action = async ({ request }) => {
   }
 
   try {
-    await VideoModel.deleteVideoAndMuxAsset(videoId);
+    await VideoModel.deleteVideoAndMuxAsset(videoId, session.shop);
     return apiSuccess({ ok: true });
   } catch (error) {
     console.error("Delete video error:", error);

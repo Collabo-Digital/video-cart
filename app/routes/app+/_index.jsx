@@ -21,15 +21,16 @@ import {
     PlusIcon,
 } from "@shopify/polaris-icons";
 import { Crisp } from "crisp-sdk-web";
-import { onCLS, onINP, onLCP } from "web-vitals";
 import { useLoaderData, useNavigate } from "react-router";
 
 import { authenticate } from "../../config/shopify.server";
 import { WIDGET_TYPES } from "../../lib/constants/common";
+import { toClientShop } from "../../lib/dto/shop";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import { getNextResetDate, getPercentage } from "../../lib/utils/common";
 import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
+import { generateCrispEmailHmac, generateCrispTokenId } from "../../lib/utils/crispToken.server";
 import { initCrisp } from "../../lib/utils/intiCrisp";
 import * as ShopModel from "../../models/shop.server";
 import * as VideoModel from "../../models/video.server";
@@ -54,14 +55,19 @@ export const loader = async ({ request }) => {
         const now = new Date();
         const limits = shopData.planLimits ?? {};
 
-        // Reset monthly view counts when the billing cycle rolls over
-        if (!limits.resetDate || limits.resetDate <= now) {
+        // Reset monthly view counts when the billing cycle rolls over.
+        // resetDate is stored as an ISO string, so parse it before comparing —
+        // comparing a string directly against a Date coerces to NaN (always false).
+        const resetAt = limits.resetDate ? new Date(limits.resetDate).getTime() : 0;
+        let didReset = false;
+        if (!limits.resetDate || Number.isNaN(resetAt) || resetAt <= now.getTime()) {
             limits.videoViewCount = 0;
             limits.videoViewLimitReached = false;
             limits.resetDate = getNextResetDate(now).toISOString();
             shopData = await ShopModel.updateByDomain(session.shop, {
                 planLimits: limits,
             });
+            didReset = true;
         }
 
         const resetDate = new Date(shopData.planLimits.resetDate);
@@ -74,7 +80,9 @@ export const loader = async ({ request }) => {
         );
 
         let muxMetrics = null;
-        if (shopVideos.length > 0) {
+        // Skip Mux on the request where the cycle just reset: the window is
+        // [now, now] (0 views this cycle) and Mux rejects a zero-length timeframe.
+        if (shopVideos.length > 0 && !didReset) {
             muxMetrics = await getOverallDataMetricsForVideoIds(
                 shopVideos,
                 30,
@@ -93,7 +101,18 @@ export const loader = async ({ request }) => {
             });
         }
 
-        return apiSuccess({ feeds: [], session, shopData, muxMetrics });
+        // Never return `session` or the raw shop record — both carry the Admin
+        // API access token, which would be serialized into the client HTML.
+        return apiSuccess({
+            feeds: [],
+            shopData: toClientShop(shopData),
+            // Generated server-side so they can't be forged in the browser.
+            crisp: {
+                tokenId: generateCrispTokenId(shopData.id),
+                emailHmac: generateCrispEmailHmac(shopData.email),
+            },
+            muxMetrics,
+        });
     } catch (error) {
         console.error("Error fetching feeds:", error);
 
@@ -325,7 +344,7 @@ function SupportCard({ onChatClick }) {
 
 export default function IndexPage() {
     const loaderData = useLoaderData();
-    const { shopData, muxMetrics } = loaderData?.data ?? {};
+    const { shopData, muxMetrics, crisp } = loaderData?.data ?? {};
 
     const totalViews = muxMetrics?.aggregate?.views ?? 0;
 
@@ -363,15 +382,12 @@ export default function IndexPage() {
     }, []);
 
     useEffect(() => {
-        onCLS(console.log);
-        onINP(console.log);
-        onLCP(console.log);
-
         if (shopData) {
-            initCrisp(shopData);
+            initCrisp(shopData, crisp);
+            // shopData is the token-free DTO (see loader); safe to cache.
             setShopDataLocalStorage(shopData);
         }
-    }, [shopData]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [shopData, crisp]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <Page

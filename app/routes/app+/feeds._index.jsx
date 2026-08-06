@@ -26,7 +26,6 @@ import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import * as FeedModel from "../../models/feed.server";
 import {
   deleteFeed,
-  getFeedById,
   updateFeed,
 } from "../../services/feed/feed.service.server";
 import { DEBOUNCE_MS, WIDGET_TYPE_OPTIONS, SORT_OPTIONS, TABLE_HEADINGS, STATUS_CHOICES } from "../../lib/constants/feedsPage";
@@ -80,8 +79,7 @@ export const action = async ({ request }) => {
       const feedId = formData.get("feedId");
       if (!feedId) return apiError({ error: "Feed ID is required" }, { status: 400 });
 
-      await getFeedById(feedId, session.shop);
-      await updateFeed(feedId, { isEnabled: formData.get("isEnabled") === "true" });
+      await updateFeed(feedId, { isEnabled: formData.get("isEnabled") === "true" }, session.shop);
       return apiSuccess({ ok: true });
     }
 
@@ -172,7 +170,7 @@ function FeedRow({ feed, index, fetcher, onToggle, onEdit, onDeleteClick }) {
       </IndexTable.Cell>
 
       <IndexTable.Cell>
-        <Text variant="bodyMd">{feed.videos?.length ?? 0}</Text>
+        <Text variant="bodyMd">{feed._count?.videos ?? 0}</Text>
       </IndexTable.Cell>
 
       <IndexTable.Cell>

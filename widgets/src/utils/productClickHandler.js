@@ -26,29 +26,57 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
     if (isPreview) return;
     const cartSource = WIDGET_SOURCES[source] || WIDGET_SOURCES.carousel;
 
-    return async function handleProductClick(product, video) {
+    /**
+     * @param {Object} [options] Supplied by the overlay detail view, which knows
+     *   the shopper's actual choice. Callers that omit it keep the old
+     *   behaviour: first variant, quantity 1.
+     * @param {string} [options.variantId]
+     * @param {number} [options.quantity]
+     * @param {'view'|'add'} [options.intent]
+     */
+    return async function handleProductClick(product, video, options) {
         if (isPreview) return;
+        const variantId = options?.variantId ?? null;
+        const quantity = Math.max(1, Math.floor(Number(options?.quantity) || 1));
         const productHandle = typeof product === 'object' ? getProductHandle(product) : product;
-        onEvent?.('product_click', {
-            feedId: feed?.id,
-            videoId: video?.id,
-            productId: productHandle,
-            source,
-        });
+
+        // 'add' only ever follows a 'view', so emitting on both would
+        // double-count a single shopper journey.
+        if (options?.intent !== 'add') {
+            onEvent?.('product_click', {
+                feedId: feed?.id,
+                videoId: video?.id,
+                productId: productHandle,
+                source,
+                variantId,
+                quantity,
+            });
+        }
+
+        // Opening the detail panel is a product click — not a cart write, and
+        // not a navigation.
+        if (options?.intent === 'view') {
+            if (feed?.id && video?.id) {
+                trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_PRODUCT_CLICK });
+                trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_PRODUCT_CLICK });
+            }
+            return;
+        }
 
         const behavior = feed?.settings?.general?.buttonBehavior;
-
+        console.log('productObj', product);
         if (behavior === BUTTON_BEHAVIOR_ADD_TO_CART) {
             const productObj = typeof product === 'object' ? product : { id: product };
             try {
                 await addToCart([{
-                    id: getVariantId(productObj),
-                    quantity: 1,
+                    id: variantId ?? getVariantId(productObj),
+                    quantity,
                 }]);
 
                 const existing = getStorageItem('atc_products', []);
                 const newEntry = {
                     product_id: productObj.id,
+                    variant_id: variantId,
                     video_id: video?.id,
                     widget_id: feed?.id,
                     source: cartSource,
@@ -63,10 +91,10 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
                 );
 
                 if (idx !== -1) {
-                    existing[idx].quantity = (existing[idx].quantity || 1) + 1;
+                    existing[idx].quantity = (existing[idx].quantity || 1) + quantity;
                     existing[idx].timestamp = Date.now();
                 } else {
-                    existing.push({ ...newEntry, quantity: 1 });
+                    existing.push({ ...newEntry, quantity });
                 }
 
                 setStorageItem('atc_products', existing);
@@ -92,6 +120,10 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
         }
 
         const handle = typeof product === 'object' ? getProductHandle(product) : product;
-        if (handle) window.location.href = `/products/${handle}`;
+        if (handle) {
+            // Locale-prefixed storefronts serve /en-ca/products/… — routes.root has it.
+            const root = window.Shopify?.routes?.root || '/';
+            window.location.href = `${root}products/${handle}`;
+        }
     };
 }

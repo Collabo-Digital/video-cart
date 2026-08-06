@@ -4,12 +4,8 @@ import * as VideoModel from "../../models/video.server";
 import * as ShopModel from "../../models/shop.server";
 
 export const loader = async ({ request, params }) => {
-  console.log('request of feeds $feedId hitted', request, params);
   try {
-    console.log('before appProxy');
     const { session } = await authenticate.public.appProxy(request);
-    console.log('session of feeds $feedId', session);
-    console.log('Check point #1');
     if (!session) {
       return Response.json({
         success: false,
@@ -96,7 +92,10 @@ export const loader = async ({ request, params }) => {
         widgetPage: feed.widgetPage,
         customPagePath: feed.customPagePath || null,
         isEnabled: feed.isEnabled,
-        videos: feed.videos,
+        // readyVideos, NOT feed.videos: the raw junction rows expose FeedVideo
+        // ids (breaking video analytics, which expect a Video id) and include
+        // PROCESSING/ERRORED videos that render as broken players on the store.
+        videos: readyVideos,
         settings: {
           autoplay: feed.autoplay,
           showControls: feed.showControls,
@@ -104,9 +103,16 @@ export const loader = async ({ request, params }) => {
           ...(feed.settings || {}),
         },
       },
+    }, {
+      // Per-shop (not per-shopper) data — safe to cache briefly. Every proxy hit
+      // is otherwise an uncached round-trip through Shopify to a lambda to Mongo.
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=600" },
     });
   } catch (error) {
-    console.error('auth appProxy error:', error.constructor?.name, error);
+    // authenticate.public.appProxy throws a Response (400) on an invalid
+    // signature — framework control flow, not an error. Let it through.
+    if (error instanceof Response) throw error;
+
     console.error('Proxy get feed error:', error);
 
     return Response.json({

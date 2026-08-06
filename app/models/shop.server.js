@@ -52,3 +52,23 @@ export async function updateByDomain(shopDomain, data) {
     },
   });
 }
+
+/**
+ * Deactivate a shop on uninstall. Idempotent: uses updateMany so it does NOT
+ * throw when the row is already gone, which makes the uninstall webhook safe to
+ * retry. Sets isActive:false and uninstalledAt; merge any extra fields via `extra`.
+ * @param {string} shopDomain - Shop domain
+ * @param {Object} [extra] - Additional fields to set (e.g. appPlan, planLimits)
+ * @returns {Promise<{count: number}>} Number of rows updated
+ */
+export async function deactivateByDomain(shopDomain, extra = {}) {
+  return prisma.shop.updateMany({
+    where: { shopDomain },
+    data: {
+      isActive: false,
+      uninstalledAt: new Date(),
+      updatedAt: new Date(),
+      ...extra,
+    },
+  });
+}

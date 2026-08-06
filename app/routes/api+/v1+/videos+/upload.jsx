@@ -74,6 +74,7 @@ import { authenticate } from '../../../../config/shopify.server';
 import { createUploadUrl } from '../../../../services/video/upload.service';
 import * as ShopModel from '../../../../models/shop.server';
 import * as VideoModel from '../../../../models/video.server';
+import { VIDEO_CONFIG } from '../../../../lib/constants/video';
 import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 function jsonResponse(body, status = 200) {
@@ -113,6 +114,27 @@ export const action = async ({ request }) => {
       body = await request.json().catch(() => ({}));
     } catch (_) {}
     const fileName = typeof body?.fileName === 'string' ? body.fileName.trim() : null;
+
+    // Enforce the size cap server-side, before a Mux upload URL is spent.
+    // Note: the size is client-declared (the bytes go browser -> Mux directly,
+    // never through us), so this stops honest oversized uploads rather than a
+    // determined attacker. Mux-side limits are the backstop for that.
+    const fileSize = Number(body?.fileSize);
+    if (!Number.isFinite(fileSize) || fileSize <= 0) {
+      return jsonResponse({
+        success: false,
+        error: 'fileSize is required',
+        code: 'FILE_SIZE_REQUIRED',
+      }, 400);
+    }
+    if (fileSize > VIDEO_CONFIG.MAX_SIZE_BYTES) {
+      return jsonResponse({
+        success: false,
+        error: `File size must be less than ${VIDEO_CONFIG.MAX_SIZE_MB}MB`,
+        code: 'FILE_TOO_LARGE',
+      }, 413);
+    }
+
     const uploadData = await createUploadUrl({ fileName: fileName || undefined, shopDomain: session.shop });
 
     return jsonResponse({ success: true, data: uploadData, remaining: remaining - 1 });

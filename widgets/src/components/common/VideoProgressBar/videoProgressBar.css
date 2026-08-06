@@ -1,0 +1,115 @@
+/* Reels-style scrubber for the desktop player: a hairline that thickens on
+   hover, a thumb that fades in, and a time bubble that follows the cursor.
+   Everything that moves per-frame is a transform, written from rAF. */
+
+.vc-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  /* Generous hit area around a 2px bar — the visible hairline is far too thin
+     to grab, so the padding is what makes it usable. */
+  height: 22px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+  outline: none;
+  /* Just enough scrim to keep a white bar legible over pale footage. */
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.35));
+}
+
+.vc-progress-track {
+  position: relative;
+  flex: 1;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+  transition: height 0.18s ease;
+}
+
+/* Full-width bar translated left and clipped by the track. Unlike scaleX this
+   leaves the rounded end cap undistorted, and it is still a pure transform. */
+.vc-progress-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--vc-progress-fill, #fff);
+  transform: translateX(-100%);
+  will-change: transform;
+}
+
+.vc-progress-thumb {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--vc-progress-fill, #fff);
+  box-shadow:
+    0 0 0 4px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  scale: 0.6;
+  transform: translate3d(0, -50%, 0);
+  transform-origin: center;
+  will-change: transform;
+  pointer-events: none;
+  transition: opacity 0.18s ease, scale 0.18s ease;
+}
+
+.vc-progress-bubble {
+  position: absolute;
+  left: 14px;
+  bottom: 26px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate3d(0, 0, 0);
+  /* Centred on the cursor without a second transform channel. */
+  margin-left: -18px;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* Hovering anywhere on the video expands the bar, not just the bar itself. */
+.video-carousel-overlay-center:hover .vc-progress-track,
+.vc-progress:focus-visible .vc-progress-track {
+  height: 5px;
+}
+
+.video-carousel-overlay-center:hover .vc-progress-thumb,
+.vc-progress:focus-visible .vc-progress-thumb {
+  opacity: 1;
+  scale: 1;
+}
+
+.vc-progress:hover .vc-progress-bubble,
+.vc-progress:focus-visible .vc-progress-bubble {
+  opacity: 1;
+}
+
+.vc-progress:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-progress-track,
+  .vc-progress-thumb,
+  .vc-progress-bubble {
+    transition: none !important;
+  }
+}
