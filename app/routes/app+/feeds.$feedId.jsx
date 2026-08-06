@@ -17,6 +17,7 @@ import { SettingsIcon, UploadIcon, ViewIcon } from "@shopify/polaris-icons";
 import {
   redirect,
   useActionData,
+  useFetcher,
   useLoaderData,
   useNavigation,
   useSubmit,
@@ -41,6 +42,27 @@ import * as GlobalSettingsModel from "../../models/globalSettings.server";
 import { createFeed, getFeedById, updateFeed } from "../../services/feed/feed.service.server";
 
 import { normaliseFeedVideo } from "../../lib/utils/common";
+
+/** Matches the window refreshed on every admin page view in app+/_layout.jsx.
+ *  "Configure in theme" only extends it; the layout already opened it. */
+const THEME_SETUP_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** Which theme template the editor should open on, so the block lands on the
+ *  page this feed is meant for. */
+const widgetPageToTemplate = {
+  homePage: "index",
+  productPage: "product",
+  collectionPage: "collection",
+};
+
+function templateForCustomPath(path) {
+  const p = (path || "").toLowerCase();
+  if (p.startsWith("/products/")) return "product";
+  if (p.startsWith("/collections/")) return "collection";
+  if (p.startsWith("/blogs/")) return "article";
+  if (p.startsWith("/pages/")) return "page";
+  return "index";
+}
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 import { SettingsTab } from "../../components/SettingsTab/Index";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
@@ -97,6 +119,27 @@ export const action = async ({ params, request }) => {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
+
+    // Opens the window that makes /blocks/assign writable, then hands back a
+    // deep link that drops the block into the theme editor already placed.
+    // Both halves matter: a deep link cannot carry setting values, so without
+    // the window the merchant would land on a block that cannot save its pick.
+    if (data.intent === "configureInTheme") {
+      await ShopModel.updateByDomain(session.shop, {
+        themeSetupUntil: new Date(Date.now() + THEME_SETUP_WINDOW_MS),
+      });
+
+      // SHOPIFY_API_KEY differs between shopify.app.toml and
+      // shopify.app.video-cart.toml — never hardcode it.
+      const themeEditorUrl =
+        `https://${session.shop}/admin/themes/current/editor` +
+        `?template=${encodeURIComponent(data.template || "index")}` +
+        `&addAppBlockId=${process.env.SHOPIFY_API_KEY}/video-carousel` +
+        `&target=newAppsSection`;
+
+      return { themeEditorUrl };
+    }
+
     const parsedVideos = JSON.parse(data.videos ?? "[]");
     const parsedSettings = data.settings ? JSON.parse(data.settings) : undefined;
 
@@ -125,7 +168,7 @@ export const action = async ({ params, request }) => {
       isEnabled: data.isEnabled === "true",
       settings: parsedSettings,
       videos: parsedVideos,
-    });
+    }, session.shop);
 
     return redirect(`/app/feeds/${params.feedId}`);
   } catch (error) {
@@ -184,12 +227,35 @@ export default function FeedEditorPage() {
   const [shopData] = useLocalStorage("shopData", null);
 
   const [uploadedVideos, setUploadedVideos] = useState([]);
+  // Filled by VideoUploader with { cancel, retry, checkAgain } so the buttons on
+  // an in-flight card can drive the upload that lives inside VideoUploader.
+  const uploadActionsRef = useRef(null);
   const [error, setError] = useState(null);
   const [hasVideoChanges, setHasVideoChanges] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [settingsTab, setSettingsTab] = useState(0);
 
   const previewModalRef = useRef(null);
+
+  // Opens the setup window server-side, then sends the merchant to the theme
+  // editor with the block already placed. target="_top" because the admin runs
+  // us in an iframe and the theme editor refuses to load inside it.
+  const themeFetcher = useFetcher();
+  const isConfiguringTheme = themeFetcher.state !== "idle";
+
+  const configureInTheme = useCallback(() => {
+    const template =
+      widgetPageToTemplate[feed?.widgetPage] ?? templateForCustomPath(feed?.customPagePath);
+    themeFetcher.submit(
+      { intent: "configureInTheme", template },
+      { method: "post" }
+    );
+  }, [feed?.widgetPage, feed?.customPagePath, themeFetcher]);
+
+  useEffect(() => {
+    const url = themeFetcher.data?.themeEditorUrl;
+    if (url) window.open(url, "_top");
+  }, [themeFetcher.data]);
 
   const formValues = useMemo(
     () => getFeedFormDefaultValues(feed, widgetType, widgetPage, globalSettings),
@@ -257,10 +323,107 @@ export default function FeedEditorPage() {
     [uploadedVideos]
   );
 
-  const handleRemoveVideo = useCallback((index) => {
-    setUploadedVideos((prev) => prev.filter((_, i) => i !== index));
+  // --- In-flight upload placeholders --------------------------------------
+  // The device upload runs in VideoUploader (so it survives the modal closing)
+  // and reports progress here. A placeholder card appears immediately and is
+  // swapped for the real video once Mux returns a playback id.
+  const updatePendingVideo = useCallback((tempId, patch) => {
+    setUploadedVideos((prev) =>
+      prev.map((v) => (v.tempId === tempId ? { ...v, ...patch } : v)),
+    );
+  }, []);
+
+  const handleUploadStart = useCallback(({ tempId, fileName, file }) => {
+    setError(null);
+    setUploadedVideos((prev) => [
+      ...prev,
+      // `file` is kept so a failed transfer can be retried without re-picking it.
+      { tempId, fileName, title: fileName, uploadState: 'uploading', progress: 0, file },
+    ]);
+  }, []);
+
+  const handleUploadProgress = useCallback(
+    (tempId, progress) => updatePendingVideo(tempId, { progress }),
+    [updatePendingVideo],
+  );
+
+  const handleUploadStateChange = useCallback(
+    (tempId, uploadState, patch = {}) => updatePendingVideo(tempId, { uploadState, ...patch }),
+    [updatePendingVideo],
+  );
+
+  // The poll ran out of budget. Keep whatever it did learn (videoId, playbackId)
+  // so the card stays saveable and "Check again" has an uploadId to re-poll.
+  const handleUploadPending = useCallback(
+    (tempId, video) => {
+      updatePendingVideo(tempId, { ...(video ?? {}), uploadState: 'slow' });
+      // Without this the Save Bar never appears on an otherwise-clean form, so a
+      // perfectly saveable 'slow' card has no way to be saved at all.
+      if (video?.videoId) setHasVideoChanges(true);
+    },
+    [updatePendingVideo],
+  );
+
+  const handleUploadReady = useCallback((tempId, video) => {
+    // Replace the placeholder with the real video, keeping its position.
+    setUploadedVideos((prev) =>
+      prev.map((v) => (v.tempId === tempId ? { ...video } : v)),
+    );
     setHasVideoChanges(true);
   }, []);
+
+  const handleUploadFailed = useCallback(
+    (tempId, uploadError, meta = {}) =>
+      updatePendingVideo(tempId, {
+        uploadState: 'failed',
+        uploadError,
+        // Records that Mux rejected the asset, so Retry re-uploads rather than
+        // re-polling an upload whose verdict can never change.
+        assetErrored: !!meta.assetErrored,
+      }),
+    [updatePendingVideo],
+  );
+
+  const handleUploadCancel = useCallback((tempId) => {
+    setUploadedVideos((prev) => prev.filter((v) => v.tempId !== tempId));
+  }, []);
+
+  const handleRemoveVideo = useCallback(
+    (index) => {
+      // Read the target OUTSIDE the updater and scope the abort to this card —
+      // an unscoped cancel kills whatever upload happens to be live and then
+      // deletes that other card too.
+      const target = uploadedVideos[index];
+      if (target?.uploadState === 'uploading' || target?.uploadState === 'processing') {
+        uploadActionsRef.current?.cancel?.(target.tempId);
+      }
+      // Remove by IDENTITY, not index. cancel() above synchronously fires
+      // onUploadCancel, which already filtered this card out — a positional
+      // filter would then delete whichever card slid into the vacated slot.
+      setUploadedVideos((prev) =>
+        target ? prev.filter((v) => v !== target) : prev.filter((_, i) => i !== index),
+      );
+      setHasVideoChanges(true);
+    },
+    [uploadedVideos],
+  );
+
+  const handleRetryVideo = useCallback(
+    (index) => {
+      const target = uploadedVideos[index];
+      if (!target) return;
+      // Re-polling only helps while the asset can still turn out fine. Once Mux
+      // has rejected it, no amount of checking will change the verdict — that
+      // card needs a fresh upload.
+      const canRepoll = target.uploadId && !target.assetErrored;
+      if (canRepoll) {
+        uploadActionsRef.current?.checkAgain?.(target.tempId, target.uploadId, target.fileName);
+      } else if (target.file) {
+        uploadActionsRef.current?.retry?.(target.tempId, target.file);
+      }
+    },
+    [uploadedVideos],
+  );
 
   const handleTaggedProductsChange = useCallback((videoIndex, products) => {
     setUploadedVideos((prev) =>
@@ -281,10 +444,34 @@ export default function FeedEditorPage() {
   }, []);
 
   const handleSave = useCallback(() => {
-    if (!uploadedVideos.length) {
+    // Only these two genuinely have nothing the server can resolve yet.
+    if (uploadedVideos.some((v) => v.uploadState === "uploading" || v.uploadState === "processing")) {
+      setError("Wait for the upload to finish before saving.");
+      shopify.toast.show("Wait for the upload to finish before saving.", { isError: true });
+      return;
+    }
+
+    // A 'slow' card that reached a videoId is a real, persisted video that is
+    // merely still encoding — perfectly safe to attach to the feed.
+    const readyVideos = uploadedVideos.filter(
+      (v) => !v.uploadState || (v.uploadState === "slow" && v.videoId),
+    );
+    const skipped = uploadedVideos.length - readyVideos.length;
+
+    if (!readyVideos.length) {
       setError("Upload at least one video");
       shopify.toast.show("Upload at least one video", { isError: true });
       return;
+    }
+
+    if (skipped > 0) {
+      // Toast as well as the banner: the banner lives inside the Uploads panel,
+      // which is now always mounted but display:none on the Settings tab.
+      const msg = `${skipped} video(s) could not be saved. Retry them and save again.`;
+      setError(msg);
+      // Survive the redirect: the success branch clears setError, so without
+      // this the partial save would end up reported as a clean success.
+      skippedWarningRef.current = msg;
     }
 
     const values = watch();
@@ -296,18 +483,58 @@ export default function FeedEditorPage() {
         widgetPage: values.widgetPage,
         customPagePath: values.customPagePath || "",
         settings: JSON.stringify(values.settings ?? { general: {}, design: {}, translation: {} }),
-        videos: JSON.stringify(prepareVideosPayload(uploadedVideos)),
+        videos: JSON.stringify(prepareVideosPayload(readyVideos)),
       },
       { method: "post" }
     );
-
-    shopify.toast.show("Feed saved successfully", { isSuccess: true });
-    shopify?.saveBar?.hide(SAVE_BAR_ID);
+    // No toast here — the server has not answered yet. See the effect below.
   }, [uploadedVideos, watch, submit, shopify]);
 
+  // Report the ACTUAL result. Toasting synchronously after the non-awaited
+  // submit() claimed success even when the action failed or dropped a video.
+  const savedRef = useRef(false);
+  // Carries a partial-save warning across the action's redirect.
+  const skippedWarningRef = useRef(null);
+  useEffect(() => {
+    if (navigation.state === "submitting") {
+      savedRef.current = true;
+      return;
+    }
+    if (navigation.state !== "idle" || !savedRef.current) return;
+    savedRef.current = false;
+
+    const err = actionData?.error ?? (actionData?.success === false ? "Failed to save feed" : null);
+    if (err) {
+      setError(err);
+      shopify.toast.show(err, { isError: true });
+      return;
+    }
+    // A save that dropped videos is not a clean success — say so instead.
+    if (skippedWarningRef.current) {
+      const warning = skippedWarningRef.current;
+      skippedWarningRef.current = null;
+      setError(warning);
+      shopify.toast.show(`Feed saved, but ${warning}`, { isError: true });
+      setHasVideoChanges(false);
+      return;
+    }
+
+    shopify.toast.show("Feed saved successfully", { isSuccess: true });
+    // Drop any stale client-side error, or a warning from an earlier attempt
+    // lingers in the banner next to a success toast.
+    setError(null);
+    // Clear the dirty flag rather than hiding the bar directly — the effect
+    // above owns save-bar visibility and would immediately re-show it.
+    setHasVideoChanges(false);
+  }, [navigation.state, actionData, shopify]);
+
   const handleDiscard = useCallback(() => {
+    // Discarding drops the placeholder cards, so abort anything still running —
+    // otherwise the transfer keeps going against a card that no longer exists.
+    uploadActionsRef.current?.cancel?.();
     reset(getFeedFormDefaultValues(feed));
-    setUploadedVideos(feed?.videos ?? []);
+    // Normalise, or every card degrades to "Untitled Video" / status unknown.
+    setUploadedVideos((feed?.videos ?? []).map(normaliseFeedVideo));
     setHasVideoChanges(false);
     setError(null);
     shopify?.saveBar?.hide(SAVE_BAR_ID);
@@ -321,6 +548,14 @@ export default function FeedEditorPage() {
         <VideoUploader
           setUploadedVideo={handleVideoUpload}
           onVideosFromLibrary={handleVideosFromLibrary}
+          onUploadStart={handleUploadStart}
+          onUploadProgress={handleUploadProgress}
+          onUploadStateChange={handleUploadStateChange}
+          onUploadReady={handleUploadReady}
+          onUploadPending={handleUploadPending}
+          onUploadFailed={handleUploadFailed}
+          onUploadCancel={handleUploadCancel}
+          uploadActionsRef={uploadActionsRef}
           shopData={shopData}
           remaining={remaining}
         />
@@ -345,7 +580,7 @@ export default function FeedEditorPage() {
               <InlineGrid columns={{ xs: 1, md: 3 }} gap="300">
                 {uploadedVideos.map((video, index) => (
                   <Box
-                    key={video.id ?? video.videoId ?? index}
+                    key={video.tempId ?? video.id ?? video.videoId ?? index}
                     padding="200"
                     borderRadius="200"
                     border="1px solid"
@@ -355,6 +590,7 @@ export default function FeedEditorPage() {
                       video={video}
                       index={index}
                       onRemove={() => handleRemoveVideo(index)}
+                      onRetry={() => handleRetryVideo(index)}
                       shopify={shopify}
                       onTaggedProductsChange={handleTaggedProductsChange}
                       onFileNameChange={handleFileNameChange}
@@ -392,6 +628,14 @@ export default function FeedEditorPage() {
             </Badge>
 
             <Button
+              onClick={configureInTheme}
+              disabled={!feed?.id || isConfiguringTheme}
+              loading={isConfiguringTheme}
+            >
+              Configure in theme
+            </Button>
+
+            <Button
               variant="primary"
               icon={ViewIcon}
               onClick={() => previewModalRef.current?.showOverlay?.()}
@@ -422,7 +666,14 @@ export default function FeedEditorPage() {
                     />
                   </Box>
 
-                  {activeTab === 0 && renderUploadsTab()}
+                  {/* Rendered unconditionally and hidden via inline style.
+                      Unmounting this panel unmounts VideoUploader, which aborts
+                      the in-flight upload and strands the placeholder card.
+                      Inline display beats Polaris' own display rules, which the
+                      `hidden` attribute would not. */}
+                  <div style={{ display: activeTab === 0 ? undefined : "none" }}>
+                    {renderUploadsTab()}
+                  </div>
 
                   {activeTab === 1 && (
                     <SettingsTab

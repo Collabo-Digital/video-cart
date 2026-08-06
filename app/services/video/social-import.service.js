@@ -8,8 +8,69 @@
  * @see ARCHITECTURE.md Services layer
  */
 
+/* global process */
+
 import { SOCIAL_SOURCE } from '../../lib/constants/video';
 import { createAssetFromUrl, createVideoForImportedAsset } from './upload.service';
+
+const RESOLVE_TIMEOUT_MS = 15_000;
+
+/**
+ * Only these hosts are ever contacted for a given source. The resolver is an
+ * unaffiliated third party, so nothing but a genuine social link leaves here.
+ */
+const ALLOWED_HOSTS = {
+  [SOCIAL_SOURCE.INSTAGRAM]: ['instagram.com', 'www.instagram.com'],
+  [SOCIAL_SOURCE.TIKTOK]: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com', 'vt.tiktok.com'],
+};
+
+/**
+ * Validate a merchant-supplied social URL before it leaves this server.
+ * @param {'instagram'|'tiktok'} source
+ * @param {string} rawUrl
+ * @returns {string} Normalized https URL
+ * @throws {Error} With statusCode 400 when the URL is not a valid social link
+ */
+function assertSocialUrl(source, rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(String(rawUrl).trim());
+  } catch {
+    const err = new Error('Invalid URL');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (parsed.protocol !== 'https:') {
+    const err = new Error('URL must use https');
+    err.statusCode = 400;
+    throw err;
+  }
+  const allowed = ALLOWED_HOSTS[source] ?? [];
+  if (!allowed.includes(parsed.hostname.toLowerCase())) {
+    const err = new Error(`URL must be a ${source} link`);
+    err.statusCode = 400;
+    throw err;
+  }
+  return parsed.toString();
+}
+
+/**
+ * Reject if the third-party resolver doesn't answer in time, so a hanging host
+ * can't burn the whole serverless function timeout.
+ */
+function withTimeout(promise, ms, label) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        const err = new Error(`${label} timed out`);
+        err.statusCode = 504;
+        reject(err);
+      }, ms);
+    }),
+  ]);
+}
 
 /**
  * Derive a stable fileUploadName from an Instagram or TikTok URL for duplicate detection.
@@ -51,18 +112,24 @@ export function deriveFileUploadNameFromUrl(source, url, shopDomain) {
  * @returns {Promise<{source: string, postUrl: string, directUrl: string, thumbnail: string|null, title: string|null}>}
  */
 export async function resolveSocialUrl({ source, url }) {
+  // Kill switch: lets the feature be disabled without a deploy if the
+  // third-party resolver goes down or is compromised.
+  if (process.env.SOCIAL_IMPORT_ENABLED === 'false') {
+    const err = new Error('Social import is temporarily unavailable');
+    err.statusCode = 503;
+    throw err;
+  }
+
   if (!url || typeof url !== 'string') {
     throw new Error('URL is required');
   }
-  const postUrl = url.trim();
-  if (!postUrl) {
-    throw new Error('URL is required');
-  }
+  // Only genuine Instagram/TikTok https links are ever sent to the resolver.
+  const postUrl = assertSocialUrl(source, url);
 
   const { igdl, ttdl } = await import('btch-downloader');
 
   if (source === SOCIAL_SOURCE.INSTAGRAM) {
-    const data = await igdl(postUrl);
+    const data = await withTimeout(igdl(postUrl), RESOLVE_TIMEOUT_MS, 'Instagram resolve');
     if (!data?.status) {
       throw new Error(data?.message || 'Failed to fetch Instagram video');
     }
@@ -81,7 +148,7 @@ export async function resolveSocialUrl({ source, url }) {
   }
 
   if (source === SOCIAL_SOURCE.TIKTOK) {
-    const data = await ttdl(postUrl);
+    const data = await withTimeout(ttdl(postUrl), RESOLVE_TIMEOUT_MS, 'TikTok resolve');
     if (!data?.status) {
       throw new Error(data?.message || 'Failed to fetch TikTok video');
     }
@@ -117,7 +184,19 @@ export async function importSocialVideo({ source, url, shopDomain }) {
   }
   const fileUploadName = deriveFileUploadNameFromUrl(source, url, shopDomain);
   const resolved = await resolveSocialUrl({ source, url });
-  const asset = await createAssetFromUrl(resolved.directUrl, { shopDomain });
+
+  // The resolver is a third party — don't hand Mux whatever it returns unchecked.
+  let directUrl;
+  try {
+    directUrl = new URL(resolved.directUrl);
+  } catch {
+    throw new Error('Resolver returned an invalid video URL');
+  }
+  if (directUrl.protocol !== 'https:') {
+    throw new Error('Resolver returned an unsupported video URL');
+  }
+
+  const asset = await createAssetFromUrl(directUrl.toString(), { shopDomain });
   const displayName = resolved.title?.trim() || fileUploadName;
   const video = await createVideoForImportedAsset({
     assetId: asset.assetId,

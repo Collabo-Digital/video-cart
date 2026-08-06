@@ -7,8 +7,8 @@
 import prisma from '../config/database.server';
 
 const FEEDS_PAGE_SIZE = 10;
-const ORDER_DESC = [{ widgetRevenue: 'desc' }, { id: 'asc' }];
-const ORDER_ASC = [{ widgetRevenue: 'asc' }, { id: 'desc' }];
+const MIN_TAKE = 1;
+const MAX_TAKE = 100;
 
 /**
  * Normalize to UTC start-of-day for date bucketing
@@ -50,63 +50,51 @@ export async function findByFeedAndDateRange(feedId, { startDate, endDate }) {
  */
 export async function upsertIncrement(feedId, date, increments) {
   const dateOnly = toDateOnly(date);
-  const existing = await prisma.feedAnalytics.findUnique({
-    where: {
-      feedId_date: { feedId, date: dateOnly },
-    },
-  });
 
-  const add = (a, b) => (a ?? 0) + (b ?? 0);
-
-  const data = {
-    widgetImpressions: add(existing?.widgetImpressions, increments.widgetImpressions),
-    widgetClicks: add(existing?.widgetClicks, increments.widgetClicks),
-    widgetVideoPlays: add(existing?.widgetVideoPlays, increments.widgetVideoPlays),
-    widgetViews: add(existing?.widgetViews, increments.widgetViews),
-    widgetProductClicks: add(existing?.widgetProductClicks, increments.widgetProductClicks),
-    widgetAddToCart: add(existing?.widgetAddToCart, increments.widgetAddToCart),
-    widgetOrders: add(existing?.widgetOrders, increments.widgetOrders),
-    widgetRevenue: (existing?.widgetRevenue != null ? Number(existing.widgetRevenue) : 0) + (increments.widgetRevenue ?? 0),
-  };
-
-  let shopDomain = existing?.shopDomain;
-  if (!shopDomain) {
-    const feed = await prisma.feed.findUnique({
-      where: { id: feedId },
-      select: { shopDomain: true },
-    });
-    if (!feed) throw new Error(`Feed not found: ${feedId}`);
-    shopDomain = feed.shopDomain;
+  // Atomic increment ops: { field: { increment: n } } → MongoDB $inc, which is
+  // safe when many events land at once (no read-modify-write, so nothing is lost).
+  const incOps = {};
+  for (const [key, value] of Object.entries(increments)) {
+    if (value != null) incOps[key] = { increment: value };
   }
 
-
-  let createPayload = {
-    feed: { connect: { id: feedId } },
-    shop: { connect: { shopDomain: shopDomain } },
-    date: dateOnly,
-    ...data,
-  };
-  if (!existing) {
-    const feed = await prisma.feed.findUnique({
-      where: { id: feedId },
-      select: { shopDomain: true },
+  // Fast path: today's row already exists → atomically add to it (a single op).
+  try {
+    return await prisma.feedAnalytics.update({
+      where: { feedId_date: { feedId, date: dateOnly } },
+      data: incOps,
     });
-    if (!feed) throw new Error(`Feed not found: ${feedId}`);
-    createPayload = {
-      feed: { connect: { id: feedId } },
-      shop: { connect: { shopDomain: feed.shopDomain } },
-      date: dateOnly,
-      ...data,
-    };
+  } catch (error) {
+    if (error.code !== "P2025") throw error; // P2025 = row doesn't exist yet
   }
 
-  return prisma.feedAnalytics.upsert({
-    where: {
-      feedId_date: { feedId, date: dateOnly },
-    },
-    create: createPayload,
-    update: data,
+  // First event of the day → create the row.
+  const feed = await prisma.feed.findUnique({
+    where: { id: feedId },
+    select: { shopDomain: true },
   });
+  if (!feed) throw new Error(`Feed not found: ${feedId}`);
+
+  try {
+    return await prisma.feedAnalytics.create({
+      data: {
+        feed: { connect: { id: feedId } },
+        shop: { connect: { shopDomain: feed.shopDomain } },
+        date: dateOnly,
+        ...increments,
+      },
+    });
+  } catch (error) {
+    // A concurrent request created the row a split-second earlier — the unique
+    // index rejects us with P2002; just add to the row that now exists.
+    if (error.code === "P2002") {
+      return prisma.feedAnalytics.update({
+        where: { feedId_date: { feedId, date: dateOnly } },
+        data: incOps,
+      });
+    }
+    throw error;
+  }
 }
 
 /**
@@ -120,7 +108,10 @@ export async function getAggregatedByShop(shopDomain, { startDate, endDate }) {
   const end = toDateOnly(endDate);
   const rows = await prisma.feedAnalytics.findMany({
     where: {
-      feed: { shopDomain, isDeleted: false },
+      // Filter on the denormalized column (indexed) rather than through the
+      // relation; keep feed.isDeleted so deleted feeds stay excluded.
+      shopDomain,
+      feed: { isDeleted: false },
       isDeleted: false,
       date: { gte: start, lte: end },
     },
@@ -159,7 +150,10 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
   const end = toDateOnly(endDate);
   const rows = await prisma.feedAnalytics.findMany({
     where: {
-      feed: { shopDomain, isDeleted: false },
+      // Filter on the denormalized column (indexed) rather than through the
+      // relation; keep feed.isDeleted so deleted feeds stay excluded.
+      shopDomain,
+      feed: { isDeleted: false },
       isDeleted: false,
       date: { gte: start, lte: end },
     },
@@ -197,74 +191,84 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
  */
 export async function getListofFeedsWithAnalytics(shopDomain, options = {}) {
   const { cursor, direction = 'next', take = FEEDS_PAGE_SIZE, startDate, endDate } = options;
+  // `take` arrives from a JSON body, so it can be a string ("5" + 1 === "51") or
+  // an absurd number. Coerce and clamp — same pattern as video.server.js.
+  const safeTake = Math.min(MAX_TAKE, Math.max(MIN_TAKE, Number(take) || FEEDS_PAGE_SIZE));
 
   const where = { shopDomain, isDeleted: false };
   if (startDate != null && endDate != null) {
     where.date = { gte: toDateOnly(startDate), lte: toDateOnly(endDate) };
   }
 
-  const include = {
-    feed: {
-      select: {
-        id: true,
-        feedName: true,
-        widgetId: true,
-        widgetType: true,
-        isEnabled: true,
-        shopDomain: true,
-      },
-    },
-  };
-
-  if (!cursor) {
-    const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
-      where,
-      orderBy: ORDER_DESC,
-      take: take + 1,
-      include,
-    });
-    const hasMore = feedsWithAnalyticsItems.length > take;
-    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
-    return {
-      feedsWithAnalytics,
-      nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
-      previousCursor: null,
-    };
-  }
-
-  if (direction === 'next') {
-    const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
-      where,
-      orderBy: ORDER_DESC,
-      cursor: { id: cursor },
-      skip: 1,
-      take: take + 1,
-      include,
-    });
-    const hasMore = feedsWithAnalyticsItems.length > take;
-    const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
-    return {
-      feedsWithAnalytics,
-      nextCursor: hasMore ? feedsWithAnalytics[feedsWithAnalytics.length - 1].id : null,
-      previousCursor: cursor,
-    };
-  }
-
-  const feedsWithAnalyticsItems = await prisma.feedAnalytics.findMany({
+  // Aggregate the daily snapshots per feed. Without this the same feed appears
+  // once per day, each row showing only that day's revenue — so the table was
+  // really "top days across all feeds", not "top feeds".
+  const grouped = await prisma.feedAnalytics.groupBy({
+    by: ['feedId'],
     where,
-    orderBy: ORDER_ASC,
-    cursor: { id: cursor },
-    skip: 1,
-    take: take + 1,
-    include,
+    _sum: {
+      widgetImpressions: true,
+      widgetClicks: true,
+      widgetVideoPlays: true,
+      widgetViews: true,
+      widgetProductClicks: true,
+      widgetAddToCart: true,
+      widgetOrders: true,
+      widgetRevenue: true,
+    },
   });
-  const hasMore = feedsWithAnalyticsItems.length > take;
-  const feedsWithAnalytics = hasMore ? feedsWithAnalyticsItems.slice(0, take) : feedsWithAnalyticsItems;
-  feedsWithAnalytics.reverse();
+
+  if (!grouped.length) {
+    return { feedsWithAnalytics: [], nextCursor: null, previousCursor: null };
+  }
+
+  // Highest total revenue first; tie-break on feedId so the order is stable.
+  const sorted = grouped
+    .map((g) => ({
+      feedId: g.feedId,
+      widgetImpressions: g._sum.widgetImpressions ?? 0,
+      widgetClicks: g._sum.widgetClicks ?? 0,
+      widgetVideoPlays: g._sum.widgetVideoPlays ?? 0,
+      widgetViews: g._sum.widgetViews ?? 0,
+      widgetProductClicks: g._sum.widgetProductClicks ?? 0,
+      widgetAddToCart: g._sum.widgetAddToCart ?? 0,
+      widgetOrders: g._sum.widgetOrders ?? 0,
+      widgetRevenue: g._sum.widgetRevenue ?? 0,
+    }))
+    .sort((a, b) => (b.widgetRevenue - a.widgetRevenue) || a.feedId.localeCompare(b.feedId));
+
+  // Cursor is now a feedId (previously an analytics-row id).
+  let start = 0;
+  if (cursor) {
+    const idx = sorted.findIndex((r) => r.feedId === cursor);
+    if (idx !== -1) {
+      start = direction === 'next' ? idx + 1 : Math.max(0, idx - safeTake);
+    }
+  }
+  const page = sorted.slice(start, start + safeTake);
+
+  const feeds = await prisma.feed.findMany({
+    where: { id: { in: page.map((r) => r.feedId) } },
+    select: {
+      id: true,
+      feedName: true,
+      widgetId: true,
+      widgetType: true,
+      isEnabled: true,
+      shopDomain: true,
+    },
+  });
+  const feedById = new Map(feeds.map((f) => [f.id, f]));
+
+  const feedsWithAnalytics = page.map((r) => ({
+    id: r.feedId,
+    ...r,
+    feed: feedById.get(r.feedId) ?? null,
+  }));
 
   return {
     feedsWithAnalytics,
-    nextCursor: cursor,
-    previousCursor: hasMore ? feedsWithAnalytics[0].id : null,
+    nextCursor: start + safeTake < sorted.length ? page[page.length - 1]?.feedId ?? null : null,
+    previousCursor: start > 0 ? page[0]?.feedId ?? null : null,
   };
 }

@@ -23,8 +23,6 @@ import { getNextResetDate } from "../../lib/utils/common";
  * @returns {Promise<Object|null>} Saved shop object
  */
 export async function doTaskAfterAuth({ session, admin }) {
-  console.log("DO TASK AFTER AUTH PROCESS", session);
-
   if (!session || !session.shop) {
     console.error("Invalid session: missing shop domain");
     return null;
@@ -133,9 +131,6 @@ export async function doTaskAfterAuth({ session, admin }) {
       email: shop.email || existingShop?.email || null,
       contactEmail: shop.contactEmail || existingShop?.contactEmail || null,
 
-      // Always keep access token fresh from the current session
-      accessToken: session.accessToken,
-
       // Plan info: Shopify → existing DB → fallback
       planDisplayName:
         shop.plan?.displayName || existingShop?.planDisplayName || null,
@@ -159,7 +154,7 @@ export async function doTaskAfterAuth({ session, admin }) {
       // - isActive: keep existing, default to true on first install
       // - installedAt: never overwrite once set
       // - appPlan: preserve DB plan (user upgrades) and only set "Free" initially
-      isActive: existingShop?.isActive ?? true,
+      isActive: true,
       installedAt: existingShop?.installedAt ?? new Date(),
       appPlan: existingShop?.appPlan ?? "Free",
       planLimits,
