@@ -7,6 +7,7 @@
 import * as FeedModel from '../../models/feed.server';
 import { syncFeedVideos } from '../../models/feed.server';
 import * as VideoModel from '../../models/video.server';
+import * as ThemeBlockFeedModel from '../../models/themeBlockFeed.server';
 
 /** MongoDB ObjectId is 24 hex characters */
 function isMongoId(str) {
@@ -55,14 +56,16 @@ async function applyFileName(videoId, entry) {
 /**
  * Get all feeds for a shop
  * @param {string} shopDomain - Shop domain
+ * @param {Object} [options] - Optional filters: { search, isEnabled, limit }.
+ *   Omitted entirely by existing callers, whose behaviour is unchanged.
  * @returns {Promise<Array>} Array of feeds
  */
-export async function getFeedsByShop(shopDomain) {
+export async function getFeedsByShop(shopDomain, options = {}) {
   if (!shopDomain) {
     throw new Error('Shop domain is required');
   }
 
-  return FeedModel.findAll({ shopDomain });
+  return FeedModel.findAll({ shopDomain, ...options });
 }
 
 
@@ -264,5 +267,8 @@ export async function deleteFeed(feedId, shopDomain) {
     throw new Error('Shop domain is required');
   }
   await getFeedById(feedId, shopDomain);
+  // Drop any theme block still pointing here, or those blocks render nothing on
+  // the storefront with no indication why.
+  await ThemeBlockFeedModel.deleteByFeedId(shopDomain, feedId).catch(() => {});
   return FeedModel.deleteById(feedId);
 }

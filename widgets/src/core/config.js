@@ -14,6 +14,8 @@ export const FEED_API_PATH = '/apps/video-widget/feeds';
 export const ANALYTICS_EVENT_PATH = '/apps/video-widget/eventLog';
 export const SETTINGS_API_PATH = '/apps/video-widget/settings';
 export const DISCOVERY_API_PATH = '/apps/video-widget/discovery';
+/** Which feed each theme app block renders, looked up by block id. */
+export const BLOCKS_RESOLVE_PATH = '/apps/video-widget/blocks/resolve';
 
 /** Demo/placeholder playback ID (e.g. for demo or input); do not hardcode full URLs in components. */
 export const DEMO_PLAYBACK_ID = '7O7RsL2n51IHLTkYLPQ2GqrmEYez00DyevmpNUSgG024A';

@@ -79,27 +79,49 @@ export async function initFeeds() {
     }
   };
 
-  // Collect the containers that still need mounting.
-  const jobs = [];
+  // Collect the containers that still need mounting, split by how they name
+  // their feed. A pasted feed id (the Advanced override) always wins; every
+  // other block is resolved from its stable Shopify block id.
+  const idJobs = [];
+  const blockJobs = [];
   for (const container of containers) {
     if (container.dataset.videoCartInitialized === 'true') continue;
-    const feedId = container.dataset.feedId;
     const containerId = container.dataset.containerId;
-    const shop = container.dataset.shop;
-
-    if (!feedId || !containerId) continue;
+    if (!containerId) continue;
 
     const mountEl = document.getElementById(containerId);
     if (!mountEl) continue;
 
-    jobs.push({ container, feedId, containerId, shop, mountEl });
-  }
-  if (!jobs.length) return;
+    const job = {
+      container,
+      containerId,
+      mountEl,
+      shop: container.dataset.shop,
+      feedId: (container.dataset.feedId || '').trim(),
+      blockId: container.dataset.blockId,
+    };
 
-  // Fetch every feed in parallel. Previously this awaited inside the loop, so N
-  // widgets on a page cost N sequential uncached proxy round-trips.
+    if (job.feedId) idJobs.push(job);
+    else if (job.blockId) blockJobs.push(job);
+  }
+  if (!idJobs.length && !blockJobs.length) return;
+
+  // One request for every auto block on the page, however many there are.
+  if (blockJobs.length) {
+    const blockMap = await api.feeds
+      .resolveBlocks(blockJobs.map((job) => job.blockId))
+      .catch((err) => {
+        logError(err);
+        return {};
+      });
+    blockJobs.forEach((job) => { job.feed = blockMap[job.blockId] || null; });
+  }
+
+  // Fetch every explicitly-identified feed in parallel. Previously this awaited
+  // inside the loop, so N widgets on a page cost N sequential uncached proxy
+  // round-trips.
   const feeds = await Promise.all(
-    jobs.map((job) => {
+    idJobs.map((job) => {
       const cached = widgets.find((entry) => entry.containerId === job.containerId);
       if (cached) return Promise.resolve(cached);
 
@@ -127,18 +149,26 @@ export async function initFeeds() {
 
   const currentPage = window.__video_cart_config__?.store_page || 'other';
 
-  jobs.forEach((job, i) => {
-    const feed = feeds[i];
+  idJobs.forEach((job, i) => { job.feed = feeds[i]; });
+
+  [...idJobs, ...blockJobs].forEach((job) => {
+    const feed = job.feed;
     if (!feed) return;
 
     try {
       if (!feed.shop) feed.shop = job.shop;
 
-      const feedPage = feed.widgetPage || 'homePage';
-      if (feedPage === 'custom') {
-        if (window.location.pathname !== feed.customPagePath) return;
-      } else if (currentPage !== feedPage) {
-        return;
+      // The page gate applies only to the pasted-id path, where the feed was
+      // never chosen for this specific block. A block mapping is an explicit
+      // per-block choice — second-guessing it by page would silently ignore
+      // what the merchant picked.
+      if (job.feedId) {
+        const feedPage = feed.widgetPage || 'homePage';
+        if (feedPage === 'custom') {
+          if (window.location.pathname !== feed.customPagePath) return;
+        } else if (currentPage !== feedPage) {
+          return;
+        }
       }
 
       const widgetType = feed.widgetType || DEFAULT_WIDGET_TYPE;

@@ -12,11 +12,14 @@ import prisma from '../config/database.server';
  * @returns {Promise<Array>} Array of feed objects
  */
 export async function findAll(filters = {}) {
-  const { shopDomain, limit = 50, offset = 0, includeDeleted = false } = filters;
+  const { shopDomain, limit = 50, offset = 0, includeDeleted = false, search, isEnabled } = filters;
 
   const where = {};
   if (shopDomain) where.shopDomain = shopDomain;
   if (!includeDeleted) where.isDeleted = false;
+  // Both optional and off by default, so existing callers are unaffected.
+  if (typeof isEnabled === 'boolean') where.isEnabled = isEnabled;
+  if (search) where.feedName = { contains: search, mode: 'insensitive' };
 
   return prisma.feed.findMany({
     where: Object.keys(where).length ? where : undefined,

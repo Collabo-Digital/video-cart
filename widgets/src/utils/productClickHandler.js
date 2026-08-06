@@ -64,7 +64,7 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
         }
 
         const behavior = feed?.settings?.general?.buttonBehavior;
-
+        console.log('productObj', product);
         if (behavior === BUTTON_BEHAVIOR_ADD_TO_CART) {
             const productObj = typeof product === 'object' ? product : { id: product };
             try {

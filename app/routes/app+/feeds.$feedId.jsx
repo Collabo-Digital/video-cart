@@ -17,6 +17,7 @@ import { SettingsIcon, UploadIcon, ViewIcon } from "@shopify/polaris-icons";
 import {
   redirect,
   useActionData,
+  useFetcher,
   useLoaderData,
   useNavigation,
   useSubmit,
@@ -41,6 +42,27 @@ import * as GlobalSettingsModel from "../../models/globalSettings.server";
 import { createFeed, getFeedById, updateFeed } from "../../services/feed/feed.service.server";
 
 import { normaliseFeedVideo } from "../../lib/utils/common";
+
+/** Matches the window refreshed on every admin page view in app+/_layout.jsx.
+ *  "Configure in theme" only extends it; the layout already opened it. */
+const THEME_SETUP_WINDOW_MS = 2 * 60 * 60 * 1000;
+
+/** Which theme template the editor should open on, so the block lands on the
+ *  page this feed is meant for. */
+const widgetPageToTemplate = {
+  homePage: "index",
+  productPage: "product",
+  collectionPage: "collection",
+};
+
+function templateForCustomPath(path) {
+  const p = (path || "").toLowerCase();
+  if (p.startsWith("/products/")) return "product";
+  if (p.startsWith("/collections/")) return "collection";
+  if (p.startsWith("/blogs/")) return "article";
+  if (p.startsWith("/pages/")) return "page";
+  return "index";
+}
 import AnalyticsTab from "../../components/AnalyticsTab/AnalyticsTab";
 import { SettingsTab } from "../../components/SettingsTab/Index";
 import VideoDisplay from "../../components/VideoContainer/VideoContainer";
@@ -97,6 +119,27 @@ export const action = async ({ params, request }) => {
   try {
     const formData = await request.formData();
     const data = Object.fromEntries(formData);
+
+    // Opens the window that makes /blocks/assign writable, then hands back a
+    // deep link that drops the block into the theme editor already placed.
+    // Both halves matter: a deep link cannot carry setting values, so without
+    // the window the merchant would land on a block that cannot save its pick.
+    if (data.intent === "configureInTheme") {
+      await ShopModel.updateByDomain(session.shop, {
+        themeSetupUntil: new Date(Date.now() + THEME_SETUP_WINDOW_MS),
+      });
+
+      // SHOPIFY_API_KEY differs between shopify.app.toml and
+      // shopify.app.video-cart.toml — never hardcode it.
+      const themeEditorUrl =
+        `https://${session.shop}/admin/themes/current/editor` +
+        `?template=${encodeURIComponent(data.template || "index")}` +
+        `&addAppBlockId=${process.env.SHOPIFY_API_KEY}/video-carousel` +
+        `&target=newAppsSection`;
+
+      return { themeEditorUrl };
+    }
+
     const parsedVideos = JSON.parse(data.videos ?? "[]");
     const parsedSettings = data.settings ? JSON.parse(data.settings) : undefined;
 
@@ -193,6 +236,26 @@ export default function FeedEditorPage() {
   const [settingsTab, setSettingsTab] = useState(0);
 
   const previewModalRef = useRef(null);
+
+  // Opens the setup window server-side, then sends the merchant to the theme
+  // editor with the block already placed. target="_top" because the admin runs
+  // us in an iframe and the theme editor refuses to load inside it.
+  const themeFetcher = useFetcher();
+  const isConfiguringTheme = themeFetcher.state !== "idle";
+
+  const configureInTheme = useCallback(() => {
+    const template =
+      widgetPageToTemplate[feed?.widgetPage] ?? templateForCustomPath(feed?.customPagePath);
+    themeFetcher.submit(
+      { intent: "configureInTheme", template },
+      { method: "post" }
+    );
+  }, [feed?.widgetPage, feed?.customPagePath, themeFetcher]);
+
+  useEffect(() => {
+    const url = themeFetcher.data?.themeEditorUrl;
+    if (url) window.open(url, "_top");
+  }, [themeFetcher.data]);
 
   const formValues = useMemo(
     () => getFeedFormDefaultValues(feed, widgetType, widgetPage, globalSettings),
@@ -563,6 +626,14 @@ export default function FeedEditorPage() {
             >
               {feed?.isEnabled ? "Active" : "Inactive"}
             </Badge>
+
+            <Button
+              onClick={configureInTheme}
+              disabled={!feed?.id || isConfiguringTheme}
+              loading={isConfiguringTheme}
+            >
+              Configure in theme
+            </Button>
 
             <Button
               variant="primary"

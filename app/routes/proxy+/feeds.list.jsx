@@ -17,9 +17,35 @@ export const loader = async ({ request }) => {
       }, { status: 401 });
     }
 
-    const feeds = await getFeedsByShop(session.shop);
+    // The theme-editor picker shows a short list and searches for the rest, so
+    // the whole feed inventory is no longer shipped to the browser on every
+    // render. Absent params keep the old behaviour for any other caller.
+    const url = new URL(request.url);
+    // `contains` + insensitive becomes a MongoDB $regex. This endpoint is
+    // reachable by any storefront visitor, so strip regex metacharacters rather
+    // than hand one a catastrophic-backtracking pattern. Feed names realistically
+    // don't contain these, and the remaining substring still matches.
+    const search = (url.searchParams.get('q') || '')
+      .replace(/[\\^$.*+?()[\]{}|]/g, '')
+      .trim()
+      .slice(0, 100);
+    const requestedLimit = parseInt(url.searchParams.get('limit') || '', 10);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), 25)
+      : 50;
+
+    // Ask for one more than needed, so "there are others, keep searching" is
+    // knowable without a second count query.
+    const feeds = await getFeedsByShop(session.shop, {
+      isEnabled: true,
+      limit: limit + 1,
+      ...(search ? { search } : {}),
+    });
+
+    const hasMore = feeds.length > limit;
 
     const feedList = feeds
+      .slice(0, limit)
       .filter(feed => feed.isEnabled && !feed.isDeleted) // Only return enabled + not deleted
       .map((feed) => ({
         id: feed.id,
@@ -33,6 +59,7 @@ export const loader = async ({ request }) => {
     return Response.json({
       success: true,
       data: feedList,
+      hasMore,
     });
   } catch (error) {
     // authenticate.public.appProxy throws a Response (400) on an invalid

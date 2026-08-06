@@ -8,6 +8,7 @@
 .video-carousel-overlay-panel-page {
   grid-area: stack;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 30px;
@@ -16,6 +17,12 @@
   scrollbar-gutter: stable;
   /* Opaque, so the page underneath never shows through mid-slide. */
   background: #fff;
+}
+
+.video-carousel-overlay-panel-page > *,
+.video-carousel-overlay-pdetail > *,
+.video-carousel-overlay-plist > * {
+  flex-shrink: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -38,7 +45,7 @@
   gap: 12px;
   width: 100%;
   padding: 10px;
-  background: transparent;
+  background: #81818178;
   border: none;
   border-radius: 12px;
   text-align: left;
@@ -47,7 +54,7 @@
 }
 
 .video-carousel-overlay-plist-row:hover {
-  background: #f4f4f4;
+  background: #53535378;
 }
 
 .video-carousel-overlay-plist-thumb {
