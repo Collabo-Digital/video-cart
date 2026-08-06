@@ -157,7 +157,6 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
         body: JSON.stringify({ filters: { search: searchTerm.trim() } }),
       });
       const payload = await res.json();
-      console.log("data for library videos ----->", payload.data?.videosData);
       if (payload.success) {
         setVideos(payload.data?.videosData?.videos ?? []);
         setTotal(payload.data?.total ?? 0);

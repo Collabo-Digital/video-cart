@@ -39,7 +39,7 @@ if (host === "localhost") {
   };
 }
 
-export default defineConfig(({ ssrBuild }) => {
+export default defineConfig(({ isSsrBuild }) => {
   const r = (p) => fileURLToPath(new URL(p, import.meta.url));
 
   return {
@@ -60,13 +60,13 @@ export default defineConfig(({ ssrBuild }) => {
       alias: [
         {
           find: "~/lib/utils/observability/errorCapture",
-          replacement: ssrBuild
+          replacement: isSsrBuild
             ? r("./app/lib/utils/observability/errorCapture.server.js")
             : r("./app/lib/utils/observability/errorCapture.client.js"),
         },
         {
           find: "~/lib/utils/observability/tracing",
-          replacement: ssrBuild
+          replacement: isSsrBuild
             ? r("./app/lib/utils/observability/tracing.server.js")
             : r("./app/lib/utils/observability/tracing.client.js"),
         },

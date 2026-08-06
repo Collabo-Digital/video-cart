@@ -128,6 +128,13 @@ export async function getOverallDataMetricsForPlaybackId(
   if (!playbackId || typeof playbackId !== 'string') return null;
 
   const timeframe = resolveTimeframe(dateWindow, days);
+  // Mux rejects a non-positive timeframe ("must be larger than 0 seconds").
+  // A degenerate window (e.g. a billing cycle that just reset, so start == end)
+  // has nothing to measure — return zeroed metrics instead of firing one failing
+  // request per metric id.
+  if (!(timeframe[1] > timeframe[0])) {
+    return buildMetricsFromResults([null, null, null, null, null]);
+  }
   const filters = [`playback_id:${playbackId}`];
 
   const results = await Promise.all(

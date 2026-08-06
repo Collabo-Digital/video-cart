@@ -3,10 +3,16 @@
  */
 
 export const VIDEO_CONFIG = {
-  MAX_SIZE_BYTES: 500 * 1024 * 1024, // 500MB
+  // Single source of truth for the upload cap — the UI strings interpolate
+  // MAX_SIZE_MB so the displayed limit can never drift from the enforced one.
+  MAX_SIZE_MB: 200,
+  MAX_SIZE_BYTES: 200 * 1024 * 1024, // 200MB
   MAX_POLL_ATTEMPTS: 20,
   POLL_DELAY_MS: 2000, // 2 seconds
-  CHUNK_SIZE: 512000, // 512KB
+  // UpChunk's chunkSize is in KILOBYTES, not bytes. The previous value (512000)
+  // was ~500MB — UpChunk's maximum — so every upload was a single chunk with no
+  // real resumability. 30720 KB = 30MB is UpChunk's default.
+  CHUNK_SIZE: 30720, // 30MB per chunk
   RESET_DELAY_MS: 3000, // 3 seconds
 };
 

@@ -129,10 +129,16 @@
   white-space: nowrap;
 }
 
-.vd-product-overlay-item-button:hover {
+.vd-product-overlay-item-button:hover:not(:disabled) {
   background: #f9fafb;
   border-color: #fff;
   transform: translateY(-1px);
+}
+
+.vd-product-overlay-item-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ── Nav buttons (already use vd- prefix, kept as-is) ───────────────────── */

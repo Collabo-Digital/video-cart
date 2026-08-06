@@ -25,6 +25,23 @@ export const feedsService = {
   },
 
   /**
+   * Resolve which feed each theme app block renders. One request for the whole
+   * page, keyed by block id — blocks with no saved pick are simply absent.
+   * @param {string[]} blockIds
+   * @returns {Promise<Record<string, object>>} blockId -> feed payload
+   */
+  async resolveBlocks(blockIds) {
+    const result = await apiClient.get(ENDPOINTS.BLOCKS_RESOLVE(blockIds));
+    if (!result || typeof result.success !== 'boolean') {
+      throw new Error('Invalid blocks response');
+    }
+    if (!result.success) {
+      throw new Error(result.error || 'Invalid blocks data');
+    }
+    return result.data || {};
+  },
+
+  /**
    * Build feed URL (e.g. for debugging or links). Encodes query params.
    * @param {string} feedId
    * @param {string} [shop]

@@ -152,6 +152,8 @@ export function VideoDiscovery({ videos, settings, layoutStyle = 'floating', sho
           productPrice={productPrice}
           addToCartButtonLabel={addToCartButtonLabel}
           addToCartButtonStyle={addToCartButtonStyle}
+          // Discovery has no feed, so it reads the global settings instead.
+          buttonBehavior={() => settings?.general?.buttonBehavior}
           handleProductClick={handleProductClick}
           onVideoChange={() => {}}
           onFirstPlay={() => {}}

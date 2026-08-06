@@ -7,7 +7,7 @@
  * Validates shop has an offline session (app installed), then records conversion events.
  */
 
-import { authenticate } from "../../../../config/shopify.server.js";
+import { unauthenticated } from "../../../../config/shopify.server.js";
 import { recordConversionFromPixel } from "../../../../models/analytics.server";
 import { upsertOrderWithItems } from "../../../../models/videoCartOrder.server";
 
@@ -36,7 +36,12 @@ export const loader = async ({ request }) => {
 };
 
 export const action = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
+  // Public endpoint: the web pixel runs sandboxed on the storefront and has no
+  // admin session, so we must NOT call authenticate.admin here. Instead we take
+  // the shop from the body and confirm the app is installed (an offline session
+  // exists) before recording. Writes are idempotent on orderId (see
+  // upsertOrderWithItems), so replays/duplicate checkout_completed events do not
+  // double-count. Revenue here is analytics-only, never used for billing.
   if (request.method !== "POST") {
     return Response.json({ success: false, error: "Method not allowed" }, { status: 405, headers: JSON_HEADERS });
   }
@@ -50,8 +55,18 @@ export const action = async ({ request }) => {
         { success: false, error: "Invalid JSON body" },
         { status: 400, headers: JSON_HEADERS }
       );
-    } if (!session.shop) {
-      return Response.json({ success: false, error: "Unauthorized" }, { status: 401, headers: JSON_HEADERS });
+    }
+
+    const shop = typeof body?.shop === "string" ? body.shop.trim() : "";
+    if (!shop) {
+      return Response.json({ success: false, error: "shop is required" }, { status: 400, headers: JSON_HEADERS });
+    }
+
+    // Confirm the app is installed on this shop (offline session exists); throws otherwise.
+    try {
+      await unauthenticated.admin(shop);
+    } catch (e) {
+      return Response.json({ success: false, error: "Unknown or uninstalled shop" }, { status: 404, headers: JSON_HEADERS });
     }
 
     const items = Array.isArray(body?.items) ? body.items : [];
@@ -64,8 +79,8 @@ export const action = async ({ request }) => {
       return Response.json({ success: true, recorded: 0 }, { status: 200, headers: JSON_HEADERS });
     }
 
-    await upsertOrderWithItems(session.shop, orderId, orderNumber, items, currency);
-    await recordConversionFromPixel(session.shop, items);
+    await upsertOrderWithItems(shop, orderId, orderNumber, items, currency);
+    await recordConversionFromPixel(shop, items);
 
     return Response.json(
       { success: true, recorded: items.length },

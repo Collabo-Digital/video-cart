@@ -46,6 +46,10 @@ export const action = async ({ request }) => {
       { status: 200, headers: JSON_HEADERS }
     );
   } catch (err) {
+    // authenticate.public.appProxy throws a Response (400) on an invalid
+    // signature — framework control flow, not an error. Let it through.
+    if (err instanceof Response) throw err;
+
     if (err.message === "Feed not found") {
       return Response.json(
         { success: false, error: "Feed not found" },

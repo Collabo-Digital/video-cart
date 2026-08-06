@@ -18,6 +18,10 @@ export const loader = async ({ request }) => {
       </div>
     `);
   } catch (error) {
+    // authenticate.public.appProxy throws a Response (400) on an invalid
+    // signature — framework control flow, not an error. Let it through.
+    if (error instanceof Response) throw error;
+
     console.error("Proxy error:", error);
     return new Response("Proxy Error: " + error.message, { status: 500 });
   }

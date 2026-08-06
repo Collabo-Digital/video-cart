@@ -2,7 +2,6 @@
 import {
   DropZone,
   Banner,
-  ProgressBar,
   Text,
   InlineStack,
   BlockStack,
@@ -11,16 +10,19 @@ import {
 } from "@shopify/polaris";
 import { DeleteIcon } from "@shopify/polaris-icons";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useVideoUpload } from "../../lib/hooks/useVideoUpload";
 import { VIDEO_CONFIG } from "../../lib/constants/video";
 
 const MODAL_ID = "upload-from-device-modal";
 
-export default function UploadFromDeviceModal({ open, onClose, onUploaded, remaining = 0 }) {
+/**
+ * File picker only. The upload itself is owned by VideoUploader so it keeps
+ * running (and keeps reporting progress into the video list) after this modal
+ * closes — the merchant is not held hostage by a progress bar in a dialog.
+ */
+export default function UploadFromDeviceModal({ open, onClose, onStartUpload, remaining = 0 }) {
   const modalRef = useRef(null);
   const [file, setFile] = useState(null);
-  const [uploadComplete, setUploadComplete] = useState(false);
-  const { uploadProgress, isUploading, error, setError, uploadVideo } = useVideoUpload();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const el = modalRef.current;
@@ -28,12 +30,11 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
     if (open) {
       el.showOverlay?.();
       setFile(null);
-      setUploadComplete(false);
       setError(null);
     } else {
       el.hideOverlay?.();
     }
-  }, [open, setError]);
+  }, [open]);
 
   useEffect(() => {
     const el = modalRef.current;
@@ -55,23 +56,23 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
         return;
       }
       if (selectedFile.size > VIDEO_CONFIG.MAX_SIZE_BYTES) {
-        setError("File size must be less than 500MB");
+        setError(`File size must be less than ${VIDEO_CONFIG.MAX_SIZE_MB}MB`);
         return;
       }
       setFile(selectedFile);
       setError(null);
-      setUploadComplete(false);
     },
-    [setError]
+    []
   );
 
   const handleRemoveFile = useCallback(() => {
     setFile(null);
     setError(null);
-    setUploadComplete(false);
-  }, [setError]);
+  }, []);
 
-    const handleUpload = useCallback(async () => {
+  // Hand the file off and close immediately — progress is shown on the video
+  // card in the list, not here.
+  const handleUpload = useCallback(() => {
     if (remaining <= 0) {
       setError("You have reached your video upload limit. Please upgrade your plan.");
       return;
@@ -80,23 +81,15 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
       setError("No file selected");
       return;
     }
-    try {
-      await uploadVideo(file, (playbackData) => {
-        onUploaded?.(playbackData);
-        setUploadComplete(true);
-        setTimeout(() => {
-          handleRemoveFile();
-          modalRef.current?.hideOverlay?.();
-          onClose?.();
-        }, VIDEO_CONFIG.RESET_DELAY_MS);
-      });
-    } catch (_err) {
-      // Error is already set by the hook
-    }
-  }, [file, remaining, uploadVideo, onUploaded, onClose, handleRemoveFile, setError]);
+    onStartUpload?.(file);
+    setFile(null);
+    setError(null);
+    modalRef.current?.hideOverlay?.();
+    onClose?.();
+  }, [file, remaining, onStartUpload, onClose]);
 
   const fileUploadContent = !file && (
-    <DropZone.FileUpload actionHint="Accepts video files up to 500MB" />
+    <DropZone.FileUpload actionHint={`Accepts video files up to ${VIDEO_CONFIG.MAX_SIZE_MB}MB`} />
   );
 
   const uploadedFilePreview = file && (
@@ -121,20 +114,17 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
             </Text>
           </BlockStack>
         </InlineStack>
-        {!uploadComplete && (
-          <Button
-            icon={DeleteIcon}
-            variant="plain"
-            onClick={handleRemoveFile}
-            disabled={isUploading}
-            accessibilityLabel="Remove file"
-          />
-        )}
+        <Button
+          icon={DeleteIcon}
+          variant="plain"
+          onClick={handleRemoveFile}
+          accessibilityLabel="Remove file"
+        />
       </InlineStack>
     </BlockStack>
   );
 
-  const isUploadDisabled = !file || isUploading;
+  const isUploadDisabled = !file;
 
   return (
     <s-modal
@@ -146,7 +136,7 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
       <BlockStack gap="400">
         <Banner tone="info">
           <Text variant="bodySm">
-            Drag & drop a video here or click to browse. Max 500MB per file.
+            Drag &amp; drop a video here or click to browse. Max {VIDEO_CONFIG.MAX_SIZE_MB}MB per file.
           </Text>
         </Banner>
 
@@ -156,30 +146,11 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
           </Banner>
         )}
 
-        {uploadComplete && (
-          <Banner tone="success">
-            <Text>Upload complete! Video is ready.</Text>
-          </Banner>
-        )}
-
         {uploadedFilePreview}
 
-        <DropZone
-          onDrop={handleDropZoneDrop}
-          accept="video/*"
-          disabled={isUploading || uploadComplete}
-        >
+        <DropZone onDrop={handleDropZoneDrop} accept="video/*">
           {fileUploadContent}
         </DropZone>
-
-        {isUploading && (
-          <BlockStack gap="200">
-            <ProgressBar progress={uploadProgress} size="small" />
-            <Text variant="bodySm" tone="subdued">
-              {uploadProgress}% uploaded
-            </Text>
-          </BlockStack>
-        )}
       </BlockStack>
 
       <s-button
@@ -188,14 +159,13 @@ export default function UploadFromDeviceModal({ open, onClose, onUploaded, remai
         disabled={isUploadDisabled}
         onClick={handleUpload}
       >
-        {isUploading ? "Uploading…" : "Start upload"}
+        Start upload
       </s-button>
       <s-button
         slot="secondary-actions"
         variant="secondary"
         commandFor={MODAL_ID}
         command="--hide"
-        disabled={isUploading}
       >
         Cancel
       </s-button>

@@ -12,15 +12,16 @@ import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 
 export const action = async ({ request }) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
+  const { shop, topic } = await authenticate.webhook(request);
 
   console.log(`Received ${topic} webhook for ${shop}`);
 
-  // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-  // If this webhook already ran, the session may have been deleted previously.
+  // Webhooks can fire multiple times and after the app is already uninstalled.
+  // Everything below is idempotent (updateMany / deleteMany), so retries and a
+  // missing Shop row are both safe — no throw, no partial state.
   try {
-    if(shop && session) {
-      await ShopModel.updateByDomain(shop, {
+    if (shop) {
+      await ShopModel.deactivateByDomain(shop, {
         appPlan: "Free",
         planLimits: {
           videoViewLimit: VIDEO_VIEW_LIMITS.free,
@@ -35,7 +36,7 @@ export const action = async ({ request }) => {
       route: "app-uninstalled",
       url: request.url,
       method: request.method,
-      shop: session?.shop ?? "unknown",
+      shop: shop ?? "unknown",
     });
 
     return apiError(error, {
@@ -45,6 +46,4 @@ export const action = async ({ request }) => {
       requestId: request.id,
     });
   }
-
-  return new Response();
 };

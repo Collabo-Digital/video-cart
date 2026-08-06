@@ -43,14 +43,13 @@ export async function ensureWebPixelInstalled(admin, settings) {
     const payload = await createWebPixel(admin, settings);
 
     if (payload?.userErrors?.length) {
-        // If pixel already exists, Shopify may return an error; treat as non-fatal.
-        const messages = payload.userErrors.map((e) => e.message?.toLowerCase() ?? "");
-        const alreadyExists = messages.some(
-            (m) =>
-                m.includes("already exists") ||
-                m.includes("web pixel") ||
-                m.includes("duplicate")
-        );
+        // Shopify returns code "TAKEN" when a web pixel already exists for this app
+        // on the shop — that's benign. Any other code (INVALID_SETTINGS, BLANK,
+        // INVALID_CONFIGURATION_JSON, NO_EXTENSION, UNEXPECTED_ERROR, …) is a real
+        // failure that must surface — otherwise the pixel silently never installs
+        // and revenue attribution never works.
+        // Ref: https://shopify.dev/docs/api/admin-graphql/latest/enums/ErrorsWebPixelUserErrorCode
+        const alreadyExists = payload.userErrors.some((e) => e.code === "TAKEN");
         if (alreadyExists) {
             return { status: "exists", webPixel: null, userErrors: [] };
         }

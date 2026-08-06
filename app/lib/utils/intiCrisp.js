@@ -1,20 +1,17 @@
 import { Crisp } from "crisp-sdk-web";
-import { decryptCrispToken, generateCrispToken } from "./crispTokenEncrypter";
-
-async function generateCrispTokenClient(shopId) {
-    if (!shopId) return null;
-    const data = new TextEncoder().encode(String(shopId));
-    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 /**
- * Initialize Crisp chat with the website ID from shop settings.
- * crispObject.crispTokenId (or crispWebsiteId) = Crisp Website ID from dashboard (Setup → Website ID).
+ * Initialize Crisp chat.
+ *
+ * The session token id and the email verification signature are generated on
+ * the server (see crispToken.server.js) and passed in — never derived in the
+ * browser, so they cannot be forged.
+ *
+ * @param {Object} shopData - Token-free shop DTO
+ * @param {{ tokenId?: string|null, emailHmac?: string|null }} [crisp] - Server-generated values
  */
-export const initCrisp = async (shopData) => {
-    const websiteId = 'e841739d-077d-4871-8147-8150673f9141'; // or crispWebsiteId, depending on what you store
+export const initCrisp = (shopData, crisp) => {
+    const websiteId = 'e841739d-077d-4871-8147-8150673f9141'; // Crisp Website ID (public by design)
 
     if (!websiteId || typeof websiteId !== "string") {
         return;
@@ -23,28 +20,20 @@ export const initCrisp = async (shopData) => {
     Crisp.configure(websiteId);
 
     if (shopData?.email) {
-        Crisp.user.setEmail(shopData.email);
+        // Second arg is Crisp's Identity Verification signature; without it the
+        // identity is unverified.
+        Crisp.user.setEmail(shopData.email, crisp?.emailHmac || undefined);
     }
     if (shopData?.name) {
         Crisp.user.setNickname(shopData.name);
     }
+
     Crisp.session.setData({
-        user_id: shopData.id,
-        shop_domain: shopData.shopDomain,
+        user_id: shopData?.id,
+        shop_domain: shopData?.shopDomain,
     });
 
-    if (shopData?.crispObject?.crispTokenId && shopData?.crispObject?.crispTokenId !== '') {
-        Crisp.setTokenId(shopData.crispObject.crispTokenId);
-    } else {
-        const crispToken = await generateCrispTokenClient(shopData.id);
-        Crisp.setTokenId(crispToken);
-        await fetch('/api/v1/shop/updateShopData', {
-            method: 'POST',
-            body: JSON.stringify({
-                crispObject: {
-                    crispTokenId: crispToken,
-                }
-            }),
-        });
+    if (crisp?.tokenId) {
+        Crisp.setTokenId(crisp.tokenId);
     }
 };
