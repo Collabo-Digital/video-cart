@@ -2,7 +2,7 @@ import { authenticate } from '../../../../config/shopify.server.js';
 import { recordEvent, EVENT_TYPES } from '../../../../models/analytics.server';
 import * as FeedModel from '../../../../models/feed.server';
 import { apiError, apiSuccess } from '../../../../lib/utils/apiResponse.js';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 export const action = async ({ request }) => {
   if (request.method !== 'POST') {

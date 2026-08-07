@@ -1,6 +1,6 @@
 import { authenticate } from '../../../../config/shopify.server';
 import { findAllPaginatedWithWidgets } from '../../../../models/video.server';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from '../../../../lib/utils/apiResponse.js';
 
 

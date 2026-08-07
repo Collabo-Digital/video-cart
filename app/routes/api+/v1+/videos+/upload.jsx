@@ -75,7 +75,7 @@ import { createUploadUrl } from '../../../../services/video/upload.service';
 import * as ShopModel from '../../../../models/shop.server';
 import * as VideoModel from '../../../../models/video.server';
 import { VIDEO_CONFIG } from '../../../../lib/constants/video';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {

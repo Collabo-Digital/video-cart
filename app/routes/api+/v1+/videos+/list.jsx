@@ -8,7 +8,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import * as VideoModel from '../../../../models/video.server';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PER_PAGE = 20;

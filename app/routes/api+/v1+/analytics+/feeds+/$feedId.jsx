@@ -1,7 +1,7 @@
 import { authenticate } from '../../../../../config/shopify.server';
 import * as FeedModel from '../../../../../models/feed.server';
 import { getFeedAnalytics } from '../../../../../models/analytics.server';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from '../../../../../lib/utils/apiResponse.js';
 
 function parseDate(str) {

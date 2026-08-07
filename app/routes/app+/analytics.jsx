@@ -37,7 +37,7 @@ import Chart from "../../components/Chart/Chart.jsx";
 import SparkLine from "../../components/Chart/SparkLine.jsx";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
 import { parseDateRange, formatRevenue, mergeDailyChartData, getChartTrend } from "../../lib/utils/common.js";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse.js";
 
 export const loader = async ({ request }) => {

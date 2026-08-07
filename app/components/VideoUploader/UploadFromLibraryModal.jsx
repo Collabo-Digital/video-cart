@@ -14,6 +14,8 @@ import {
 import { SearchIcon } from "@shopify/polaris-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { getVideoThumbnailUrl } from "../../lib/utils/videoThumbnail";
+
 const PER_PAGE = 12;
 const MODAL_ID = "upload-from-library-modal";
 
@@ -34,9 +36,9 @@ function libraryVideoToFeedVideo(video) {
 }
 
 function VideoCard({ video, isSelected, onToggle }) {
-  const thumbUrl = video.videoPlaybackId
-    ? `https://image.mux.com/${video.videoPlaybackId}/thumbnail.webp?width=400&fit_mode=smartcrop`
-    : "";
+  // Null while the asset is still encoding — the "No preview" branch below then
+  // renders instead of a 412'd broken image.
+  const thumbUrl = getVideoThumbnailUrl(video, { width: 400 });
 
   return (
     <div

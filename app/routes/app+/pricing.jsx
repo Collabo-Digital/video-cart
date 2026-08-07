@@ -3,7 +3,7 @@ import { useLoaderData, useRevalidator } from "react-router";
 
 import { authenticate } from "../../config/shopify.server";
 import { PricingCard } from "../../components/Pricing/Pricing";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 import { toClientShop } from "../../lib/dto/shop";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import {
