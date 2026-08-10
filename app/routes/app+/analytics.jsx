@@ -234,7 +234,7 @@ export default function AnalyticsPage() {
   const { data } = useLoaderData();
   const { analytics = {}, dateRange, chartData = [], orders = [], ordersNextCursor = null, feedsData, videosData } = data ?? {};
 
-  const [feeds, setFeeds] = useState(feedsData.feedsWithAnalytics);
+  const [feeds, setFeeds] = useState(feedsData?.feedsWithAnalytics ?? []);
   const [feedsHasMore, setFeedsHasMore] = useState(feedsData?.nextCursor ?? false);
   const [feedsPreviousCursor, setFeedsPreviousCursor] = useState(feedsData?.previousCursor ?? null);
   const [videos, setVideos] = useState(videosData?.videosWithAnalytics ?? []);

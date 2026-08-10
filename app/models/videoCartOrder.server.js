@@ -82,7 +82,9 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
         lineTotal: i.lineTotal,
       })),
     });
-    return { order: { ...existing, ...orderData }, itemCount: created.count };
+    // existed: true tells callers this order was already recorded — counter
+    // increments must be skipped or replays double-count the scoreboards.
+    return { order: { ...existing, ...orderData }, itemCount: created.count, existed: true };
   }
 
   const order = await prisma.videoCartOrder.create({
@@ -103,7 +105,7 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
     include: { items: true },
   });
 
-  return { order, itemCount: normalized.length };
+  return { order, itemCount: normalized.length, existed: false };
 }
 
 /**

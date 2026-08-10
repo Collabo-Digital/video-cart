@@ -70,7 +70,11 @@ export const action = async ({ request }) => {
     }
 
     const items = Array.isArray(body?.items) ? body.items : [];
-    const orderId = (typeof body?.orderId === "string" ? body.orderId : body?.order_id)?.trim() || null;
+    // Shopify order GIDs look like gid://shopify/Order/123. Anything else is
+    // junk or a spoof attempt — treat as "no id" so it can't squat a real
+    // order's row identity (the endpoint is public).
+    const rawOrderId = (typeof body?.orderId === "string" ? body.orderId : body?.order_id)?.trim();
+    const orderId = rawOrderId && /^gid:\/\/shopify\/Order\/\d+$/.test(rawOrderId) ? rawOrderId : null;
     const orderNumber = (typeof body?.orderNumber === "string" ? body.orderNumber : body?.order_number) != null ? String(body.orderNumber ?? body.order_number).trim() || null : null;
     const currency = (typeof body?.currency === "string" ? body.currency : null)?.trim() || null;
 
@@ -79,8 +83,14 @@ export const action = async ({ request }) => {
       return Response.json({ success: true, recorded: 0 }, { status: 200, headers: JSON_HEADERS });
     }
 
-    await upsertOrderWithItems(shop, orderId, orderNumber, items, currency);
-    await recordConversionFromPixel(shop, items);
+    // Counters bump only when the order is NEW. The order table is idempotent
+    // on orderId, but recordConversionFromPixel is a blind increment — without
+    // this gate a replayed checkout_completed double-counts feed/video
+    // orders and revenue while the orders table stays correct.
+    const { existed } = await upsertOrderWithItems(shop, orderId, orderNumber, items, currency);
+    if (!existed) {
+      await recordConversionFromPixel(shop, items);
+    }
 
     return Response.json(
       { success: true, recorded: items.length },
