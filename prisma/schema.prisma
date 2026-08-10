@@ -302,6 +302,28 @@ model VideoCartOrderItem {
   @@index([shopDomain])
 }
 
+// Server-side ATC attribution intent, keyed by Shopify cart token. The
+// orders/create webhook joins on payload.cart_token — nothing is written into
+// the cart or order itself, so nothing shows in the merchant's order admin.
+model CartAttribution {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopDomain String
+  cartToken  String
+  productId  String
+  variantId  String?
+  feedId     String   @db.ObjectId
+  videoId    String   @db.ObjectId
+  quantity   Int      @default(1)
+  visitorId  String?
+  createdAt  DateTime @default(now())
+
+  // Repeat ATC of the same product+video+feed in the same cart updates
+  // quantity instead of stacking rows.
+  @@unique([shopDomain, cartToken, productId, feedId, videoId])
+  @@index([shopDomain, cartToken])
+  @@index([createdAt])
+}
+
 // Which feed a given theme app block renders.
 //
 // Keyed by Shopify's block id, which is stable in the theme's template JSON.

@@ -59,7 +59,31 @@ export async function recordEvent({
   return res;
 }
 
+/**
+ * Record an ATC attribution intent keyed by the Shopify cart token. The
+ * orders/create webhook joins on the order's cart_token server-side, so no
+ * properties ever touch the cart or order.
+ * @param {Object} params
+ * @param {string} params.cartToken
+ * @param {string|number} params.productId
+ * @param {string} [params.variantId]
+ * @param {number} [params.quantity]
+ * @param {string} params.feedId
+ * @param {string} params.videoId
+ */
+export async function recordAtcIntent({ cartToken, productId, variantId, quantity, feedId, videoId }) {
+  return apiClient.post(ENDPOINTS.ATC_INTENT, {
+    cartToken,
+    productId,
+    variantId,
+    quantity,
+    feedId,
+    videoId,
+  });
+}
+
 export const analyticsService = {
   recordEvent,
+  recordAtcIntent,
   EVENT_TYPES,
 };

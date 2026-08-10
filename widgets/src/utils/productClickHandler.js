@@ -1,5 +1,5 @@
 import { addToCart } from './shopifyService';
-import { trackDbEvent } from './analytics';
+import { trackDbEvent, trackAtcIntent } from './analytics';
 import { EVENT_TYPES } from '../api/services/analyticsService';
 import {
     getVariantId,
@@ -72,6 +72,26 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
                     id: variantId ?? getVariantId(productObj),
                     quantity,
                 }]);
+
+                // Cart-token attribution intent: the orders/create webhook
+                // joins on this token server-side, so attribution never
+                // touches cart properties and nothing shows on the order.
+                if (feed?.id && video?.id) {
+                    try {
+                        const root = window.Shopify?.routes?.root || '/';
+                        const cart = await fetch(`${root}cart.js`).then((r) => r.json());
+                        if (cart?.token) {
+                            trackAtcIntent({
+                                cartToken: cart.token,
+                                productId: productObj.id,
+                                variantId,
+                                quantity,
+                                feedId: feed.id,
+                                videoId: video.id,
+                            });
+                        }
+                    } catch { /* fire-and-forget — pixel path still covers */ }
+                }
 
                 const existing = getStorageItem('atc_products', []);
                 const newEntry = {
