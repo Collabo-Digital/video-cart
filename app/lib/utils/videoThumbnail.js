@@ -48,15 +48,22 @@ export function isVideoEncoding(video) {
  * @param {number} [options.width=400]
  * @param {number} [options.height]
  * @param {string} [options.format='webp']
+ * @param {boolean} [options.ignoreStatus=false] - Build the Mux URL even when
+ *   status says PROCESSING. For surfaces that recover from a 412 via an onError
+ *   handler: a stale PROCESSING row is common (the webhook may never have
+ *   landed) and would otherwise show "No preview" forever.
  * @returns {string|null} A usable image URL, or null when the caller should
  *   render a placeholder rather than a broken image.
  */
-export function getVideoThumbnailUrl(video, { width = 400, height, format = 'webp' } = {}) {
+export function getVideoThumbnailUrl(
+  video,
+  { width = 400, height, format = 'webp', ignoreStatus = false } = {},
+) {
   if (!video) return null;
 
   const playbackId = getPlaybackId(video);
 
-  if (playbackId && !isVideoEncoding(video)) {
+  if (playbackId && (ignoreStatus || !isVideoEncoding(video))) {
     const params = new URLSearchParams({
       width: String(width),
       fit_mode: 'smartcrop',

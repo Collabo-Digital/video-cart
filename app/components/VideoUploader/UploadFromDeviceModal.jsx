@@ -84,9 +84,10 @@ export default function UploadFromDeviceModal({ open, onClose, onStartUpload, re
     onStartUpload?.(file);
     setFile(null);
     setError(null);
+    // hideOverlay fires 'afterhide', which already calls onClose — calling it
+    // here too runs it twice.
     modalRef.current?.hideOverlay?.();
-    onClose?.();
-  }, [file, remaining, onStartUpload, onClose]);
+  }, [file, remaining, onStartUpload]);
 
   const fileUploadContent = !file && (
     <DropZone.FileUpload actionHint={`Accepts video files up to ${VIDEO_CONFIG.MAX_SIZE_MB}MB`} />
