@@ -6,6 +6,7 @@ import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
 import { Toast } from '../common/Toast/Toast';
 import { trackDbEvent } from '../../utils/analytics';
+import { observeWidgetImpression, trackVideoImpressionOnce } from '../../utils/impressionTracker';
 import { useToast } from '../../hooks/useToast';
 import {
   productsForVideo,
@@ -42,6 +43,10 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   const uniqueClass = getUniqueClassIdentifier(design);
   const hoverEffect = () => design?.hoverEffect || 'lift';
   const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
+
+  createEffect(() => {
+    observeWidgetImpression(containerRef(), feed, isPreview, onCleanup);
+  });
 
 
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
@@ -178,7 +183,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video?.id, index, source: 'grid' });
           if (feed?.id && video?.id && !isPreview) {
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+            await trackVideoImpressionOnce(feed.id, video.id);
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
@@ -189,6 +194,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
             eventType: EVENT_TYPES.VIDEO_VIEW,
             watchTimeSeconds,
           });
+          await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_VIDEO_PLAY });
         }}
       />
 

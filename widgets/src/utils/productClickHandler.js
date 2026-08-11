@@ -9,6 +9,7 @@ import {
 import { TOAST_ADDED, TOAST_ADD_FAILED } from '../constants/strings';
 import { WIDGET_SOURCES } from '../core/constant';
 import { setStorageItem, getStorageItem } from './storage';
+import { getVisitorId } from './session';
 
 const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
 
@@ -100,6 +101,7 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
                     video_id: video?.id,
                     widget_id: feed?.id,
                     source: cartSource,
+                    visitor_id: getVisitorId(),
                     timestamp: Date.now(),
                 };
 

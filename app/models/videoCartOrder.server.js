@@ -56,7 +56,7 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
   };
 
   const existing = await prisma.videoCartOrder.findUnique({
-    where: { orderId: id },
+    where: { shopDomain_orderId: { shopDomain, orderId: id } },
     include: { items: true },
   });
 

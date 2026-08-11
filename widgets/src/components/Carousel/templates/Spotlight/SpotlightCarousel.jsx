@@ -8,6 +8,7 @@ import { VideoOverlayPlayer } from '../../../common/VideoOverlayPlayer';
 import { Toast } from '../../../common/Toast/Toast';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../../../utils/designStyles';
 import { trackDbEvent } from '../../../../utils/analytics';
+import { observeWidgetImpression, trackVideoImpressionOnce } from '../../../../utils/impressionTracker';
 import { useToast } from '../../../../hooks/useToast';
 import {
   productsForVideo,
@@ -68,27 +69,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
   });
 
   createEffect(() => {
-    const container = containerRef();
-    if (!container || !feed?.id || isPreview) return;
-
-    let sent = false;
-
-    const observer = new IntersectionObserver(
-      async (entries) => {
-        if (sent) return;
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0) {
-            sent = true;
-            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_IMPRESSION });
-            break;
-          }
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(container);
-    onCleanup(() => observer.disconnect());
+    observeWidgetImpression(containerRef(), feed, isPreview, onCleanup);
   });
 
   const getThumbUrl = (video, index) => {
@@ -163,7 +144,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });
           if (feed?.id && video?.id && !isPreview) {
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+            await trackVideoImpressionOnce(feed.id, video.id);
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {

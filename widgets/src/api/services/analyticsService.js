@@ -6,6 +6,7 @@
 
 import { apiClient } from '../client';
 import { ENDPOINTS } from '../endpoints';
+import { getVisitorId, getSessionId } from '../../utils/session';
 
 export const EVENT_TYPES = {
   // Widget-level
@@ -53,6 +54,10 @@ export async function recordEvent({
   if (salesAmount != null) params.set('salesAmount', String(salesAmount));
   if (revenueAmount != null) params.set('revenueAmount', String(revenueAmount));
   if (orderCount != null) params.set('orderCount', String(orderCount));
+  // Anonymous visitor/session ids — used server-side for bot/rate-limit keying
+  // and future unique-visitor metrics.
+  params.set('vid', getVisitorId());
+  params.set('sid', getSessionId());
 
   const url = `${ENDPOINTS.ANALYTICS_EVENT}?${params.toString()}`;
   const res = await apiClient.get(url);
@@ -79,6 +84,7 @@ export async function recordAtcIntent({ cartToken, productId, variantId, quantit
     quantity,
     feedId,
     videoId,
+    visitorId: getVisitorId(),
   });
 }
 

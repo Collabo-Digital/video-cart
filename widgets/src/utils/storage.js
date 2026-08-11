@@ -30,3 +30,20 @@ export function removeStorageItem(key) {
         // silent fail
     }
 }
+
+export function setSessionItem(key, value) {
+    try {
+        const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        sessionStorage.setItem(STORAGE_PREFIX + key, serialized);
+    } catch {
+        // sessionStorage may be unavailable (private browsing, storage full, etc.)
+    }
+}
+
+export function getSessionItem(key, fallback = null) {
+    try {
+        return sessionStorage.getItem(STORAGE_PREFIX + key) ?? fallback;
+    } catch {
+        return fallback;
+    }
+}

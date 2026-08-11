@@ -1,11 +1,12 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
-import { For, Show, createSignal, createEffect } from 'solid-js';
+import { For, Show, createSignal, createEffect, onCleanup } from 'solid-js';
 import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './stories.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
 import { Toast } from '../common/Toast/Toast';
 import { trackDbEvent } from '../../utils/analytics';
+import { observeWidgetImpression, trackVideoImpressionOnce } from '../../utils/impressionTracker';
 import { useToast } from '../../hooks/useToast';
 import {
   productsForVideo,
@@ -56,13 +57,17 @@ export function VideoStories({ feed, videos, settings, onEvent, isPreview }) {
     }
   });
 
+  // Widget impression: viewport-based, once per feed per tab-session.
+  createEffect(() => {
+    observeWidgetImpression(containerRef(), feed, isPreview, onCleanup);
+  });
+
   const openStory = async (video, index) => {
     if (isPreview) return;
     setExpandedIndex(index);
     setActiveIndex(index);
-    if (feed?.id && video?.id) {
-      await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
-    }
+    // VIDEO_IMPRESSION is fired by the overlay's onVideoChange effect — firing
+    // it here too double-counted the first video.
     await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_CLICK });
   };
 
@@ -95,7 +100,7 @@ export function VideoStories({ feed, videos, settings, onEvent, isPreview }) {
             source: 'stories',
           });
           if (feed?.id && video?.id && !isPreview) {
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+            await trackVideoImpressionOnce(feed.id, video.id);
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
