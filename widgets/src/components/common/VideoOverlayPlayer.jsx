@@ -415,6 +415,26 @@ export function VideoOverlayPlayer({
     }
   });
 
+  /** Which slides get their heavy content: the products sheet and the animated
+   *  poster. ±1 so the next/previous slide is already built when the swipe
+   *  lands — nothing pops in. Modular, so the circular-wrap targets are covered.
+   *
+   *  Every slide used to mount both. That meant N backdrop-filter sheets over
+   *  moving video, N animated WebPs decoding at once, N x M product cards, and
+   *  N x M useLiveProduct fetches firing in one burst at open — all competing
+   *  with the HLS manifest for the video actually being watched. The desktop
+   *  branch mounts exactly one panel; this brings mobile close to that.
+   *
+   *  Layout-safe: the sheet and the placeholder are both position:absolute
+   *  inside a slide whose height comes from CSS, so mounting or unmounting them
+   *  cannot change a slide's height and the offsetTop scroll math above holds. */
+  const nearIndices = createMemo(() => {
+    const idx = expandedIndex();
+    const n = videos?.length ?? 0;
+    if (idx == null || !n || !isMobile()) return new Set();
+    return new Set([idx, (idx + 1) % n, (idx - 1 + n) % n]);
+  });
+
   /** Warm the static posters for adjacent slides so a swipe never lands on an unloaded image */
   createEffect(() => {
     if (!isMobile()) return;
@@ -427,7 +447,13 @@ export function VideoOverlayPlayer({
     });
   });
 
-  /** On mobile reels: circular swipe — intercept boundary gestures and wrap */
+  /** On mobile reels: circular swipe — wrap at the boundaries.
+   *  Deliberately NO touchmove listener. A non-passive touchmove on the scroller
+   *  forces the compositor to wait for main-thread JS before every scroll frame,
+   *  and the handler's scrollTop/clientHeight/scrollHeight reads each forced a
+   *  layout flush mid-gesture. The boundary is read once here, at gesture end.
+   *  The rubber-band that preventDefault() used to suppress is now handled by
+   *  `overscroll-behavior-y: none` in videoOverlay.css, which costs nothing. */
   createEffect(() => {
     if (!isMobile() || expandedIndex() == null || !videos?.length || videos.length < 2) return;
     const track = reelsTrackRef();
@@ -435,58 +461,33 @@ export function VideoOverlayPlayer({
 
     const SWIPE_THRESHOLD = 40;
     let startY = null;
-    let isBoundarySwipe = false;
 
-    const onTouchStart = (e) => {
-      startY = e.touches[0].clientY;
-      isBoundarySwipe = false;
-    };
-
-    const onTouchMove = (e) => {
-      if (startY == null) return;
-      const currentY = e.touches[0].clientY;
-      const diff = startY - currentY;
-      const idx = expandedIndex();
-      const lastIdx = videos.length - 1;
-      const atTop = track.scrollTop <= 2;
-      const atBottom = track.scrollTop + track.clientHeight >= track.scrollHeight - 2;
-
-      if ((diff > 10 && atBottom && idx === lastIdx) ||
-          (diff < -10 && atTop && idx === 0)) {
-        isBoundarySwipe = true;
-        e.preventDefault();
-      }
-    };
+    const onTouchStart = (e) => { startY = e.touches[0].clientY; };
 
     const onTouchEnd = (e) => {
-      if (startY == null || !isBoundarySwipe) {
-        startY = null;
-        isBoundarySwipe = false;
-        return;
-      }
+      if (startY == null) return;
       const endY = e.changedTouches[0].clientY;
       const diff = startY - endY;
       startY = null;
-      isBoundarySwipe = false;
-
       if (Math.abs(diff) < SWIPE_THRESHOLD) return;
 
       const idx = expandedIndex();
       const lastIdx = videos.length - 1;
+      // Layout read once per gesture, not once per frame.
+      const atTop = track.scrollTop <= 2;
+      const atBottom = track.scrollTop + track.clientHeight >= track.scrollHeight - 2;
 
-      if (diff > 0 && idx === lastIdx) {
+      if (diff > 0 && idx === lastIdx && atBottom) {
         setExpandedIndex(0);
-      } else if (diff < 0 && idx === 0) {
+      } else if (diff < 0 && idx === 0 && atTop) {
         setExpandedIndex(lastIdx);
       }
     };
 
     track.addEventListener('touchstart', onTouchStart, { passive: true });
-    track.addEventListener('touchmove', onTouchMove, { passive: false });
     track.addEventListener('touchend', onTouchEnd, { passive: true });
     onCleanup(() => {
       track.removeEventListener('touchstart', onTouchStart);
-      track.removeEventListener('touchmove', onTouchMove);
       track.removeEventListener('touchend', onTouchEnd);
     });
   });
@@ -756,7 +757,14 @@ export function VideoOverlayPlayer({
                       className={`video-carousel-reels-slide-placeholder${
                         index() === expandedIndex() && videoReady() ? ' video-carousel-reels-slide-placeholder-hidden' : ''
                       }`}
-                      style={{ 'background-image': `url(${getThumbnailPreviewUrl(video.playbackId, 560, 748) || ''})` }}
+                      /* Distant slides get no image at all — they fall back to
+                         the rule's own background-color and cost nothing. Same
+                         URL as before for near slides, so no new cache entry. */
+                      style={{
+                        'background-image': nearIndices().has(index())
+                          ? `url(${getThumbnailPreviewUrl(video.playbackId, 560, 748) || ''})`
+                          : 'none',
+                      }}
                       aria-hidden
                     />
                     <Show when={index() === expandedIndex()}>
@@ -801,25 +809,27 @@ export function VideoOverlayPlayer({
                         </div>
                       </div>
                     </Show>
-                    <aside className="video-carousel-overlay-products video-carousel-overlay-products-reels">
-                      {/* <h3 className="video-carousel-overlay-products-title">Products tagged</h3> */}
-                      <div className="video-carousel-overlay-products-inner">
-                        <For each={productsForVideo(video)}>
-                          {(product) => (
-                            <OverlayProductItem
-                              product={product}
-                              video={video}
-                              addToCartButtonLabel={addToCartButtonLabel}
-                              addToCartButtonStyle={addToCartButtonStyle}
-                              handleProductClick={handleProductClick}
-                            />
-                          )}
-                        </For>
-                      </div>
-                      <Show when={!productsForVideo(video).length}>
-                        <p className="video-carousel-overlay-products-empty">{EMPTY_PRODUCTS}</p>
-                      </Show>
-                    </aside>
+                    <Show when={nearIndices().has(index())}>
+                      <aside className="video-carousel-overlay-products video-carousel-overlay-products-reels">
+                        {/* <h3 className="video-carousel-overlay-products-title">Products tagged</h3> */}
+                        <div className="video-carousel-overlay-products-inner">
+                          <For each={productsForVideo(video)}>
+                            {(product) => (
+                              <OverlayProductItem
+                                product={product}
+                                video={video}
+                                addToCartButtonLabel={addToCartButtonLabel}
+                                addToCartButtonStyle={addToCartButtonStyle}
+                                handleProductClick={handleProductClick}
+                              />
+                            )}
+                          </For>
+                        </div>
+                        <Show when={!productsForVideo(video).length}>
+                          <p className="video-carousel-overlay-products-empty">{EMPTY_PRODUCTS}</p>
+                        </Show>
+                      </aside>
+                    </Show>
                   </div>
                 </div>
               )}

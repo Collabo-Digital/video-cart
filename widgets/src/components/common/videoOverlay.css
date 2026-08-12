@@ -408,7 +408,11 @@
   overflow-y: auto;
   overflow-x: hidden;
   scroll-snap-type: y mandatory;
-  overscroll-behavior-y: contain;
+  /* `none`, not `contain`: contain stops scroll chaining to the page but still
+     allows this element's own rubber-band. Suppressing that bounce is what the
+     removed non-passive touchmove preventDefault() used to do — this does it on
+     the compositor instead. */
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -448,6 +452,13 @@
   border-radius: 0;
   max-height: none;
   aspect-ratio: auto;
+  /* The placeholder below already shows this video's poster. Inheriting
+     `background: #000` from .video-carousel-overlay-video-wrap turned this into
+     an opaque panel that covered the poster the moment the <video> mounted —
+     the black gap on open. Transparent lets the poster stay visible until the
+     first frame paints over it (the video is object-fit: cover, so it fills the
+     box completely). */
+  background: transparent;
 }
 
 .video-carousel-reels-slide-video .video-carousel-overlay-video {
@@ -525,12 +536,15 @@
   min-width: 260px;
   max-width: 280px;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.1);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  /* No backdrop-filter here: these sit inside the sheet's own blur(20px), so a
+     nested blur samples an already-blurred surface and cannot be flattened into
+     one pass — N cards per slide, over moving video. The parent blur already
+     provides the frosted backdrop; this only needs a tint. The per-card
+     box-shadow went with it: invisible against a frosted panel, but a real
+     raster cost per card. */
+  background: rgba(255, 255, 255, 0.22);
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
 .video-carousel-overlay-products-reels .video-carousel-overlay-product:only-child {
