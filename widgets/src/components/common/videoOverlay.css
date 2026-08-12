@@ -430,6 +430,15 @@
   flex-direction: column;
   flex-shrink: 0;
   background: #000;
+  /* Skip layout and paint entirely for slides that are off screen. Height comes
+     from `height: 100%` above, not from the contents, so the box keeps its size
+     while skipped and every slide still sits at exactly N * track height — the
+     scroll math in VideoOverlayPlayer depends on that. contain-intrinsic-size
+     is belt-and-braces for the same reason.
+     Chrome/Android win; a no-op on Safari before 18, so it degrades silently
+     rather than breaking older iPhones. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100dvh;
 }
 
 .video-carousel-reels-slide-video {

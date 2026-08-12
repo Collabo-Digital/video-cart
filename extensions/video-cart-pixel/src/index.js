@@ -57,7 +57,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
   analytics.subscribe("checkout_completed", (event) => {
     const checkout = event.data.checkout;
     // const backendUrl = settings?.apiBaseUrl || 'https://video-cart.vercel.app';
-    const backendUrl = 'https://andrea-factors-herbs-tours.trycloudflare.com';
+    const backendUrl = 'https://includes-shows-contractor-pounds.trycloudflare.com';
 
     console.log('checkout ----->', checkout);
 

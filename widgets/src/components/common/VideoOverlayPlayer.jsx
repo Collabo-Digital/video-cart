@@ -83,6 +83,14 @@ export function VideoOverlayPlayer({
   const [isMuted, setIsMuted] = createSignal(false);
   const [videoReady, setVideoReady] = createSignal(false);
   const [currentTime, setCurrentTime] = createSignal(0);
+  /** Formatted once, so the clock's text nodes are only rewritten when the
+   *  displayed string actually changes. `timeupdate` fires ~4x/s and Solid
+   *  writes textContent on every read of currentTime() — and a text write whose
+   *  length can change ("0:09" -> "0:10") dirties layout, which the mobile
+   *  scroll gesture then has to flush. Memoising cuts that to ~1 write/s.
+   *  The range input still reads currentTime() directly, so the progress bar
+   *  stays smooth. Desktop uses VideoProgressBar and is unaffected. */
+  const currentTimeLabel = createMemo(() => formatTime(currentTime()));
   const [duration, setDuration] = createSignal(0);
   const [isMobile, setIsMobile] = createSignal(
     typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
@@ -353,13 +361,20 @@ export function VideoOverlayPlayer({
     const isWrap = (prev === 0 && idx === lastIdx) || (prev === lastIdx && idx === 0);
     const behavior = prev == null || isWrap ? 'instant' : 'smooth';
 
+    // Arithmetic, not measurement: every slide is exactly one track-height
+    // (.video-carousel-reels-slide is height:100% of a 100dvh track), so
+    // slide N always sits at N * clientHeight. The old version ran a
+    // querySelectorAll and read offsetTop, forcing a layout flush on every
+    // index change.
     const scrollToSlide = () => {
-      const slideEl = track.querySelectorAll('.video-carousel-reels-slide')[idx];
-      if (slideEl && Math.abs(track.scrollTop - slideEl.offsetTop) >= 2) {
-        track.scrollTo({ top: slideEl.offsetTop, behavior });
+      const h = track.clientHeight;
+      if (!h) return;
+      const top = idx * h;
+      if (Math.abs(track.scrollTop - top) >= 2) {
+        track.scrollTo({ top, behavior });
       }
     };
-    if (track.querySelectorAll('.video-carousel-reels-slide')[idx]) scrollToSlide();
+    if (track.clientHeight) scrollToSlide();
     else {
       const raf = requestAnimationFrame(() => {
         requestAnimationFrame(scrollToSlide);
@@ -375,20 +390,15 @@ export function VideoOverlayPlayer({
     const track = reelsTrackRef();
     if (!track) return;
 
+    // Same arithmetic as scrollToSlide, inverted. This runs at the end of every
+    // single swipe (scroll-snap-stop: always guarantees it), and used to do a
+    // querySelectorAll plus one offsetTop read per slide — N+1 forced layouts
+    // at the exact moment the snap was settling.
     const commitNearestSlide = () => {
-      const slides = track.querySelectorAll('.video-carousel-reels-slide');
-      if (!slides.length) return;
-      let best = null;
-      let bestDist = Infinity;
-      slides.forEach((el) => {
-        const dist = Math.abs(el.offsetTop - track.scrollTop);
-        const idx = Number(el.dataset.reelsIndex);
-        if (dist < bestDist && !Number.isNaN(idx)) {
-          bestDist = dist;
-          best = idx;
-        }
-      });
-      if (best == null) return;
+      const h = track.clientHeight;
+      if (!h) return;
+      const best = Math.round(track.scrollTop / h);
+      if (best < 0 || best >= videos.length) return;
       suppressScrollSync = true;
       try {
         setExpandedIndex(best);
@@ -794,7 +804,7 @@ export function VideoOverlayPlayer({
                         </button>
                         <div className="video-carousel-custom-controls">
                           <div className="video-carousel-progress-wrap">
-                            <span className="video-carousel-time">{formatTime(currentTime())}</span>
+                            <span className="video-carousel-time">{currentTimeLabel()}</span>
                             <input
                               type="range"
                               className="video-carousel-progress"
