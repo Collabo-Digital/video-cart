@@ -23,6 +23,9 @@ import LeftToggleIcon from '../../assets/Icons/LeftToggleIcon';
 import RightToggleIcon from '../../assets/Icons/RightToggleIcon';
 import UnMuteIcon from '../../assets/Icons/UnmuteIcon';
 import MuteIcon from '../../assets/Icons/MuteIcon';
+import HeartIcon from '../../assets/Icons/HeartIcon';
+import HeartFilledIcon from '../../assets/Icons/HeartFilledIcon';
+import { getLikedIds, likeKey, saveLikedIds } from '../../utils/likes';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -106,6 +109,38 @@ export function VideoOverlayPlayer({
   const posterUrl = (v) => getThumbnailUrl(v?.playbackId, 560, 748) || undefined;
 
   const total = () => videos?.length ?? 0;
+
+  /* --- likes: device-local, never sent anywhere ---------------------------- */
+
+  /** Seeded once from localStorage; the signal holds the array so the heart
+   *  re-renders, and every change is mirrored straight back to disk. */
+  const [likedIds, setLikedIds] = createSignal(getLikedIds());
+
+  /** Drives the one-shot like animation. Separate from likedIds so that merely
+   *  scrolling onto an already-liked video does not replay it. */
+  const [likePulse, setLikePulse] = createSignal(false);
+
+  const isCurrentLiked = createMemo(() => {
+    const key = likeKey(currentVideo());
+    return key != null && likedIds().includes(key);
+  });
+
+  const toggleCurrentLike = () => {
+    const key = likeKey(currentVideo());
+    if (key == null) return;
+    let turnedOn = false;
+    setLikedIds((prev) => {
+      turnedOn = !prev.includes(key);
+      const next = turnedOn ? [...prev, key] : prev.filter((k) => k !== key);
+      saveLikedIds(next);
+      return next;
+    });
+    // Only liking animates — un-liking just settles, which is what every reels
+    // player does. Dropping the class and re-adding it next frame is what makes
+    // a rapid re-like replay the keyframes instead of being ignored.
+    setLikePulse(false);
+    if (turnedOn) requestAnimationFrame(() => setLikePulse(true));
+  };
 
   /* --- prev/next: slide the outgoing video out, the incoming one in -------- */
 
@@ -612,6 +647,34 @@ export function VideoOverlayPlayer({
           </button>
         </Show>
 
+        {/* Mobile action rail. Lives at the overlay root, not inside a slide, so
+            there is exactly one of it and it does not move while the reels track
+            scrolls. The close button stays pinned top-right above it. */}
+        <Show when={isMobile()}>
+          <div className="video-carousel-reels-rail">
+            <button
+              type="button"
+              className={`${isCurrentLiked() ? 'video-carousel-reels-like-on' : ''}${likePulse() ? ' video-carousel-reels-like-pulse' : ''}`}
+              aria-label={isCurrentLiked() ? 'Unlike' : 'Like'}
+              aria-pressed={isCurrentLiked()}
+              onClick={toggleCurrentLike}
+              /* Clears the class from the CSS duration itself, so there is no
+                 timer to keep in sync with the keyframes. */
+              onAnimationEnd={() => setLikePulse(false)}
+            >
+              {isCurrentLiked() ? <HeartFilledIcon /> : <HeartIcon />}
+            </button>
+            <button
+              type="button"
+              className="video-carousel-control-mute"
+              aria-label={isMuted() ? 'Unmute' : 'Mute'}
+              onClick={() => setIsMuted((m) => !m)}
+            >
+              {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
+            </button>
+          </div>
+        </Show>
+
         {/* Desktop: nav arrows on the backdrop, either side of the card */}
         <Show when={!isMobile()}>
           <Show when={total() > 1}>
@@ -791,17 +854,8 @@ export function VideoOverlayPlayer({
                           autoPlay
                           loop
                         />
-                        {/* Outside the control bar: the products sheet is a
-                            later sibling at bottom:0 with no z-index, so it
-                            paints over that bar and buried this button. */}
-                        <button
-                          type="button"
-                          className="video-carousel-control-mute"
-                          aria-label={isMuted() ? 'Unmute' : 'Mute'}
-                          onClick={() => setIsMuted((m) => !m)}
-                        >
-                          {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
-                        </button>
+                        {/* Mute lives in the root-level action rail now, next to
+                            the like button — see the reels rail above. */}
                         <div className="video-carousel-custom-controls">
                           <div className="video-carousel-progress-wrap">
                             <span className="video-carousel-time">{currentTimeLabel()}</span>
