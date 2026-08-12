@@ -29,40 +29,54 @@ export function parseDateRange(request) {
 }
 
 
-export function formatRevenue(value) {
+export function formatRevenue(value, currencyCode) {
     if (value == null || Number.isNaN(value)) return "0";
     const num = Number(value);
-    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-    if (num >= 1_000) return `${(num / 1_000).toFixed(1)}k`;
-    return num.toFixed(2);
+    return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: currencyCode || "USD",
+        notation: num >= 1_000 ? "compact" : "standard",
+        maximumFractionDigits: num >= 1_000 ? 1 : 2,
+    }).format(num);
+}
+
+/** Local calendar day as YYYY-MM-DD — never toISOString (that shifts the day for non-UTC users). */
+export function toLocalDateString(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
 }
 
 export function mergeDailyChartData(dailyFeed, dailyVideo) {
     const byDate = new Map();
 
+    const empty = (date) => ({
+        date, videoViews: 0, orders: 0, impressions: 0,
+        addToCart: 0, revenue: 0, productClicks: 0, atcRate: 0,
+    });
+
+    // Widget-level counters are the canonical daily numbers. Video-level rows
+    // fire alongside widget-level ones for the same shopper action, so summing
+    // both double-counts — video rows contribute only videoViews here.
     for (const row of dailyFeed ?? []) {
-        byDate.set(row.date, {
-            date: row.date,
-            videoViews: 0,
-            orders: row.widgetOrders ?? 0,
-            impressions: row.widgetImpressions ?? 0,
-            addToCart: row.widgetAddToCart ?? 0,
-        });
+        const cur = byDate.get(row.date) ?? empty(row.date);
+        cur.orders += row.widgetOrders ?? 0;
+        cur.impressions += row.widgetImpressions ?? 0;
+        cur.addToCart += row.widgetAddToCart ?? 0;
+        cur.revenue += row.widgetRevenue ?? 0;
+        cur.productClicks += row.widgetProductClicks ?? 0;
+        byDate.set(row.date, cur);
     }
 
     for (const row of dailyVideo ?? []) {
-        const cur = byDate.get(row.date) ?? {
-            date: row.date,
-            videoViews: 0,
-            orders: 0,
-            impressions: 0,
-            addToCart: 0,
-        };
+        const cur = byDate.get(row.date) ?? empty(row.date);
         cur.videoViews += row.videoViews ?? 0;
-        cur.orders += row.videoOrders ?? 0;
-        cur.impressions += row.videoImpressions ?? 0;
-        cur.addToCart += row.videoAddToCart ?? 0;
         byDate.set(row.date, cur);
+    }
+
+    for (const cur of byDate.values()) {
+        cur.atcRate = cur.videoViews > 0 ? cur.addToCart / cur.videoViews : 0;
     }
 
     return Array.from(byDate.values()).sort((a, b) =>

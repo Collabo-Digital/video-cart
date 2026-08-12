@@ -59,8 +59,9 @@ export async function recordEvent({
       feedIncrements.widgetImpressions = 1;
       break;
     case EVENT_TYPES.WIDGET_CLICK:
+      // Clicks are their own metric. Bumping widgetViews here too made one
+      // open-then-play journey count as 2 "views" on the feed page.
       feedIncrements.widgetClicks = 1;
-      feedIncrements.widgetViews = 1;
       break;
     case EVENT_TYPES.WIDGET_VIDEO_PLAY:
       feedIncrements.widgetVideoPlays = 1;
@@ -119,7 +120,6 @@ export async function recordEvent({
       break;
     case 'click':
       feedIncrements.widgetClicks = 1;
-      feedIncrements.widgetViews = 1;
       break;
     case 'view':
       feedIncrements.widgetVideoPlays = 1;
@@ -229,8 +229,9 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
   }
   const videos = Array.from(byVideo.values());
 
-  // Derived metrics
-  const atcRate = widget.views > 0 ? widget.addToCart / widget.views : 0;
+  // Derived metrics. views = actual video plays — the stored widgetViews
+  // counter historically mixed clicks + plays and double-counted journeys.
+  const atcRate = widget.videoPlays > 0 ? widget.addToCart / widget.videoPlays : 0;
 
   return { widget, atcRate, videos };
 }

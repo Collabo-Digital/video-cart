@@ -169,12 +169,14 @@ export async function getDailyByShop(shopDomain, { startDate, endDate }) {
       widgetAddToCart: 0,
       widgetOrders: 0,
       widgetRevenue: 0,
+      widgetProductClicks: 0,
     };
     cur.widgetImpressions += row.widgetImpressions ?? 0;
     cur.widgetViews += row.widgetViews ?? 0;
     cur.widgetAddToCart += row.widgetAddToCart ?? 0;
     cur.widgetOrders += row.widgetOrders ?? 0;
     cur.widgetRevenue += (row.widgetRevenue ?? 0);
+    cur.widgetProductClicks += row.widgetProductClicks ?? 0;
     byDate.set(key, cur);
   }
   return Array.from(byDate.entries())

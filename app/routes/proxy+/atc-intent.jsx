@@ -14,6 +14,7 @@ const JSON_HEADERS = { "Content-Type": "application/json" };
 
 export const action = async ({ request }) => {
   try {
+    console.log("[Video Cart Pixel] atc-intent request received");
     const { session } = await authenticate.public.appProxy(request);
     if (!session?.shop) {
       return Response.json({ success: false, error: "Unauthorized" }, { status: 401, headers: JSON_HEADERS });
@@ -25,8 +26,10 @@ export const action = async ({ request }) => {
     } catch {
       return Response.json({ success: false, error: "Invalid JSON body" }, { status: 400, headers: JSON_HEADERS });
     }
-
-    const cartToken = typeof body?.cartToken === "string" ? body.cartToken.trim() : "";
+console.log("[Video Cart Pixel] atc-intent request body:", body);
+    // /cart.js returns tokens like "abc123?key=..." while the order webhook's
+    // cart_token is the bare "abc123" — strip the suffix or the join never matches.
+    const cartToken = typeof body?.cartToken === "string" ? body.cartToken.trim().split("?")[0] : "";
     const productId = body?.productId != null ? String(body.productId) : "";
     const feedId = typeof body?.feedId === "string" ? body.feedId : "";
     const videoId = typeof body?.videoId === "string" ? body.videoId : "";

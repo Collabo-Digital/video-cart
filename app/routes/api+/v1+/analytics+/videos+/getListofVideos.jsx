@@ -6,12 +6,14 @@ import { apiError, apiSuccess } from '../../../../../lib/utils/apiResponse.js';
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   try {
-    const { cursor, direction = "next", take = 5 } = await request.json();
+    const { cursor, direction = "next", take = 5, startDate, endDate } = await request.json();
     const shopDomain = session.shop;
     let options = {
       cursor: cursor ?? null,
       direction: direction ?? "next",
       take: take ?? 5,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
     };
     const videosData = await getListofVideosWithAnalytics(shopDomain, options);
 

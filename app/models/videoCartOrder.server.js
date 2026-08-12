@@ -18,6 +18,8 @@ function normalizeItem(item) {
     videoId: String(item.video_id ?? ""),
     productId: item.product_id != null ? String(item.product_id) : undefined,
     variantId: item.variant_id != null ? String(item.variant_id) : undefined,
+    lineItemId: item.line_item_id != null ? String(item.line_item_id) : undefined,
+    visitorId: item.visitor_id != null ? String(item.visitor_id) : undefined,
     quantity: Number.isInteger(quantity) && quantity >= 0 ? quantity : 1,
     lineTotal: Number.isFinite(lineTotal) ? lineTotal : 0,
   };
@@ -32,7 +34,8 @@ function normalizeItem(item) {
  * @param {string} [currency]
  * @returns {Promise<{ order: object, itemCount: number }>}
  */
-export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, items, currency = null) {
+export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, items, currency = null, { overwrite = true, checkoutToken = null } = {}) {
+  console.log(`[Video Cart Pixel] upsertOrderWithItems called for shop=${shopDomain} orderId=${orderId} orderNumber=${orderNumber} items=${items.length} currency=${currency} checkoutToken=${checkoutToken}`);
   if (!items?.length) {
     throw new Error("items array is required and must not be empty");
   }
@@ -53,21 +56,38 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
     orderNumber: orderNumber != null ? String(orderNumber) : null,
     totalRevenue,
     currency: currency != null ? String(currency) : null,
+    checkoutToken,
   };
 
-  const existing = await prisma.videoCartOrder.findUnique({
+  let existing = await prisma.videoCartOrder.findUnique({
     where: { shopDomain_orderId: { shopDomain, orderId: id } },
     include: { items: true },
   });
+  // Bridge: a pixel row created without a real order id is keyed by a
+  // synthetic unknown_ id but carries the checkout token — find it here so the
+  // webhook upgrades that row in place instead of creating a duplicate.
+  if (!existing && checkoutToken) {
+    existing = await prisma.videoCartOrder.findFirst({
+      where: { shopDomain, checkoutToken },
+      include: { items: true },
+    });
+  }
 
   if (existing) {
+    if (!overwrite) {
+      // A better-sourced record (the orders/create webhook) may already own
+      // this row — a late pixel event must not degrade it.
+      return { order: existing, itemCount: existing.items.length, existed: true };
+    }
     await prisma.videoCartOrderItem.deleteMany({ where: { orderId: existing.id } });
     await prisma.videoCartOrder.update({
       where: { id: existing.id },
       data: {
+        orderId: id, // upgrades a synthetic unknown_ key to the real GID
         orderNumber: orderData.orderNumber,
         totalRevenue: orderData.totalRevenue,
         currency: orderData.currency,
+        checkoutToken: checkoutToken ?? existing.checkoutToken,
       },
     });
     const created = await prisma.videoCartOrderItem.createMany({
@@ -78,6 +98,8 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
         videoId: i.videoId,
         productId: i.productId ?? null,
         variantId: i.variantId ?? null,
+        lineItemId: i.lineItemId ?? null,
+        visitorId: i.visitorId ?? null,
         quantity: i.quantity,
         lineTotal: i.lineTotal,
       })),
@@ -97,6 +119,8 @@ export async function upsertOrderWithItems(shopDomain, orderId, orderNumber, ite
           videoId: i.videoId,
           productId: i.productId ?? null,
           variantId: i.variantId ?? null,
+          lineItemId: i.lineItemId ?? null,
+          visitorId: i.visitorId ?? null,
           quantity: i.quantity,
           lineTotal: i.lineTotal,
         })),
@@ -144,14 +168,18 @@ export async function findByShopPaginated(shopDomain, options = {}) {
     if (startDate) where.createdAt.gte = startDate;
     if (endDate) where.createdAt.lte = endDate;
   }
-  const orders = await prisma.videoCartOrder.findMany({
+  const rows = await prisma.videoCartOrder.findMany({
     where,
     include: { items: true },
     orderBy: { createdAt: "desc" },
-    take: limit,
+    // Peek one extra row: its existence is proof of a next page, so a full
+    // final page no longer fabricates a phantom "Next".
+    take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
-  const nextCursor = orders.length >= limit ? orders[orders.length - 1].id : null;
+  const hasNext = rows.length > limit;
+  const orders = hasNext ? rows.slice(0, limit) : rows;
+  const nextCursor = hasNext ? orders[orders.length - 1].id : null;
   return { orders, nextCursor };
 }
 

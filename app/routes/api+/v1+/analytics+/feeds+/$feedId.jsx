@@ -1,5 +1,6 @@
 import { authenticate } from '../../../../../config/shopify.server';
 import * as FeedModel from '../../../../../models/feed.server';
+import * as ShopModel from '../../../../../models/shop.server';
 import { getFeedAnalytics } from '../../../../../models/analytics.server';
 import { captureRouteError } from "../../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from '../../../../../lib/utils/apiResponse.js';
@@ -56,11 +57,15 @@ export const loader = async ({ request, params }) => {
       });
     }
 
-    const { widget, videos, atcRate } = await getFeedAnalytics(feedId, start, end);
+    const [{ widget, videos, atcRate }, shopData] = await Promise.all([
+      getFeedAnalytics(feedId, start, end),
+      ShopModel.findByDomain(session.shop),
+    ]);
     return apiSuccess({
       widget,
       atcRate,
       videos,
+      currencyCode: shopData?.currencyCode ?? null,
     }, {
       route: "analytics-feeds-getFeedAnalytics",
       requestId: request.id,

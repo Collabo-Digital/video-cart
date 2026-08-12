@@ -271,6 +271,10 @@ model VideoCartOrder {
   shopDomain   String
   orderId      String // Shopify order GID e.g. gid://shopify/Order/123 — unique per shop, not globally
   orderNumber  String? // display number e.g. #1001
+  // Bridge key: present on both the pixel checkout object and the orders/create
+  // webhook payload, so the two paths merge into one row even when the pixel
+  // had no order id (synthetic unknown_ key).
+  checkoutToken String?
   totalRevenue Float    @default(0) // sum of line_total for app-attributed items only
   currency     String?
   createdAt    DateTime @default(now())
@@ -282,6 +286,7 @@ model VideoCartOrder {
   @@unique([shopDomain, orderId])
   @@index([shopDomain])
   @@index([shopDomain, createdAt])
+  @@index([shopDomain, checkoutToken])
 }
 
 // One row per line item that had _tracking (video_id + widget_id).

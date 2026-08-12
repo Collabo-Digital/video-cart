@@ -45,6 +45,7 @@ export async function doTaskAfterAuth({ session, admin }) {
             email
             contactEmail
             shopOwnerName
+            currencyCode
             billingAddress  {
               address1
               address2
@@ -130,6 +131,7 @@ export async function doTaskAfterAuth({ session, admin }) {
       name: shop.name || existingShop?.name || null,
       email: shop.email || existingShop?.email || null,
       contactEmail: shop.contactEmail || existingShop?.contactEmail || null,
+      currencyCode: shop.currencyCode || existingShop?.currencyCode || null,
 
       // Plan info: Shopify → existing DB → fallback
       planDisplayName:

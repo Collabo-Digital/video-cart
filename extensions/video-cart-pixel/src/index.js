@@ -57,7 +57,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
   analytics.subscribe("checkout_completed", (event) => {
     const checkout = event.data.checkout;
     // const backendUrl = settings?.apiBaseUrl || 'https://video-cart.vercel.app';
-    const backendUrl = 'https://hypothetical-mineral-example-thou.trycloudflare.com';
+    const backendUrl = 'https://dsc-frederick-nightlife-smell.trycloudflare.com';
 
     console.log('checkout ----->', checkout);
 
@@ -95,6 +95,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
 
 
       if (!backendUrl) return;
+      console.log('[Video Cart Pixel] Sending conversion to backend:', backendUrl, videoItems);
 
       fetch(`${backendUrl}/api/v1/analytics/conversion`, {
         method: 'POST',
@@ -103,6 +104,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
           shop: event.context.document.location.hostname,
           order_id: checkout.order?.id,
           order_number: checkout.order?.orderNumber,
+          checkout_token: checkout.token,
           currency: checkout.currencyCode,
           items: videoItems,
           total_revenue: videoItems.reduce((sum, item) => sum + item.line_total, 0),
