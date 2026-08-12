@@ -13,9 +13,9 @@ import mux from 'mux-embed';
 import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { useLiveProduct } from '../../hooks/useLiveProduct';
 import { OverlayProductPanel } from './OverlayProducts/OverlayProductPanel';
+import { OverlayProductDetail } from './OverlayProducts/OverlayProductDetail';
 import { VideoProgressBar } from './VideoProgressBar/VideoProgressBar';
-import { formatTime } from '../../utils/widgetHelpers';
-import { EMPTY_PRODUCTS, LABEL_SOLD_OUT } from '../../constants/strings';
+import { EMPTY_PRODUCTS } from '../../constants/strings';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 import './videoOverlay.css';
 import CloseIcon from '../../assets/Icons/CloseIcon';
@@ -36,36 +36,33 @@ const CLOSE_ANIMATION_MS = 400;
 const SLIDE_ANIMATION_MS = 400;
 
 /**
- * One tagged product in the fullscreen player. Shows the stored title/image
- * immediately, then live price/availability from Shopify so shoppers never see
- * a price that changed after the merchant tagged the product.
+ * One tagged product in the mobile card strip. Shows the stored title/image
+ * immediately, then the live price from Shopify so shoppers never see a price
+ * that changed after the merchant tagged the product.
+ *
+ * The whole card is the tap target and opens the detail sheet — the same shape
+ * as desktop, where list rows open the detail and only the detail can add to
+ * cart. That is also why there is no inline add-to-cart button: a <button>
+ * inside a <button> is invalid, and the old inline one had no variant picker,
+ * so it just guessed via getVariantId(). Everything inside is a <span> for the
+ * same reason — a <div> in a <button> is invalid too.
  */
-function OverlayProductItem({ product, video, addToCartButtonLabel, addToCartButtonStyle, handleProductClick }) {
-  const { price, available } = useLiveProduct(product);
+function OverlayProductItem({ product, onOpen }) {
+  const { price } = useLiveProduct(product);
 
   return (
-    <div className="video-carousel-overlay-product">
-      <div className="video-carousel-overlay-product-image-wrap">
-        <img src={product.image} alt={product.title} loading="lazy" />
-      </div>
-      <div className="video-carousel-overlay-product-info">
+    <button type="button" className="video-carousel-overlay-product" onClick={onOpen}>
+      <span className="video-carousel-overlay-product-image-wrap">
+        {/* alt="" — the title beside it already names the product. */}
+        <img src={product.image} alt="" loading="lazy" />
+      </span>
+      <span className="video-carousel-overlay-product-info">
         <span className="video-carousel-overlay-product-title">{product.title}</span>
         <Show when={price()}>
           <span className="video-carousel-overlay-product-price">{price()}</span>
         </Show>
-        <button
-          type="button"
-          className="video-carousel-overlay-product-add video-carousel-overlay-product-shop"
-          style={addToCartButtonStyle()}
-          disabled={!available()}
-          onClick={(e) => {
-            e.preventDefault();
-            if (!available()) return;
-            handleProductClick(product, video);
-          }}
-        >{available() ? addToCartButtonLabel() : LABEL_SOLD_OUT}</button>
-      </div>
-    </div>
+      </span>
+    </button>
   );
 }
 
@@ -85,16 +82,6 @@ export function VideoOverlayPlayer({
   const [reelsTrackRef, setReelsTrackRef] = createSignal(null);
   const [isMuted, setIsMuted] = createSignal(false);
   const [videoReady, setVideoReady] = createSignal(false);
-  const [currentTime, setCurrentTime] = createSignal(0);
-  /** Formatted once, so the clock's text nodes are only rewritten when the
-   *  displayed string actually changes. `timeupdate` fires ~4x/s and Solid
-   *  writes textContent on every read of currentTime() — and a text write whose
-   *  length can change ("0:09" -> "0:10") dirties layout, which the mobile
-   *  scroll gesture then has to flush. Memoising cuts that to ~1 write/s.
-   *  The range input still reads currentTime() directly, so the progress bar
-   *  stays smooth. Desktop uses VideoProgressBar and is unaffected. */
-  const currentTimeLabel = createMemo(() => formatTime(currentTime()));
-  const [duration, setDuration] = createSignal(0);
   const [isMobile, setIsMobile] = createSignal(
     typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
   );
@@ -203,7 +190,7 @@ export function VideoOverlayPlayer({
     onCleanup(() => clearTimeout(timer));
   });
 
-  /* --- desktop products panel: list <-> detail ---------------------------- */
+  /* --- products: desktop panel list <-> detail, mobile card strip -> sheet -- */
 
   const [selectedProductIndex, setSelectedProductIndex] = createSignal(null);
 
@@ -211,6 +198,21 @@ export function VideoOverlayPlayer({
   // Derived rather than seeded, so the reset effect below can't clobber the
   // single-product case.
   const activeProductIndex = () => (products().length === 1 ? 0 : selectedProductIndex());
+
+  /** What the mobile detail sheet shows. Deliberately the raw
+   *  selectedProductIndex, NOT activeProductIndex — the latter auto-returns 0
+   *  for single-product videos, which on desktop opens straight into the detail
+   *  but on mobile would leave the sheet permanently open. */
+  const sheetProduct = () => {
+    const i = selectedProductIndex();
+    return i == null ? null : products()[i] ?? null;
+  };
+
+  const openProductDetail = (i) => {
+    setSelectedProductIndex(i);
+    // The same 'view' ping OverlayProductPanel fires when a list row is picked.
+    handleProductClick?.(products()[i], currentVideo(), { intent: 'view' });
+  };
 
   /** Back to the list whenever the shopper moves to another video, and on close
    *  — expandedIndex() covers both, since closing sets it to null. */
@@ -589,37 +591,10 @@ export function VideoOverlayPlayer({
     });
   });
 
-  /** Clock for the mobile control bar. The desktop scrubber reads the media
-   *  element directly instead, so it never sets a signal during playback. */
-  createEffect(() => {
-    const el = videoEl();
-    if (!el) return;
-    const onTimeUpdate = () => setCurrentTime(el.currentTime);
-    const onLoadedMetadata = () => setDuration(el.duration);
-    const onDurationChange = () => setDuration(el.duration);
-    el.addEventListener('timeupdate', onTimeUpdate);
-    el.addEventListener('loadedmetadata', onLoadedMetadata);
-    el.addEventListener('durationchange', onDurationChange);
-    onTimeUpdate();
-    if (el.duration != null && !Number.isNaN(el.duration)) setDuration(el.duration);
-    onCleanup(() => {
-      el.removeEventListener('timeupdate', onTimeUpdate);
-      el.removeEventListener('loadedmetadata', onLoadedMetadata);
-      el.removeEventListener('durationchange', onDurationChange);
-    });
-  });
-
-  function handleSeek(e) {
-    const el = videoEl();
-    const range = e.currentTarget;
-    if (!el || !range) return;
-    const frac = Number(range.value);
-    const t = frac * duration();
-    if (Number.isFinite(t)) {
-      el.currentTime = t;
-      setCurrentTime(t);
-    }
-  }
+  /* The mobile clock signal and its timeupdate listeners are gone: both
+     platforms now use VideoProgressBar, which paints from rAF straight to the
+     DOM and never sets a signal during playback. That was the last thing
+     writing to the DOM ~4x/sec while the shopper was mid-scroll. */
 
   return (
     <Show when={expandedIndex() != null && videos?.length > 0}>
@@ -673,6 +648,44 @@ export function VideoOverlayPlayer({
               {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
             </button>
           </div>
+        </Show>
+
+        {/* Mobile product detail, as a bottom sheet. Rendered here at the overlay
+            root rather than per-slide, so there is exactly one of it and it is
+            driven by currentVideo() — three slides render their product strips
+            at once, so a per-slide sheet could not tell which one was open.
+            `keyed` so switching products remounts and resets variant + quantity,
+            the same reason OverlayProductPanel keys its detail. */}
+        <Show when={isMobile() ? sheetProduct() : null} keyed>
+          {(product) => (
+            <>
+              {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+              <div
+                className="video-carousel-reels-sheet-backdrop"
+                onClick={() => setSelectedProductIndex(null)}
+                aria-hidden
+              />
+              <div
+                className="video-carousel-reels-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Product details"
+              >
+                <OverlayProductDetail
+                  product={product}
+                  video={currentVideo()}
+                  buttonBehavior={buttonBehavior ?? (() => undefined)}
+                  showBack={() => true}
+                  onBack={() => setSelectedProductIndex(null)}
+                  videoNumber={() => (expandedIndex() ?? 0) + 1}
+                  videoTotal={total}
+                  addToCartButtonLabel={addToCartButtonLabel}
+                  addToCartButtonStyle={addToCartButtonStyle}
+                  handleProductClick={handleProductClick}
+                />
+              </div>
+            </>
+          )}
         </Show>
 
         {/* Desktop: nav arrows on the backdrop, either side of the card */}
@@ -855,22 +868,14 @@ export function VideoOverlayPlayer({
                           loop
                         />
                         {/* Mute lives in the root-level action rail now, next to
-                            the like button — see the reels rail above. */}
-                        <div className="video-carousel-custom-controls">
-                          <div className="video-carousel-progress-wrap">
-                            <span className="video-carousel-time">{currentTimeLabel()}</span>
-                            <input
-                              type="range"
-                              className="video-carousel-progress"
-                              min="0"
-                              max={duration() > 0 ? 1 : 0}
-                              step="any"
-                              value={duration() > 0 ? currentTime() / duration() : 0}
-                              onInput={handleSeek}
-                            />
-                            <span className="video-carousel-time">{formatTime(duration())}</span>
-                          </div>
-                        </div>
+                            the like button — see the reels rail above.
+                            The scrubber is the same component desktop uses: it
+                            already sets touch-action: none, so dragging it never
+                            fights the vertical scroll-snap. */}
+                        <VideoProgressBar
+                          videoEl={videoEl}
+                          accent={() => addToCartButtonStyle()?.['background-color'] || '#fff'}
+                        />
                       </div>
                     </Show>
                     <Show when={nearIndices().has(index())}>
@@ -878,13 +883,10 @@ export function VideoOverlayPlayer({
                         {/* <h3 className="video-carousel-overlay-products-title">Products tagged</h3> */}
                         <div className="video-carousel-overlay-products-inner">
                           <For each={productsForVideo(video)}>
-                            {(product) => (
+                            {(product, i) => (
                               <OverlayProductItem
                                 product={product}
-                                video={video}
-                                addToCartButtonLabel={addToCartButtonLabel}
-                                addToCartButtonStyle={addToCartButtonStyle}
-                                handleProductClick={handleProductClick}
+                                onOpen={() => openProductDetail(i())}
                               />
                             )}
                           </For>
