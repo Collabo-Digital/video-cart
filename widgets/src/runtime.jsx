@@ -2,9 +2,11 @@
  * Widget runtime: finds .video-cart-container nodes, fetches feed data, mounts SolidJS widget.
  */
 
+import { Show } from 'solid-js';
 import { render } from 'solid-js/web';
 import { getWidget, registerWidget } from './core/registry';
 import { CONTAINER_SELECTOR } from './core/config';
+import { useDeviceVisible } from './hooks/useDeviceVisible';
 import { api } from './api';
 import { VideoCarousel } from './components/Carousel/Carousel';
 import { VideoStories } from './components/Stories/Stories';
@@ -178,15 +180,21 @@ export async function initFeeds() {
       }
 
       job.mountEl.innerHTML = '';
-      render(
-        () =>
-          widgetDef.component({
-            feed,
-            videos: feed.videos || [],
-            settings: feed.settings || {},
-          }),
-        job.mountEl
-      );
+      render(() => {
+        const settings = feed.settings || {};
+        const deviceVisible = useDeviceVisible(settings);
+        // Callback child, not a bare call: Show must not evaluate the component
+        // while hidden, or a mobile-disabled feed still mounts its video elements
+        // on desktop. It is also what makes crossing the breakpoint unmount the
+        // widget and stop playback, rather than just hiding it.
+        return (
+          <Show when={deviceVisible()}>
+            {() => widgetDef.component({ feed, videos: feed.videos || [], settings })}
+          </Show>
+        );
+      }, job.mountEl);
+      // The container *has* been initialised — it is just rendering nothing at
+      // this width. Gating this would let a later initFeeds pass mount a second copy.
       job.container.dataset.videoCartInitialized = 'true';
     } catch (err) {
       logError(err);

@@ -46,6 +46,9 @@ model Shop {
   // Plan Info
   planName           String?
   planDisplayName    String?
+  // Shop currency (e.g. "USD", "EUR") — populated at auth; UI formats money
+  // with this instead of a hardcoded "$".
+  currencyCode       String?
   partnerDevelopment Boolean @default(false)
   shopifyPlus        Boolean @default(false)
   shopOwnerName  String?
@@ -266,16 +269,24 @@ model VideoAnalytics {
 model VideoCartOrder {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   shopDomain   String
-  orderId      String   @unique // Shopify order GID e.g. gid://shopify/Order/123
+  orderId      String // Shopify order GID e.g. gid://shopify/Order/123 — unique per shop, not globally
   orderNumber  String? // display number e.g. #1001
+  // Bridge key: present on both the pixel checkout object and the orders/create
+  // webhook payload, so the two paths merge into one row even when the pixel
+  // had no order id (synthetic unknown_ key).
+  checkoutToken String?
   totalRevenue Float    @default(0) // sum of line_total for app-attributed items only
   currency     String?
   createdAt    DateTime @default(now())
 
   items VideoCartOrderItem[]
 
+  // Per-shop uniqueness: a globally-unique orderId let one shop overwrite
+  // another shop's order via the public conversion endpoint.
+  @@unique([shopDomain, orderId])
   @@index([shopDomain])
   @@index([shopDomain, createdAt])
+  @@index([shopDomain, checkoutToken])
 }
 
 // One row per line item that had _tracking (video_id + widget_id).
@@ -287,6 +298,8 @@ model VideoCartOrderItem {
   shopDomain String
   productId  String?
   variantId  String?
+  lineItemId String? // Shopify line item id (from orders/create webhook) — enables exact refund matching
+  visitorId  String? // anonymous vdcrt_visitor id — click-to-order audit trail
   quantity   Int      @default(1)
   lineTotal  Float    @default(0)
   createdAt  DateTime @default(now())
@@ -300,6 +313,28 @@ model VideoCartOrderItem {
   @@index([videoId])
   @@index([feedId, isDeleted])
   @@index([shopDomain])
+}
+
+// Server-side ATC attribution intent, keyed by Shopify cart token. The
+// orders/create webhook joins on payload.cart_token — nothing is written into
+// the cart or order itself, so nothing shows in the merchant's order admin.
+model CartAttribution {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  shopDomain String
+  cartToken  String
+  productId  String
+  variantId  String?
+  feedId     String   @db.ObjectId
+  videoId    String   @db.ObjectId
+  quantity   Int      @default(1)
+  visitorId  String?
+  createdAt  DateTime @default(now())
+
+  // Repeat ATC of the same product+video+feed in the same cart updates
+  // quantity instead of stacking rows.
+  @@unique([shopDomain, cartToken, productId, feedId, videoId])
+  @@index([shopDomain, cartToken])
+  @@index([createdAt])
 }
 
 // Which feed a given theme app block renders.

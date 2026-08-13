@@ -12,6 +12,8 @@ export const CONTAINER_SELECTOR = '.video-cart-container';
 export const FEED_API_PATH = '/apps/video-widget/feeds';
 /** App proxy path for recording analytics events (impression, view, click) in DB. */
 export const ANALYTICS_EVENT_PATH = '/apps/video-widget/eventLog';
+/** App proxy path for cart-token ATC attribution intents (order webhook joins on cart_token). */
+export const ATC_INTENT_PATH = '/apps/video-widget/atc-intent';
 export const SETTINGS_API_PATH = '/apps/video-widget/settings';
 export const DISCOVERY_API_PATH = '/apps/video-widget/discovery';
 /** Which feed each theme app block renders, looked up by block id. */

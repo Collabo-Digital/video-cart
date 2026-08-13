@@ -5,7 +5,6 @@ import { BlockStack, Card, Text } from "@shopify/polaris";
 export default function Chart({ chartData = [], title = "Video Views & Conversions", series = "views", metrics = ["orders", "revenue"] }) {
   const [isClient, setIsClient] = useState(false);
   const [LineChart, setLineChart] = useState(null);
-  console.log("metrics ---------->", metrics);
   useEffect(() => {
     setIsClient(true);
     // Dynamically import LineChart only on client-side
@@ -18,13 +17,13 @@ export default function Chart({ chartData = [], title = "Video Views & Conversio
   const seriesData = chartData && chartData.length > 0 ? chartData : [];
 
   const metricConfig = {
-    impressions: { name: "Impressions", accessor: (d) => d.impressions ?? 0 },
-    videoViews:  { name: "Views",       accessor: (d) => d.videoViews ?? 0 },
-    addToCart:   { name: "Add to cart", accessor: (d) => d.addToCart ?? 0 },
-    orders:      { name: "Orders",      accessor: (d) => d.orders ?? 0 },
-    revenue:     { name: "Revenue",     accessor: (d) => d.revenue ?? 0 },
-    atcRate:     { name: "ATC rate",    accessor: (d) => d.atcRate ?? 0 },
-    atcClicks:   { name: "ATC clicks",  accessor: (d) => d.atcClicks ?? 0 },
+    impressions:   { name: "Impressions",    accessor: (d) => d.impressions ?? 0 },
+    videoViews:    { name: "Views",          accessor: (d) => d.videoViews ?? 0 },
+    addToCart:     { name: "Add to cart",    accessor: (d) => d.addToCart ?? 0 },
+    orders:        { name: "Orders",         accessor: (d) => d.orders ?? 0 },
+    revenue:       { name: "Revenue",        accessor: (d) => d.revenue ?? 0 },
+    atcRate:       { name: "ATC rate",       accessor: (d) => d.atcRate ?? 0 },
+    productClicks: { name: "Product Clicks", accessor: (d) => d.productClicks ?? 0 },
   };
 
   return metrics

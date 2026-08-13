@@ -106,6 +106,33 @@
   border-radius: 4px;
 }
 
+/* Mobile reels: the expand-on-hover rules above are scoped to the desktop
+   container and never match here, so the resting state has to be usable on its
+   own — a 2px hairline with a hidden thumb is neither visible nor grabbable
+   with a finger. The bubble appears only while a finger is down. This is also
+   the bottom-most element on the slide now, so it carries the safe-area inset. */
+.video-carousel-reels-video-wrap .vc-progress {
+  height: 28px;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.video-carousel-reels-video-wrap .vc-progress-track {
+  height: 3px;
+}
+
+.video-carousel-reels-video-wrap .vc-progress-thumb {
+  opacity: 1;
+  scale: 1;
+}
+
+.video-carousel-reels-video-wrap .vc-progress:active .vc-progress-track {
+  height: 5px;
+}
+
+.video-carousel-reels-video-wrap .vc-progress:active .vc-progress-bubble {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vc-progress-track,
   .vc-progress-thumb,

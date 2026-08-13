@@ -1,5 +1,5 @@
 import { authenticate } from "../../../../config/shopify.server";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse";
 import {
   APP_BILLING_PLANS_NAMES,
@@ -34,9 +34,15 @@ export const action = async ({ request }) => {
       prorate: true,
     });
 
+    // Merge into existing planLimits so cancel only changes the limit
+    // numbers — never wipe resetDate / monthly view usage.
+    const shopData = await ShopModel.findByDomain(session.shop);
+    const existingPlanLimits = shopData?.planLimits ?? {};
+
     await ShopModel.updateByDomain(session.shop, {
       appPlan: "Free",
       planLimits: {
+        ...existingPlanLimits,
         videoViewLimit: VIDEO_VIEW_LIMITS.free,
         videoUploadLimit: VIDEO_UPLOAD_LIMITS.free,
       },

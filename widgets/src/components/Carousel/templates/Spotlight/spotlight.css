@@ -1,7 +1,9 @@
 /* Spotlight (coverflow) template */
 
+/* Falls back to centred — the template's designed look — but the merchant's
+   titleAlignment wins whenever a design block is present, which is always. */
 .template-spotlight .spotlight-header {
-  text-align: center;
+  text-align: var(--vdcrt-header-align, center);
   margin-bottom: 24px;
 }
 

@@ -13,3 +13,15 @@ export async function trackDbEvent(payload) {
         }
     }
 }
+
+/** Fire-and-forget cart-token attribution intent; never breaks the ATC flow. */
+export async function trackAtcIntent(payload) {
+    if (!payload?.cartToken || !payload?.feedId || !payload?.videoId) return;
+    try {
+        await api.analytics.recordAtcIntent(payload);
+    } catch (err) {
+        if (import.meta.env?.DEV) {
+            console.error('ATC intent failed:', err);
+        }
+    }
+}

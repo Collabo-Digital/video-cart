@@ -13,10 +13,15 @@ import {
 import { ExternalIcon } from "@shopify/polaris-icons";
 import { useFetcher, useNavigate } from "react-router";
 import DateRangePicker from "../DatePicker/DatePicker";
+import { toLocalDateString } from "../../lib/utils/common.js";
 
-function formatSales(n) {
+function formatSales(n, currencyCode) {
   if (n == null || Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: currencyCode || "USD",
+    minimumFractionDigits: 2,
+  }).format(n);
 }
 
 
@@ -42,11 +47,11 @@ function AnalyticsTab({ feedId }) {
     const start = date.start || new Date(new Date().setDate(1));
     const end = date.end || new Date();
     const params = new URLSearchParams({
-      startDate: start.toISOString().slice(0, 10),
-      endDate: end.toISOString().slice(0, 10),
+      // Local calendar day — toISOString shifts the day for non-UTC users.
+      startDate: toLocalDateString(start),
+      endDate: toLocalDateString(end),
     });
     fetcher.load(`/api/v1/analytics/feeds/${feedId}?${params}`);
-    console.log("fetcher.data", fetcher.data);
   }, [feedId, date.start, date.end, fetcher]);
 
   useEffect(() => {
@@ -71,7 +76,7 @@ function AnalyticsTab({ feedId }) {
   const loading = fetcher.state === "loading" && !fetcher.data;
   const data = fetcher.data?.success ? fetcher.data.data : null;
   const widgetStats = data?.widget ?? null;
-  // const videos = data?.videos ?? []; // reserved for future per-video table
+  const currencyCode = data?.currencyCode ?? null;
 
   return (
     <>
@@ -110,7 +115,7 @@ function AnalyticsTab({ feedId }) {
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {widgetStats ? widgetStats.views : "—"}
+                  {widgetStats ? widgetStats.videoPlays : "—"}
                 </Text>
               )}
             </BlockStack>
@@ -169,50 +174,11 @@ function AnalyticsTab({ feedId }) {
                 <SkeletonBodyText lines={1} />
               ) : (
                 <Text as="h3" variant="headingMd">
-                  {widgetStats ? formatSales(widgetStats.revenue) : "—"}
+                  {widgetStats ? formatSales(widgetStats.revenue, currencyCode) : "—"}
                 </Text>
               )}
             </BlockStack>
           </Card>
-
-        {/* <Text as="h2" variant="headingMd">
-          Per video
-        </Text>
-        {videos.length > 0 ? (
-          <Card padding="0">
-            <DataTable
-              columnContentTypes={["text", "numeral", "numeral", "numeral", "numeral", "numeral", "text", "text"]}
-              headings={[
-                "Video",
-                "Impressions",
-                "Views",
-                "Clicks",
-                "Purchases",
-                "Sales",
-                "Total watch time",
-                "Avg watch time",
-              ]}
-              rows={videos.map((v) => [
-                v.title || "Untitled",
-                v.impressions ?? 0,
-                v.views ?? 0,
-                v.clicks ?? 0,
-                v.purchases ?? 0,
-                formatSales(v.sales),
-                formatDuration(v.totalWatchTime),
-                formatDuration(v.avgWatchTime),
-              ])}
-            />
-          </Card>
-        ) : (
-          !loading && (
-            <Card>
-              <Text as="p" tone="subdued">
-                No video analytics in this date range. Data appears when the storefront widget records events.
-              </Text>
-            </Card>
-          )
-        )} */}
 
         <Button variant="secondary" icon={ExternalIcon} onClick={() => {
           navigate(`/app/analytics`);

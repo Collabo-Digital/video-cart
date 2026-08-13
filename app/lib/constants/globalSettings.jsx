@@ -6,6 +6,7 @@ const DEFAULT_DEVICE_SETTINGS = {
     floatingPosition: "bottom",
     floatingBgColor: "#111827",
     inlinePosition: "nav",
+    inlineInsertMode: "append",
     showNavIcon: true,
     iconPosition: "bottomBar",
     navLabel: "Videos",
