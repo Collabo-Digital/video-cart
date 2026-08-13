@@ -19,6 +19,7 @@ import MuxPlayer from "@mux/mux-player-react/lazy";
 
 import ResourcePicker from "../ResourcePicker/ResourcePicker";
 import TaggedProductsAvatars from "../ResourcePicker/TaggedProductsAvatars";
+import { getVideoThumbnailUrl, isVideoEncoding } from "../../lib/utils/videoThumbnail";
 
 /**
  * VideoDisplay
@@ -90,6 +91,9 @@ export default function VideoDisplay({
   );
 
   const playbackId = getPlaybackId();
+  // Null while Mux is still encoding and no source thumbnail exists — the caller
+  // renders a placeholder rather than a 412'd broken image.
+  const thumbUrl = getVideoThumbnailUrl(video, { width: 400, height: 500, format: "png" });
   const videoTitle = video?.fileName || video?.title || "Untitled Video";
   const videoDuration = video?.duration ? Math.round(video.duration) : 60;
   const videoStatus = video?.status || "unknown";
@@ -315,10 +319,34 @@ export default function VideoDisplay({
         }}
         onClick={handleOpenPreview}
       >
-        <VideoThumbnail
-          // videoLength={videoDuration}
-          thumbnailUrl={`https://image.mux.com/${playbackId}/thumbnail.png?width=400&height=500&fit_mode=smartcrop&time=1`}
-        />
+        {thumbUrl ? (
+          <VideoThumbnail
+            // videoLength={videoDuration}
+            thumbnailUrl={thumbUrl}
+          />
+        ) : (
+          // Mux 412s until the asset finishes encoding, and this video has no
+          // source thumbnail to stand in — show that, rather than a broken image.
+          <div
+            style={{
+              // The parent tile is a fixed 200px box, so fill it and centre —
+              // otherwise the placeholder hugs the top edge.
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "16px",
+            }}
+          >
+            <BlockStack gap="150" inlineAlign="center">
+              <Spinner size="small" accessibilityLabel="Generating preview" />
+              <Text as="p" variant="bodySm" tone="subdued" alignment="center">
+                {isVideoEncoding(video) ? "Generating preview…" : "No preview yet"}
+              </Text>
+            </BlockStack>
+          </div>
+        )}
         <div
           style={{
             position: "absolute",

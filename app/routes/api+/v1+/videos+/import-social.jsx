@@ -2,7 +2,7 @@ import { authenticate } from '../../../../config/shopify.server';
 import { importSocialVideo } from '../../../../services/video/social-import.service';
 import * as ShopModel from '../../../../models/shop.server';
 import * as VideoModel from '../../../../models/video.server';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 const VALID_SOURCES = ['instagram', 'tiktok'];
 

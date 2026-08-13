@@ -104,6 +104,63 @@ export function deriveFileUploadNameFromUrl(source, url, shopDomain) {
   return source === SOCIAL_SOURCE.TIKTOK ? 'Tiktok-import' : 'Insta-import';
 }
 
+// Upstream infrastructure failures, as opposed to reasons the merchant can act
+// on ("private account", "post not found").
+const UPSTREAM_FAILURE_RE =
+  /\b(5\d{2}|429|timeout|timed out|unavailable|bad gateway|econn\w*|socket|network|fetch failed)\b/i;
+
+/**
+ * @param {string} platform
+ * @param {Error} cause
+ * @returns {Error} A 503 the route can surface verbatim
+ */
+function resolverUnavailable(platform, cause) {
+  const err = new Error(
+    `${platform} import is temporarily unavailable. Please try again in a few minutes.`,
+  );
+  err.statusCode = 503;
+  err.code = 'RESOLVER_UNAVAILABLE';
+  err.cause = cause;
+  return err;
+}
+
+/**
+ * Call the third-party resolver and normalise its two very different failure
+ * modes into errors the route can turn into a sensible HTTP response.
+ *
+ * btch-downloader rejects on transport errors, but reports upstream outages
+ * INSIDE a resolved payload ({ status: false, message: '503 Service
+ * Unavailable' }) — so catching rejections alone misses the common case, and
+ * the raw message reached merchants as an opaque HTTP 500.
+ *
+ * @param {Promise<Object>} promise - In-flight resolver call
+ * @param {string} platform - 'Instagram' | 'TikTok', used in the message
+ * @returns {Promise<Object>} Resolver payload, guaranteed to have status truthy
+ */
+async function callResolver(promise, platform) {
+  let data;
+  try {
+    data = await withTimeout(promise, RESOLVE_TIMEOUT_MS, `${platform} resolve`);
+  } catch (cause) {
+    throw resolverUnavailable(platform, cause);
+  }
+
+  if (!data?.status) {
+    const message = typeof data?.message === 'string' ? data.message.trim() : '';
+    if (!message || UPSTREAM_FAILURE_RE.test(message)) {
+      throw resolverUnavailable(platform, new Error(message || 'resolver returned no status'));
+    }
+    // A real, actionable reason — surface it rather than hiding it behind
+    // "temporarily unavailable".
+    const err = new Error(`${platform} could not provide this video: ${message}`);
+    err.statusCode = 422;
+    err.code = 'RESOLVER_REJECTED';
+    throw err;
+  }
+
+  return data;
+}
+
 /**
  * Resolve an Instagram/TikTok post URL to a direct downloadable video URL + preview.
  * @param {Object} params
@@ -129,10 +186,7 @@ export async function resolveSocialUrl({ source, url }) {
   const { igdl, ttdl } = await import('btch-downloader');
 
   if (source === SOCIAL_SOURCE.INSTAGRAM) {
-    const data = await withTimeout(igdl(postUrl), RESOLVE_TIMEOUT_MS, 'Instagram resolve');
-    if (!data?.status) {
-      throw new Error(data?.message || 'Failed to fetch Instagram video');
-    }
+    const data = await callResolver(igdl(postUrl), 'Instagram');
     const first = Array.isArray(data.result) ? data.result[0] : null;
     const directUrl = first?.url;
     if (!directUrl) {
@@ -148,10 +202,7 @@ export async function resolveSocialUrl({ source, url }) {
   }
 
   if (source === SOCIAL_SOURCE.TIKTOK) {
-    const data = await withTimeout(ttdl(postUrl), RESOLVE_TIMEOUT_MS, 'TikTok resolve');
-    if (!data?.status) {
-      throw new Error(data?.message || 'Failed to fetch TikTok video');
-    }
+    const data = await callResolver(ttdl(postUrl), 'TikTok');
     const videoField = data.video;
     const directUrl = typeof videoField === 'string' ? videoField : Array.isArray(videoField) ? videoField[0] : null;
     if (!directUrl) {

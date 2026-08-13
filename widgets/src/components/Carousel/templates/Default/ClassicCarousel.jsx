@@ -5,10 +5,9 @@ import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../../../shared/mux'
 import { EVENT_TYPES } from '../../../../api/services/analyticsService';
 import { ProductOverlay } from '../../../common/ProductOverlay/ProductOverlay';
 import { VideoOverlayPlayer } from '../../../common/VideoOverlayPlayer';
-import { Toast } from '../../../common/Toast/Toast';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../../../utils/designStyles';
 import { trackDbEvent } from '../../../../utils/analytics';
-import { useToast } from '../../../../hooks/useToast';
+import { observeWidgetImpression, trackVideoImpressionOnce } from '../../../../utils/impressionTracker';
 import {
   productsForVideo,
   productPrice,
@@ -43,8 +42,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   // merchant controls the gap, so neither can be hardcoded.
   const [perView, setPerView] = createSignal(0);
 
-  const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
-
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
   const hoverEffect = () =>  design?.hoverEffect  || 'lift'    ;
@@ -60,7 +57,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     feed,
     settings,
     onEvent,
-    showToast,
     source: 'carousel',
     isPreview,
   });
@@ -98,27 +94,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   });
 
   createEffect(() => {
-    const container = containerRef();
-    if (!container || !feed?.id || isPreview) return;
-
-    let sent = false;
-
-    const observer = new IntersectionObserver(
-      async (entries) => {
-        if (sent) return;
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0) {
-            sent = true;
-            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_IMPRESSION });
-            break;
-          }
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    observer.observe(container);
-    onCleanup(() => observer.disconnect());
+    observeWidgetImpression(containerRef(), feed, isPreview, onCleanup);
   });
 
   // Distance between two card origins captures width AND the real gap in one
@@ -339,7 +315,7 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video.id, index });
           if (feed?.id && video?.id && !isPreview) {
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+            await trackVideoImpressionOnce(feed.id, video.id);
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
@@ -442,14 +418,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
       <Show when={!videos?.length}>
         <p className="video-carousel-empty">{EMPTY_VIDEOS}</p>
       </Show>
-
-      <Toast
-        visible={toastVisible()}
-        message={toastMessage()}
-        type={toastType()}
-        onClose={() => setToastVisible(false)}
-      />
-
     </div>
   );
 }

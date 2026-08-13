@@ -6,7 +6,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import { resolveSocialUrl } from '../../../../services/video/social-import.service';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 const VALID_SOURCES = ['instagram', 'tiktok'];
 

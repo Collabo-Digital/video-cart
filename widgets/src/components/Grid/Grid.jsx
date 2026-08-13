@@ -4,9 +4,8 @@ import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './grid.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import { EVENT_TYPES } from '../../api/services/analyticsService';
-import { Toast } from '../common/Toast/Toast';
 import { trackDbEvent } from '../../utils/analytics';
-import { useToast } from '../../hooks/useToast';
+import { observeWidgetImpression, trackVideoImpressionOnce } from '../../utils/impressionTracker';
 import {
   productsForVideo,
   productPrice,
@@ -27,14 +26,12 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   const [containerRef, setContainerRef] = createSignal(null);
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
 
-  const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
   const addToCartButtonLabel = () => getAddToCartLabel(feed);
   const addToCartButtonStyle = () => getButtonStyle(feed, settings);
   const handleProductClick = createProductClickHandler({
     feed,
     settings,
     onEvent,
-    showToast,
     source: 'grid',
     isPreview,
   });
@@ -42,6 +39,10 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
   const uniqueClass = getUniqueClassIdentifier(design);
   const hoverEffect = () => design?.hoverEffect || 'lift';
   const autoplay = () => settings?.general.autoPlay ?? feed?.settings?.general.autoPlay;
+
+  createEffect(() => {
+    observeWidgetImpression(containerRef(), feed, isPreview, onCleanup);
+  });
 
 
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
@@ -178,7 +179,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
         onVideoChange={async (video, index) => {
           onEvent?.('video_change', { feedId: feed?.id, videoId: video?.id, index, source: 'grid' });
           if (feed?.id && video?.id && !isPreview) {
-            await trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_IMPRESSION });
+            await trackVideoImpressionOnce(feed.id, video.id);
           }
         }}
         onFirstPlay={async (video, watchTimeSeconds) => {
@@ -189,6 +190,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
             eventType: EVENT_TYPES.VIDEO_VIEW,
             watchTimeSeconds,
           });
+          await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_VIDEO_PLAY });
         }}
       />
 
@@ -256,13 +258,6 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
           </For>
         </div>
       </Show>
-
-      <Toast
-        visible={toastVisible()}
-        message={toastMessage()}
-        type={toastType()}
-        onClose={() => setToastVisible(false)}
-      />
     </section>
   );
 }

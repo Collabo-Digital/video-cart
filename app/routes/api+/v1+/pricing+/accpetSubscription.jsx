@@ -1,5 +1,5 @@
 import { authenticate } from "../../../../config/shopify.server";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse";
 import {
   APP_BILLING_PLANS_NAMES,
@@ -22,12 +22,19 @@ export const loader = async ({ request }) => {
 
     // Resolve the active plan name, defaulting to Free if no subscription found
     const planName = billingCheck?.appSubscriptions?.[0]?.name ?? "Free";
+    const planKey = planName.toLowerCase();
+
+    // Merge into existing planLimits so upgrade/downgrade only changes the
+    // limit numbers — never wipe resetDate / monthly view usage.
+    const shopData = await ShopModel.findByDomain(session.shop);
+    const existingPlanLimits = shopData?.planLimits ?? {};
 
     await ShopModel.updateByDomain(session.shop, {
       appPlan: planName,
       planLimits: {
-        videoViewLimit: VIDEO_VIEW_LIMITS[planName.toLowerCase()],
-        videoUploadLimit: VIDEO_UPLOAD_LIMITS[planName.toLowerCase()],
+        ...existingPlanLimits,
+        videoViewLimit: VIDEO_VIEW_LIMITS[planKey],
+        videoUploadLimit: VIDEO_UPLOAD_LIMITS[planKey],
       },
     });
 

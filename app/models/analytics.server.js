@@ -59,8 +59,9 @@ export async function recordEvent({
       feedIncrements.widgetImpressions = 1;
       break;
     case EVENT_TYPES.WIDGET_CLICK:
+      // Clicks are their own metric. Bumping widgetViews here too made one
+      // open-then-play journey count as 2 "views" on the feed page.
       feedIncrements.widgetClicks = 1;
-      feedIncrements.widgetViews = 1;
       break;
     case EVENT_TYPES.WIDGET_VIDEO_PLAY:
       feedIncrements.widgetVideoPlays = 1;
@@ -119,7 +120,6 @@ export async function recordEvent({
       break;
     case 'click':
       feedIncrements.widgetClicks = 1;
-      feedIncrements.widgetViews = 1;
       break;
     case 'view':
       feedIncrements.widgetVideoPlays = 1;
@@ -229,8 +229,9 @@ export async function getFeedAnalytics(feedId, startDate, endDate) {
   }
   const videos = Array.from(byVideo.values());
 
-  // Derived metrics
-  const atcRate = widget.views > 0 ? widget.addToCart / widget.views : 0;
+  // Derived metrics. views = actual video plays — the stored widgetViews
+  // counter historically mixed clicks + plays and double-counted journeys.
+  const atcRate = widget.videoPlays > 0 ? widget.addToCart / widget.videoPlays : 0;
 
   return { widget, atcRate, videos };
 }
@@ -287,7 +288,10 @@ export async function recordConversionFromPixel(shop, items) {
     const videoId = item.video_id;
     if (!feedId || !videoId) continue;
 
-    const revenue = Number(item.line_total) ?? 0;
+    // Number() yields NaN (not null) on bad input, so `?? 0` never caught it —
+    // one malformed line_total used to poison the whole feed's revenue sum.
+    const parsed = Number(item.line_total);
+    const revenue = Number.isFinite(parsed) ? parsed : 0;
 
     if (!byFeed.has(feedId)) byFeed.set(feedId, { revenue: 0 });
     byFeed.get(feedId).revenue += revenue;
@@ -297,13 +301,17 @@ export async function recordConversionFromPixel(shop, items) {
     byFeedVideo.get(fvKey).revenue += revenue;
   }
 
+  if (!shop) throw new Error('Shop domain is required');
+
+  // Skip unknown/foreign feeds instead of throwing — one bad item must not
+  // discard the whole order's credit, and with the existed-flag gate in the
+  // conversion route a mid-loop throw would lose the counters permanently.
+  const validFeedIds = new Set();
   for (const [feedId, { revenue }] of byFeed) {
-    // Validate feed belongs to shop - replace getFeedById with FeedModel.findById
-    if (!feedId) throw new Error('Feed ID is required');
-    if (!shop) throw new Error('Shop domain is required');
     const feed = await FeedModel.findById(feedId, shop);
-    if (!feed) throw new Error('Feed not found');
-    
+    if (!feed) continue;
+    validFeedIds.add(feedId);
+
     await recordEvent({
       feedId,
       eventType: EVENT_TYPES.WIDGET_ORDER,
@@ -313,6 +321,12 @@ export async function recordConversionFromPixel(shop, items) {
   }
 
   for (const [, { feedId, videoId, revenue }] of byFeedVideo) {
+    // Feed must have passed the shop check above, and the video must actually
+    // be IN that feed — membership proves the video is this shop's too.
+    if (!validFeedIds.has(feedId)) continue;
+    const feedVideo = await FeedModel.findFeedVideo(feedId, videoId);
+    if (!feedVideo) continue;
+
     await recordEvent({
       feedId,
       videoId,

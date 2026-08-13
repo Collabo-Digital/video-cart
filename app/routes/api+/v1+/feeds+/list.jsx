@@ -7,7 +7,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import {  getFeedsWithPaginationAndFilters } from '../../../../services/feed/feed.service.server';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);

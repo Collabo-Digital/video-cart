@@ -7,7 +7,7 @@
 
 import { authenticate } from '../../../../config/shopify.server';
 import { getUploadStatus } from '../../../../services/video/upload.service';
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 
 export const loader = async ({ request, params }) => {
   const { session } = await authenticate.admin(request);

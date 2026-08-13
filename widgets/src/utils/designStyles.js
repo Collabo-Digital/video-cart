@@ -48,6 +48,29 @@ export function getUniqueClassIdentifier(design) {
     return id || null;
 }
 
+/** Last value put on <body>, so a re-run swaps rather than stacks. */
+let appliedGlobalClass = null;
+
+/**
+ * Puts the global custom class on <body>.
+ *
+ * Not on the widget roots: the video overlay and the floating widget portal out
+ * to <body>, so a class on a widget container could never reach them. On <body>
+ * a single hook scopes to everything the app renders.
+ *
+ * @param {Object} design - The design object from global settings.
+ */
+export function applyGlobalClass(design) {
+    if (typeof document === 'undefined' || !document.body) return;
+
+    const cls = getUniqueClassIdentifier(design);
+    if (cls === appliedGlobalClass) return;
+
+    if (appliedGlobalClass) document.body.classList.remove(appliedGlobalClass);
+    if (cls) document.body.classList.add(cls);
+    appliedGlobalClass = cls;
+}
+
 /**
  * Injects the custom CSS into the container.
  * @param {Object} container - The container element.

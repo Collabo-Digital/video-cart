@@ -9,7 +9,7 @@ import { authenticate } from "../../config/shopify.server";
 import * as SessionModel from "../../models/session.server";
 import * as ShopModel from "../../models/shop.server";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 
 export const action = async ({ request }) => {
   const { shop, topic } = await authenticate.webhook(request);

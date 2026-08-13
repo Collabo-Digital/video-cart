@@ -71,6 +71,13 @@ const FLOATING_POSITION_OPTIONS = [
     { label: "Right", value: "right" },
 ];
 
+const INLINE_INSERT_MODE_OPTIONS = [
+    { label: "Append — inside, at the end", value: "append" },
+    { label: "Prepend — inside, at the start", value: "prepend" },
+    { label: "Before — outside, above the target", value: "before" },
+    { label: "After — outside, below the target", value: "after" },
+];
+
 const DEVICE_TABS = [
     { id: "desktop", content: "Desktop", panelID: "desktop-panel" },
     { id: "mobile", content: "Mobile", panelID: "mobile-panel" },
@@ -195,6 +202,26 @@ function DeviceSettings({ device, control }) {
                                             helpText="Example selectors: nav, header__inline-menu, .header__menu"
                                             autoComplete="off"
                                             value={field.value ?? "nav"}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                                <Controller
+                                    name={`${prefix}.inlineInsertMode`}
+                                    control={control}
+                                    defaultValue="append"
+                                    render={({ field }) => (
+                                        <Select
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Insertion mode</Text>
+                                                    <Tooltip dismissOnMouseOut content="Where to place the link relative to the navigation target. Append and Prepend insert inside the target; Before and After insert outside it, as a sibling.">
+                                                        <Icon source={InfoIcon} />
+                                                    </Tooltip>
+                                                </InlineStack>
+                                            }
+                                            options={INLINE_INSERT_MODE_OPTIONS}
+                                            value={field.value ?? "append"}
                                             onChange={field.onChange}
                                         />
                                     )}
