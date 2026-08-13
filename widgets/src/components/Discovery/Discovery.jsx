@@ -8,7 +8,6 @@ import {
   getButtonStyle,
 } from '../../utils/widgetHelpers';
 import { createProductClickHandler } from '../../utils/productClickHandler';
-import { getUniqueClassIdentifier } from '../../utils/designStyles';
 import ReelIcon from '../../assets/Icons/reelIcon';
 import './discovery.css';
 
@@ -20,9 +19,12 @@ const DEVICE_DEFAULTS = {
   floatingPosition: 'bottom',
   floatingBgColor: '#111827',
   inlinePosition: 'nav',
+  inlineInsertMode: 'append',
   showNavIcon: true,
   navLabel: 'Videos',
 };
+
+const INSERT_MODES = new Set(['append', 'prepend', 'before', 'after']);
 
 /** Turn admin input into a valid querySelector (e.g. "header__icons" → ".header__icons", "nav" stays "nav"). */
 function normalizeSelector(raw) {
@@ -67,13 +69,39 @@ function waitForElement(selector, maxWaitMs = 8000) {
   });
 }
 
-function resolveInlineTarget(element) {
-  if (!element) return null;
-  const tag = element.tagName?.toLowerCase();
-  if (tag === 'nav' || tag === 'header') {
-    return element.querySelector('ul, ol') || element;
+function wrapListItem(mountEl) {
+  const listItem = document.createElement('li');
+  listItem.className = 'vc-discovery-nav-item';
+  listItem.appendChild(mountEl);
+  return listItem;
+}
+
+/**
+ * Place the discovery mount relative to the merchant's navigation target.
+ *
+ * The selector names the parent verbatim: prepend/append go inside it, first and
+ * last; before/after become its previous and next sibling. Nothing descends into
+ * inner containers — pointing at a <nav> means the <nav>, not the <ul> inside it.
+ *
+ * The one wrinkle is list markup: a direct child of <ul>/<ol> has to be an <li>,
+ * so the mount is wrapped whenever it would otherwise land in a list.
+ */
+function insertInline(target, mountEl, mode) {
+  // before/after fall back to appending inside when the target has no parent
+  // (a selector resolving to <html>), which would otherwise throw.
+  const asSibling = (mode === 'before' || mode === 'after') && Boolean(target.parentNode);
+  const container = asSibling ? target.parentNode : target;
+
+  let node = mountEl;
+  if (container.matches?.('ul, ol')) {
+    node = wrapListItem(mountEl);
+  } else {
+    mountEl.classList.add('vc-discovery-nav-host');
   }
-  return element;
+
+  if (asSibling) target[mode](node);
+  else if (mode === 'prepend') container.prepend(node);
+  else container.appendChild(node);
 }
 
 export function resolveShowNavIcon(value) {
@@ -119,11 +147,11 @@ export function VideoDiscovery({ videos, settings, layoutStyle = 'floating', sho
     setExpandedIndex(0);
   };
 
-  const uniqueClass = getUniqueClassIdentifier(settings?.design);
-  const wrapperClass = [
-    isInline ? 'vc-discovery vc-discovery-inline' : `vc-discovery vc-discovery-floating vc-discovery-btn-${position}`,
-    uniqueClass,
-  ].filter(Boolean).join(' ');
+  // The global custom class lives on <body> (see applyGlobalClass), so nothing
+  // here re-applies it.
+  const wrapperClass = isInline
+    ? 'vc-discovery vc-discovery-inline'
+    : `vc-discovery vc-discovery-floating vc-discovery-btn-${position}`;
 
   return (
     <Show when={videos?.length > 0}>
@@ -164,33 +192,26 @@ export async function mountDiscovery(videos, settings) {
 
   const layoutStyle = deviceSettings.layoutStyle || 'floating';
   const existing = document.getElementById('vc-discovery-root');
-  if (existing) existing.remove();
+  // Remove the <li> wrapper too — dropping only the root leaves an empty bullet
+  // behind in the theme's nav on any re-mount.
+  if (existing) (existing.closest('.vc-discovery-nav-item') || existing).remove();
 
   const mountEl = document.createElement('div');
   mountEl.id = 'vc-discovery-root';
 
-  const design = settings?.design;
-  const uniqueClass = getUniqueClassIdentifier(design);
-  if (uniqueClass) mountEl.classList.add(uniqueClass);
-
   if (layoutStyle === 'inline') {
     const selector = normalizeSelector(deviceSettings.inlinePosition);
-    const found = await waitForElement(selector);
-    const target = resolveInlineTarget(found);
+    const target = await waitForElement(selector);
     if (!target) {
       console.warn(`[Video Discovery] Could not find element: "${selector}"`);
       return;
     }
 
-    if (target.matches('ul, ol')) {
-      const listItem = document.createElement('li');
-      listItem.className = 'vc-discovery-nav-item';
-      if (uniqueClass) listItem.classList.add(uniqueClass);
-      listItem.appendChild(mountEl);
-      target.appendChild(listItem);
-    } else {
-      target.appendChild(mountEl);
-    }
+    // A stale or hand-edited settings blob must not silently produce a no-op.
+    const mode = INSERT_MODES.has(deviceSettings.inlineInsertMode)
+      ? deviceSettings.inlineInsertMode
+      : 'append';
+    insertInline(target, mountEl, mode);
   } else {
     document.body.appendChild(mountEl);
   }
