@@ -20,6 +20,9 @@
   display: flex;
   flex-direction: column;
   align-items: var(--vdcrt-header-align, start);
+  /* align-items only positions the flex items. A subtitle long enough to wrap
+     fills the header's width, so the text inside it needs aligning too. */
+  text-align: var(--vdcrt-header-align, start);
 }
 
 .video-carousel-title {
