@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
 import { Show, createSignal, createEffect, onCleanup } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import './floating.css';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
@@ -20,12 +21,41 @@ import { DEFAULT_TITLE_WATCH, EMPTY_VIDEOS_SHORT } from '../../constants/strings
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../utils/designStyles';
 import CloseIcon from '../../assets/Icons/CloseIcon';
 
+/**
+ * Body-level host for the floating widget's portal.
+ *
+ * The widget is `position: fixed`, but the theme block renders it inside a
+ * .shopify-section — and any ancestor with transform, filter, backdrop-filter,
+ * perspective, will-change, contain or content-visibility becomes the
+ * containing block for fixed descendants, which turns `fixed` into `absolute`
+ * inside that section. Such an ancestor also caps z-index to its own stacking
+ * context, so a sticky header covers the widget. Rendering at <body> level is
+ * the only reliable fix.
+ *
+ * Keyed per feed and replaced on every mount: the theme editor's
+ * remountPreview() re-runs initFeeds() on the same container, and runtime.jsx
+ * starts each mount with `mountEl.innerHTML = ''` — which cannot reach a portal
+ * living in <body>. Without this, every save would stack another copy. Same
+ * approach as mountDiscovery's #vc-discovery-root.
+ */
+function createFloatingHost(feedId) {
+  const id = `vc-floating-root-${feedId ?? 'default'}`;
+  document.getElementById(id)?.remove();
+  const el = document.createElement('div');
+  el.id = id;
+  document.body.appendChild(el);
+  return el;
+}
+
 export function VideoFloating({ feed, videos, settings, onEvent, isPreview }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
   const [isVisible, setIsVisible] = createSignal(true);
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
   const firstVideo = () => (Array.isArray(videos) && videos.length ? videos[0] : null);
+
+  const portalHost = createFloatingHost(feed?.id);
+  onCleanup(() => portalHost.remove());
 
   const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
   const addToCartButtonLabel = () => getAddToCartLabel(feed);
@@ -99,78 +129,80 @@ export function VideoFloating({ feed, videos, settings, onEvent, isPreview }) {
   };
   return (
     <Show when={isVisible()}>
-      <div className={`video-floating ${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
-        <button
-          type="button"
-          className="video-floating-close"
-          aria-label="Close floating video"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsVisible(false);
-          }}
-        >
-          <CloseIcon />
-        </button>
-        <VideoOverlayPlayer
-          videos={videos}
-          expandedIndex={expandedIndex}
-          setExpandedIndex={setExpandedIndex}
-          productsForVideo={productsForVideo}
-          productPrice={productPrice}
-          addToCartButtonLabel={addToCartButtonLabel}
-          addToCartButtonStyle={addToCartButtonStyle}
-          buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
-          handleProductClick={handleProductClick}
-          onVideoChange={async (video, index) => {
-            onEvent?.('video_change', {
-              feedId: feed?.id,
-              videoId: video?.id,
-              index,
-              source: 'floating',
-            });
-            if (feed?.id && video?.id && !isPreview) {
-              await trackVideoImpressionOnce(feed.id, video.id);
-            }
-          }}
-          onFirstPlay={async (video, watchTimeSeconds) => {
-            if (!feed?.id || !video?.id || isPreview) return;
-            await trackDbEvent({
-              feedId: feed.id,
-              videoId: video.id,
-              eventType: EVENT_TYPES.VIDEO_VIEW,
-              watchTimeSeconds,
-            });
-            await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_VIDEO_PLAY });
-          }}
-        />
-
-        <Show when={firstVideo()} fallback={<div className="video-floating-empty">{EMPTY_VIDEOS_SHORT}</div>}>
+      <Portal mount={portalHost}>
+        <div className={`video-floating ${uniqueClass ? ` ${uniqueClass}` : ''}`} ref={setContainerRef}>
           <button
             type="button"
-            onClick={openVideo}
-            className="video-floating-button"
-            aria-label="Open featured video"
-            onMouseEnter={handleFloatingMouseEnter}
-            onMouseLeave={handleFloatingMouseLeave}
+            className="video-floating-close"
+            aria-label="Close floating video"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsVisible(false);
+            }}
           >
-            <div className="video-floating-thumb-wrap">
-              <Show
-                when={thumbUrl()}
-                fallback={<div className="video-floating-thumb video-floating-thumb-fallback" aria-hidden="true" />}
-              >
-                <img className="video-floating-thumb" src={thumbUrl()} alt="" loading="lazy" />
-              </Show>
-            </div>
+            <CloseIcon />
           </button>
-        </Show>
+          <VideoOverlayPlayer
+            videos={videos}
+            expandedIndex={expandedIndex}
+            setExpandedIndex={setExpandedIndex}
+            productsForVideo={productsForVideo}
+            productPrice={productPrice}
+            addToCartButtonLabel={addToCartButtonLabel}
+            addToCartButtonStyle={addToCartButtonStyle}
+            buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
+            handleProductClick={handleProductClick}
+            onVideoChange={async (video, index) => {
+              onEvent?.('video_change', {
+                feedId: feed?.id,
+                videoId: video?.id,
+                index,
+                source: 'floating',
+              });
+              if (feed?.id && video?.id && !isPreview) {
+                await trackVideoImpressionOnce(feed.id, video.id);
+              }
+            }}
+            onFirstPlay={async (video, watchTimeSeconds) => {
+              if (!feed?.id || !video?.id || isPreview) return;
+              await trackDbEvent({
+                feedId: feed.id,
+                videoId: video.id,
+                eventType: EVENT_TYPES.VIDEO_VIEW,
+                watchTimeSeconds,
+              });
+              await trackDbEvent({ feedId: feed.id, eventType: EVENT_TYPES.WIDGET_VIDEO_PLAY });
+            }}
+          />
 
-        <Toast
-          visible={toastVisible()}
-          message={toastMessage()}
-          type={toastType()}
-          onClose={() => setToastVisible(false)}
-        />
-      </div>
+          <Show when={firstVideo()} fallback={<div className="video-floating-empty">{EMPTY_VIDEOS_SHORT}</div>}>
+            <button
+              type="button"
+              onClick={openVideo}
+              className="video-floating-button"
+              aria-label="Open featured video"
+              onMouseEnter={handleFloatingMouseEnter}
+              onMouseLeave={handleFloatingMouseLeave}
+            >
+              <div className="video-floating-thumb-wrap">
+                <Show
+                  when={thumbUrl()}
+                  fallback={<div className="video-floating-thumb video-floating-thumb-fallback" aria-hidden="true" />}
+                >
+                  <img className="video-floating-thumb" src={thumbUrl()} alt="" loading="lazy" />
+                </Show>
+              </div>
+            </button>
+          </Show>
+
+          <Toast
+            visible={toastVisible()}
+            message={toastMessage()}
+            type={toastType()}
+            onClose={() => setToastVisible(false)}
+          />
+        </div>
+      </Portal>
     </Show>
   );
 }
