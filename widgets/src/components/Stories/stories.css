@@ -30,7 +30,7 @@
   gap: var(--vdcrt-video-gap, 20px);
   overflow-x: auto;
   padding: 0.25rem 0 0.125rem;
-  scrollbar-width: thin;
+  /* scrollbar-width: thin; */
 }
 
 .video-story {

@@ -2,8 +2,6 @@
 import { createSignal, Show } from 'solid-js';
 import { render } from 'solid-js/web';
 import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
-import { Toast } from '../common/Toast/Toast';
-import { useToast } from '../../hooks/useToast';
 import {
   productsForVideo,
   productPrice,
@@ -95,8 +93,6 @@ export function getDeviceSettings() {
 
 export function VideoDiscovery({ videos, settings, layoutStyle = 'floating', showNavIcon: showNavIconProp }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
-  const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
-
   const deviceSettings = getDeviceSettings();
   if (!deviceSettings?.isVisible) return null;
 
@@ -114,7 +110,6 @@ export function VideoDiscovery({ videos, settings, layoutStyle = 'floating', sho
     feed: null,
     settings,
     onEvent: null,
-    showToast,
     source: 'discovery',
     isPreview: false,
   });
@@ -157,13 +152,6 @@ export function VideoDiscovery({ videos, settings, layoutStyle = 'floating', sho
           handleProductClick={handleProductClick}
           onVideoChange={() => {}}
           onFirstPlay={() => {}}
-        />
-
-        <Toast
-          visible={toastVisible()}
-          message={toastMessage()}
-          type={toastType()}
-          onClose={() => setToastVisible(false)}
         />
       </div>
     </Show>

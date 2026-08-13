@@ -1,0 +1,166 @@
+/* Add-to-cart button state machine — idle → loading → done | error.
+   Adapted from the "Activate Button" pattern: the label track is a 4-face
+   rotating cube and the icon disc hosts a dash-offset spinner. */
+
+.vc-atc {
+  --vc-atc-bg: #1a1a1a;
+  --vc-atc-fg: #fff;
+  --vc-atc-success: #3fdc75;
+  --vc-atc-error: #e2444b;
+  --vc-atc-line: 20px;  /* label line box; also sets the cube depth */
+  --vc-atc-ico: 18px;   /* icon slot; also the glyph slide distance */
+
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  cursor: pointer;
+  background: var(--vc-atc-bg);
+  color: var(--vc-atc-fg);
+  transition: transform 0.2s ease, background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.vc-atc:hover:not(:disabled) { box-shadow: 0 8px 24px rgb(0 0 0 / 15%); }
+.vc-atc:active:not(:disabled) { transform: scale(0.94); }
+.vc-atc:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Icon slot ─────────────────────────────────────────────────────────── */
+/* A plain clipping box the three cart icons slide through; the spinner ring
+   turns in the same space. No disc — a detailed cart needs the room. */
+.vc-atc-icon {
+  position: relative;
+  flex: none;
+  width: var(--vc-atc-ico);
+  height: var(--vc-atc-ico);
+  overflow: hidden;
+}
+
+.vc-atc-glyph {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  /* The icons paint with fill: currentColor, so they follow the button's
+     text colour through every state — the background is what changes. */
+  color: var(--vc-atc-fg);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+              opacity 0.3s ease;
+}
+
+.vc-atc-glyph svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.vc-atc-glyph--done,
+.vc-atc-glyph--error { transform: translateY(var(--vc-atc-ico)); }
+
+.vc-atc-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: var(--vc-atc-ico);
+  height: var(--vc-atc-ico);
+  fill: none;
+  stroke: var(--vc-atc-fg);
+  stroke-width: 1px;
+  /* r=7.5 → circumference 47.124; offset 2× keeps it invisible at rest. */
+  stroke-dasharray: 47.124;
+  stroke-dashoffset: 94.248;
+}
+
+/* ── Label cube ────────────────────────────────────────────────────────── */
+.vc-atc-labels {
+  /* Grid-stacked rather than the reference's fixed width: the idle label is
+     merchant-configurable, so the track has to size to its widest face. */
+  display: grid;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  height: var(--vc-atc-line);
+  line-height: var(--vc-atc-line);
+  text-align: center;
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+
+.vc-atc-labels li {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  backface-visibility: hidden;
+  transform-origin: 50% 50%;
+  /* Depth is half the line box, so faces meet on the horizontal centre axis. */
+  transform: rotateX(var(--vc-atc-face, 0deg)) translateZ(calc(var(--vc-atc-line) / 2));
+}
+
+.vc-atc-labels li:nth-child(2) { --vc-atc-face: -90deg; }
+.vc-atc-labels li:nth-child(3) { --vc-atc-face: -180deg; }
+.vc-atc-labels li:nth-child(4) { --vc-atc-face: -270deg; }
+
+/* ── Loading ───────────────────────────────────────────────────────────── */
+.vc-atc.is-loading { pointer-events: none; }
+.vc-atc.is-loading .vc-atc-labels { transform: rotateX(90deg); }
+
+.vc-atc.is-loading .vc-atc-glyph--idle { transform: translateY(calc(var(--vc-atc-ico) * -1)); }
+.vc-atc.is-loading .vc-atc-ring {
+  animation: vc-atc-turn 1.6s linear infinite forwards,
+             vc-atc-path 1.6s linear infinite forwards;
+}
+
+/* ── Terminal states ───────────────────────────────────────────────────── */
+.vc-atc.is-done,
+.vc-atc.is-error { pointer-events: none; }
+
+.vc-atc.is-done { background: var(--vc-atc-success); }
+.vc-atc.is-error { background: var(--vc-atc-error); }
+
+.vc-atc.is-done .vc-atc-labels { transform: rotateX(180deg); }
+.vc-atc.is-error .vc-atc-labels { transform: rotateX(270deg); }
+
+.vc-atc.is-done .vc-atc-ring,
+.vc-atc.is-error .vc-atc-ring { animation: none; }
+
+.vc-atc.is-done .vc-atc-glyph--idle,
+.vc-atc.is-error .vc-atc-glyph--idle { transform: translateY(calc(var(--vc-atc-ico) * -1)); }
+
+.vc-atc.is-done .vc-atc-glyph--done,
+.vc-atc.is-error .vc-atc-glyph--error {
+  transform: translateY(0);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.3s;
+}
+
+@keyframes vc-atc-turn { 100% { transform: rotate(360deg); } }
+@keyframes vc-atc-path { 100% { stroke-dashoffset: 0; } }
+
+/* ── Variants ──────────────────────────────────────────────────────────── */
+.vc-atc--primary {
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.vc-atc--compact {
+  --vc-atc-bg: var(--vdcrt-button-bg, #fff);
+  --vc-atc-fg: var(--vdcrt-button-color, #1a1a1a);
+  --vc-atc-line: 16px;
+  --vc-atc-ico: 14px;
+  gap: 6px;
+  padding: 5px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  border: 1px solid rgb(255 255 255 / 50%);
+  border-radius: 8px;
+}
+
+/* Colour and copy still change; only the motion is dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .vc-atc,
+  .vc-atc-glyph,
+  .vc-atc-labels { transition: none; }
+
+  .vc-atc-ring { animation: none !important; }
+  .vc-atc.is-loading .vc-atc-ring { stroke-dashoffset: 23.562; }
+  .vc-atc:active:not(:disabled) { transform: none; }
+}

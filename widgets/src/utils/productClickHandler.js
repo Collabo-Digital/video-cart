@@ -6,7 +6,6 @@ import {
     getProductHandle,
     // isAddToCartSuccess,
 } from './widgetHelpers';
-import { TOAST_ADDED, TOAST_ADD_FAILED } from '../constants/strings';
 import { WIDGET_SOURCES } from '../core/constant';
 import { setStorageItem, getStorageItem } from './storage';
 import { getVisitorId } from './session';
@@ -20,10 +19,11 @@ const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
  * @param {Object} opts.feed
  * @param {Object} opts.settings
  * @param {Function} opts.onEvent
- * @param {Function} opts.showToast
  * @param {'carousel'|'grid'|'floating'|'stories'} opts.source
+ * @returns {Function} handleProductClick — resolves true when the cart write
+ *   succeeded, false when it failed. AddToCartButton renders that outcome.
  */
-export function createProductClickHandler({ feed, settings, onEvent, showToast, source, isPreview }) {
+export function createProductClickHandler({ feed, settings, onEvent, source, isPreview }) {
     if (isPreview) return;
     const cartSource = WIDGET_SOURCES[source] || WIDGET_SOURCES.carousel;
 
@@ -65,7 +65,6 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
         }
 
         const behavior = feed?.settings?.general?.buttonBehavior;
-        console.log('productObj', product);
         if (behavior === BUTTON_BEHAVIOR_ADD_TO_CART) {
             const productObj = typeof product === 'object' ? product : { id: product };
             try {
@@ -120,7 +119,6 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
                 }
 
                 setStorageItem('atc_products', existing);
-                showToast(TOAST_ADDED, 'success');
 
                 // Fire-and-forget — don't block the UI for analytics
                 if (feed?.id) {
@@ -129,10 +127,10 @@ export function createProductClickHandler({ feed, settings, onEvent, showToast, 
                 if (feed?.id && video?.id) {
                     trackDbEvent({ feedId: feed.id, videoId: video.id, eventType: EVENT_TYPES.VIDEO_ATC });
                 }
+                return true;
             } catch {
-                showToast(TOAST_ADD_FAILED, 'error');
+                return false;
             }
-            return;
         }
 
         // Fire-and-forget — don't block navigation for analytics

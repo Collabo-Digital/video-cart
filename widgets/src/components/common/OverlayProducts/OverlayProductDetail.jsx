@@ -17,6 +17,7 @@ import {
 } from '../../../constants/strings';
 import { VariantSelector } from './VariantSelector';
 import { QuantityStepper } from './QuantityStepper';
+import { AddToCartButton } from '../AddToCartButton/AddToCartButton';
 import LeftToggleIcon from '../../../assets/Icons/LeftToggleIcon';
 
 const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
@@ -69,15 +70,14 @@ export function OverlayProductDetail({
   const description = () => htmlToText(model().description);
   const heroSrc = () => model().images[activeImageIndex()] ?? product.image ?? null;
 
-  const onPrimary = (e) => {
-    e.preventDefault();
-    if (soldOut()) return;
+  // Returns the handler's promise so the button can render the cart outcome.
+  const onPrimary = () => {
+    if (soldOut()) return false;
     // handleProductClick is undefined in preview mode — always call it optionally.
     if (!isAddToCart()) {
-      handleProductClick?.(product, video);
-      return;
+      return handleProductClick?.(product, video);
     }
-    handleProductClick?.(product, video, {
+    return handleProductClick?.(product, video, {
       intent: 'add',
       variantId: matched()?.id ?? getVariantId(product),
       quantity: quantity(),
@@ -159,17 +159,15 @@ export function OverlayProductDetail({
         <Show when={isAddToCart()}>
           <QuantityStepper quantity={quantity} setQuantity={setQuantity} />
         </Show>
-        <button
-          type="button"
+        <AddToCartButton
           className="video-carousel-overlay-pdetail-atc"
-          // Inline, not a CSS var: the overlay is portalled outside the container
-          // where designStyles.js sets --vdcrt-*.
-          style={addToCartButtonStyle()}
-          disabled={soldOut()}
-          onClick={onPrimary}
-        >
-          {soldOut() ? LABEL_SOLD_OUT : isAddToCart() ? addToCartButtonLabel() : LABEL_VIEW_PRODUCT}
-        </button>
+          variant="primary"
+          label={() => (isAddToCart() ? addToCartButtonLabel() : LABEL_VIEW_PRODUCT)}
+          disabledLabel={LABEL_SOLD_OUT}
+          disabled={soldOut}
+          style={addToCartButtonStyle}
+          onAdd={handleProductClick ? onPrimary : undefined}
+        />
       </div>
 
       <Show when={description()}>

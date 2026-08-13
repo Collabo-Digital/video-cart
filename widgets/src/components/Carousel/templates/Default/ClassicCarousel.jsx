@@ -5,11 +5,9 @@ import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../../../shared/mux'
 import { EVENT_TYPES } from '../../../../api/services/analyticsService';
 import { ProductOverlay } from '../../../common/ProductOverlay/ProductOverlay';
 import { VideoOverlayPlayer } from '../../../common/VideoOverlayPlayer';
-import { Toast } from '../../../common/Toast/Toast';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../../../utils/designStyles';
 import { trackDbEvent } from '../../../../utils/analytics';
 import { observeWidgetImpression, trackVideoImpressionOnce } from '../../../../utils/impressionTracker';
-import { useToast } from '../../../../hooks/useToast';
 import {
   productsForVideo,
   productPrice,
@@ -44,8 +42,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
   // merchant controls the gap, so neither can be hardcoded.
   const [perView, setPerView] = createSignal(0);
 
-  const { showToast, toastVisible, toastMessage, toastType, setToastVisible } = useToast();
-
   const design = settings?.design ?? feed?.settings?.design;
   const uniqueClass = getUniqueClassIdentifier(design);
   const hoverEffect = () =>  design?.hoverEffect  || 'lift'    ;
@@ -61,7 +57,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     feed,
     settings,
     onEvent,
-    showToast,
     source: 'carousel',
     isPreview,
   });
@@ -423,14 +418,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
       <Show when={!videos?.length}>
         <p className="video-carousel-empty">{EMPTY_VIDEOS}</p>
       </Show>
-
-      <Toast
-        visible={toastVisible()}
-        message={toastMessage()}
-        type={toastType()}
-        onClose={() => setToastVisible(false)}
-      />
-
     </div>
   );
 }
