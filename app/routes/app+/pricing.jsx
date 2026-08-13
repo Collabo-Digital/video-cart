@@ -3,7 +3,7 @@ import { useLoaderData, useRevalidator } from "react-router";
 
 import { authenticate } from "../../config/shopify.server";
 import { PricingCard } from "../../components/Pricing/Pricing";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 import { toClientShop } from "../../lib/dto/shop";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import {
@@ -31,11 +31,17 @@ export const loader = async ({ request }) => {
       const planName = billingCheck?.appSubscriptions?.[0]?.name ?? "Free";
       
       if (planName && session.shop) {
+        // Merge into existing planLimits so upgrade/downgrade only changes
+        // the limit numbers — never wipe resetDate / monthly view usage.
+        const existingPlanLimits = shopData?.planLimits ?? {};
+        const planKey = planName.toLowerCase();
+
         shopData = await ShopModel.updateByDomain(session.shop, {
           appPlan: planName,
           planLimits: {
-            videoViewLimit: VIDEO_VIEW_LIMITS[planName.toLowerCase()],
-            videoUploadLimit: VIDEO_UPLOAD_LIMITS[planName.toLowerCase()],
+            ...existingPlanLimits,
+            videoViewLimit: VIDEO_VIEW_LIMITS[planKey],
+            videoUploadLimit: VIDEO_UPLOAD_LIMITS[planKey],
           },
         });
       }

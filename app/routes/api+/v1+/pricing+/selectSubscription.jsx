@@ -1,5 +1,4 @@
 import { authenticate } from "../../../../config/shopify.server";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
 import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse";
 
 

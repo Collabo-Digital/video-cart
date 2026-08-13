@@ -278,7 +278,14 @@ export async function findAllPaginatedWithWidgets(shopDomain, filters = {}) {
   // }
 
   if (search && typeof search === 'string' && search.trim()) {
-    where.title = { contains: search.trim(), mode: 'insensitive' };
+    const term = search.trim();
+    // Search BOTH fields. The merchant sees fileName, and renaming a video
+    // updates only fileName — title keeps its upload-time value forever, so
+    // matching on title alone misses every video that has ever been renamed.
+    where.OR = [
+      { fileName: { contains: term, mode: 'insensitive' } },
+      { title: { contains: term, mode: 'insensitive' } },
+    ];
   }
 
   if (status && typeof status === 'string' && status.trim()) {

@@ -6,6 +6,7 @@
 
 import { apiClient } from '../client';
 import { ENDPOINTS } from '../endpoints';
+import { getVisitorId, getSessionId } from '../../utils/session';
 
 export const EVENT_TYPES = {
   // Widget-level
@@ -53,13 +54,42 @@ export async function recordEvent({
   if (salesAmount != null) params.set('salesAmount', String(salesAmount));
   if (revenueAmount != null) params.set('revenueAmount', String(revenueAmount));
   if (orderCount != null) params.set('orderCount', String(orderCount));
+  // Anonymous visitor/session ids — used server-side for bot/rate-limit keying
+  // and future unique-visitor metrics.
+  params.set('vid', getVisitorId());
+  params.set('sid', getSessionId());
 
   const url = `${ENDPOINTS.ANALYTICS_EVENT}?${params.toString()}`;
   const res = await apiClient.get(url);
   return res;
 }
 
+/**
+ * Record an ATC attribution intent keyed by the Shopify cart token. The
+ * orders/create webhook joins on the order's cart_token server-side, so no
+ * properties ever touch the cart or order.
+ * @param {Object} params
+ * @param {string} params.cartToken
+ * @param {string|number} params.productId
+ * @param {string} [params.variantId]
+ * @param {number} [params.quantity]
+ * @param {string} params.feedId
+ * @param {string} params.videoId
+ */
+export async function recordAtcIntent({ cartToken, productId, variantId, quantity, feedId, videoId }) {
+  return apiClient.post(ENDPOINTS.ATC_INTENT, {
+    cartToken,
+    productId,
+    variantId,
+    quantity,
+    feedId,
+    videoId,
+    visitorId: getVisitorId(),
+  });
+}
+
 export const analyticsService = {
   recordEvent,
+  recordAtcIntent,
   EVENT_TYPES,
 };

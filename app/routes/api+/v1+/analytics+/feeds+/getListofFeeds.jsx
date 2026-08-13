@@ -1,6 +1,6 @@
 import { authenticate } from "../../../../../config/shopify.server";
 import { getListofFeedsWithAnalytics } from "../../../../../models/feedAnalytics.server";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from '../../../../../lib/utils/apiResponse.js';
 
 export const action = async ({ request }) => {

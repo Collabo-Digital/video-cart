@@ -57,6 +57,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
   analytics.subscribe("checkout_completed", (event) => {
     const checkout = event.data.checkout;
     const backendUrl = settings?.apiBaseUrl || 'https://video-cart.vercel.app';
+    // const backendUrl = 'https://bands-catalogs-attacked-organized.trycloudflare.com';
 
     console.log('checkout ----->', checkout);
 
@@ -94,6 +95,7 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
 
 
       if (!backendUrl) return;
+      console.log('[Video Cart Pixel] Sending conversion to backend:', backendUrl, videoItems);
 
       fetch(`${backendUrl}/api/v1/analytics/conversion`, {
         method: 'POST',
@@ -102,6 +104,8 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
           shop: event.context.document.location.hostname,
           order_id: checkout.order?.id,
           order_number: checkout.order?.orderNumber,
+          checkout_token: checkout.token,
+          currency: checkout.currencyCode,
           items: videoItems,
           total_revenue: videoItems.reduce((sum, item) => sum + item.line_total, 0),
           timestamp: Date.now(),
@@ -114,19 +118,29 @@ register(({ analytics, browser, settings }) => {  // ← Add 'settings' paramete
         .catch((e) => {
           console.error('[Video Cart Pixel] Conversion error:', e);
         })
-        .finally(() => {
-          browser.localStorage.removeItem('vdcrt_atc_products');
+        .finally(async () => {
+          // Selective cleanup: drop entries for products in THIS order (they
+          // served their purpose) and entries older than the attribution
+          // window; keep the rest so a later purchase still attributes.
+          try {
+            const raw = await browser.localStorage.getItem('vdcrt_atc_products');
+            const all = raw ? JSON.parse(raw) : [];
+            const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+            const orderedIds = new Set(videoItems.map((i) => String(i.product_id)));
+            const keep = all.filter(
+              (a) => !orderedIds.has(String(a.product_id)) && Date.now() - (a.timestamp || 0) < THIRTY_DAYS
+            );
+            if (keep.length) {
+              await browser.localStorage.setItem('vdcrt_atc_products', JSON.stringify(keep));
+            } else {
+              await browser.localStorage.removeItem('vdcrt_atc_products');
+            }
+          } catch {
+            // best effort — worst case behaves like the old full wipe did
+          }
         });
     });
 
-    fetch(`${backendUrl}/api/v1/analytics/orderGenerated`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        shop: event.context.document.location.hostname,
-        order: checkout?.order || null,
-      }),
-    });
   });
 
   console.log('[Video Cart Pixel] Ready');

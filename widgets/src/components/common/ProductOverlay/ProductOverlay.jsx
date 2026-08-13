@@ -4,6 +4,7 @@ import { productsForVideo } from '../../../utils/widgetHelpers';
 import { useLiveProduct } from '../../../hooks/useLiveProduct';
 import { LABEL_SOLD_OUT } from '../../../constants/strings';
 import { PRODUCT_ITEM_GAP } from '../../../core/constant';
+import { AddToCartButton } from '../AddToCartButton/AddToCartButton';
 import LeftToggleIcon from '../../../assets/Icons/LeftToggleIcon';
 import RightToggleIcon from '../../../assets/Icons/RightToggleIcon';
 import './productOverlay.css';
@@ -29,19 +30,15 @@ function ProductItem({ product, video, addToCartButtonLabel, addToCartButtonStyl
               {price()}
             </span>
           </Show>
-          <button
-            type="button"
+          <AddToCartButton
             className="vd-product-overlay-item-button"
-            style={addToCartButtonStyle()}
-            disabled={!available()}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!available()) return;
-              onProductClick(product, video);
-            }}
-          >
-            {available() ? addToCartButtonLabel() : LABEL_SOLD_OUT}
-          </button>
+            variant="compact"
+            label={addToCartButtonLabel}
+            disabledLabel={LABEL_SOLD_OUT}
+            disabled={() => !available()}
+            style={addToCartButtonStyle}
+            onAdd={onProductClick ? () => onProductClick(product, video) : undefined}
+          />
         </div>
       </div>
     </div>

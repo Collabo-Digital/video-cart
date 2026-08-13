@@ -26,10 +26,11 @@ import { onCLS, onINP, onLCP } from "web-vitals";
 import { authenticate } from "../../config/shopify.server";
 import { VideoLibraryIcon } from "../../components/Icons/VideoLibrary/VideoLibrary";
 import useLocalStorage from "../../lib/hooks/useLocalStorage";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse";
 import * as VideoModel from "../../models/video.server";
 import { getWidgetsFromVideo, truncateName, buildFiltersPayload, parseSortSelected } from "../../lib/utils/common";
+import { getVideoThumbnailUrl } from "../../lib/utils/videoThumbnail";
 import { PER_PAGE, BADGE_LIMIT, DEBOUNCE_MS, TABLE_HEADINGS, SORT_OPTIONS, EMPTY_STATE_IMAGE } from "../../lib/constants/video";
 import { fetchVideos } from "../../lib/utils/api/videosApi";
 
@@ -152,7 +153,9 @@ function VideoRow({ video, index, selectedResources, onDeleteClick, onViewAnalyt
     >
       <IndexTable.Cell>
         <Avatar
-          source={`https://image.mux.com/${video.videoPlaybackId}/thumbnail.webp`}
+          // Omitted, never empty: an empty source still counts as a failed load,
+          // so Avatar would flash a broken image before falling back to initials.
+          source={getVideoThumbnailUrl(video, { width: 80 }) ?? undefined}
           initials={video.title?.slice(0, 2) ?? "??"}
         />
       </IndexTable.Cell>

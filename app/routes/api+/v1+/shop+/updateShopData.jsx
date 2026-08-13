@@ -1,6 +1,6 @@
 import { authenticate } from "../../../../config/shopify.server";
 import { findByDomain, updateByDomain } from "../../../../models/shop.server";
-import { captureRouteError } from "~/lib/utils/observability/errorCapture";
+import { captureRouteError } from "../../../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from "../../../../lib/utils/apiResponse.js";
 export const action = async ({ request }) => {
     const { session } = await authenticate.admin(request);

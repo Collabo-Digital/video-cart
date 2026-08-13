@@ -334,22 +334,10 @@
   margin: 0;
 }
 
+/* Layout only — the visuals belong to .vc-atc, which needs to be able to
+   repaint the button for its done/error states. */
 .video-carousel-overlay-pdetail-atc {
   flex: 1;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  background: #1a1a1a;
-  border: none;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.video-carousel-overlay-pdetail-atc:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .video-carousel-overlay-pdetail-desc {

@@ -2,8 +2,11 @@
 
 client_id = "46a6333228dbe822d3cad6e6ecaaa25c"
 name = "video-cart"
-application_url = "https://qhvkwtn5-3000.inc1.devtunnels.ms"
+application_url = "https://dsc-frederick-nightlife-smell.trycloudflare.com"
 embedded = true
+
+[build]
+automatically_update_urls_on_dev = true
 
 [webhooks]
 api_version = "2026-04"
@@ -16,17 +19,18 @@ api_version = "2026-04"
   topics = [ "app/scopes_update" ]
   uri = "/webhooks/app/scopes_update"
 
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_customer_events,write_app_proxy,write_pixels,write_products"
+scopes = "read_customer_events,read_orders,write_app_proxy,write_pixels,write_products"
 
 [auth]
-redirect_urls = [ "https://qhvkwtn5-3000.inc1.devtunnels.ms/api/auth" ]
+redirect_urls = [ "https://dsc-frederick-nightlife-smell.trycloudflare.com/api/auth" ]
 
 [app_proxy]
-url = "https://qhvkwtn5-3000.inc1.devtunnels.ms/proxy"
+url = "https://dsc-frederick-nightlife-smell.trycloudflare.com/proxy"
 subpath = "video-widget"
 prefix = "apps"
-
-[build]
-automatically_update_urls_on_dev = true

@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 import {
+  Banner,
   Text,
   TextField,
   BlockStack,
@@ -7,56 +8,82 @@ import {
   Box,
   Spinner,
   EmptyState,
-  Pagination,
   Checkbox,
   Button,
 } from "@shopify/polaris";
 import { SearchIcon } from "@shopify/polaris-icons";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const PER_PAGE = 12;
+import { getVideoThumbnailUrl } from "../../lib/utils/videoThumbnail";
+
+const PER_PAGE = 2;
+const GRID_MAX_HEIGHT = "60vh";
+// Card width. Lower = smaller cards and more per row. The grid packs as many
+// columns as fit rather than forcing exactly four, so cards hold this size
+// instead of stretching to fill a wide modal.
+const CARD_MIN_WIDTH = 150;
 const MODAL_ID = "upload-from-library-modal";
+
+/**
+ * The library API returns raw Video rows. The display name is fileName, with
+ * title as the fallback — there is no `videoName` field on the model, which is
+ * why every card used to read "Untitled".
+ */
+const videoDisplayName = (video) => video?.fileName || video?.title || "";
 
 /**
  * Converts a library video (from API list) to the shape expected by the feed editor.
  */
 function libraryVideoToFeedVideo(video) {
+  // Deliberately not defaulting to "Untitled" — this value can reach the DB via
+  // the feed save, and a placeholder must never be persisted as a real name.
+  const name = videoDisplayName(video) || undefined;
   return {
     id: video.id,
     videoId: video.id,
     playbackId: video.videoPlaybackId,
     uploadId: video.videoUploadId,
-    fileName: video.videoName,
-    fileUploadName: video.fileUploadName ?? video.videoName ?? undefined,
-    title: video.videoName,
+    fileName: name,
+    fileUploadName: video.fileUploadName ?? name,
+    title: name,
     taggedProducts: [],
   };
 }
 
 function VideoCard({ video, isSelected, onToggle }) {
-  const thumbUrl = video.videoPlaybackId
-    ? `https://image.mux.com/${video.videoPlaybackId}/thumbnail.webp?width=400&fit_mode=smartcrop`
-    : "";
+  const name = videoDisplayName(video) || "Untitled";
+  // Status is only a hint: a library row can carry a stale PROCESSING (in dev
+  // the Mux webhook never lands), so try Mux anyway and let a genuine 412 fall
+  // through to the placeholder.
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const thumbUrl = thumbFailed
+    ? null
+    // 2x the card width — enough for retina without fetching four times the
+    // pixels the card can actually show.
+    : getVideoThumbnailUrl(video, { width: CARD_MIN_WIDTH * 2, ignoreStatus: true });
 
   return (
     <div
-      onClick={() => onToggle(video.id)}
+      onClick={() => onToggle(video)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onToggle(video.id);
+          onToggle(video);
         }
       }}
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
-      aria-label={`${video.videoName || "Video"}${isSelected ? ", selected" : ""}`}
+      aria-label={`${name}${isSelected ? ", selected" : ""}`}
       style={{
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
         gap: "8px",
         outline: "none",
+        // Grid items default to min-width:auto (min-content), so a long
+        // unbreakable filename would widen the whole column.
+        minWidth: 0,
       }}
     >
       {/* Thumbnail container */}
@@ -75,7 +102,11 @@ function VideoCard({ video, isSelected, onToggle }) {
         {thumbUrl ? (
           <img
             src={thumbUrl}
-            alt={video.videoName || "Video"}
+            alt={name}
+            // Infinite scroll can accumulate hundreds of cards; without this
+            // every offscreen thumbnail is fetched and decoded into memory.
+            loading="lazy"
+            onError={() => setThumbFailed(true)}
             style={{
               width: "100%",
               height: "100%",
@@ -100,8 +131,11 @@ function VideoCard({ video, isSelected, onToggle }) {
           </div>
         )}
 
-        {/* Checkbox overlay — top-left */}
+        {/* Purely decorative — the card itself is the control. aria-hidden and
+            tabIndex -1 because pointer-events only blocks the mouse: without
+            them every card contributes a keyboard tab stop that does nothing. */}
         <div
+          aria-hidden="true"
           style={{
             position: "absolute",
             top: "8px",
@@ -113,7 +147,6 @@ function VideoCard({ video, isSelected, onToggle }) {
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-            // Prevent the card's onClick from double-firing via the checkbox's own onChange
             pointerEvents: "none",
           }}
         >
@@ -121,14 +154,15 @@ function VideoCard({ video, isSelected, onToggle }) {
             label=""
             labelHidden
             checked={isSelected}
-            onChange={() => {}} // handled by card click
+            onChange={() => {}}
+            tabIndex={-1}
           />
         </div>
       </div>
 
       {/* Title */}
       <Text as="span" variant="bodySm" truncate>
-        {video.videoName || "Untitled"}
+        {name}
       </Text>
     </div>
   );
@@ -136,34 +170,91 @@ function VideoCard({ video, isSelected, onToggle }) {
 
 export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
   const modalRef = useRef(null);
+  // Node state, not refs: refs attach bottom-up (child before parent), so
+  // reading a parent ref inside a child's callback ref sees null. State also
+  // makes the observer effect re-run when the grid remounts after a search.
+  const [rootEl, setRootEl] = useState(null);
+  const [sentinelEl, setSentinelEl] = useState(null);
+
+  const inFlightRef = useRef(false);
+  const abortRef = useRef(null);
+
   const [videos, setVideos] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasNext, setHasNext] = useState(false);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
+  // Map, not a Set of ids: a search REPLACES `videos`, so ids alone leave us
+  // unable to resolve anything selected before the search.
+  const [selected, setSelected] = useState(() => new Map());
 
-  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
+  /**
+   * @param {Object} [opts]
+   * @param {string} [opts.searchTerm]
+   * @param {string|null} [opts.cursor] - omit to start a fresh list, pass to append
+   */
+  const fetchVideos = useCallback(async ({ searchTerm = "", cursor = null } = {}) => {
+    const isAppend = Boolean(cursor);
 
-  const fetchVideos = useCallback(async (searchTerm = "") => {
-    setLoading(true);
+    // Scroll-triggered appends must not stampede, but a user-initiated search
+    // must never be swallowed — so appends bail when busy, searches supersede.
+    if (isAppend && inFlightRef.current) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    inFlightRef.current = true;
+
+    if (isAppend) setLoadingMore(true);
+    else setLoading(true);
+    setError(null);
+
     try {
       const res = await fetch(`/api/v1/videos/filter`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ filters: { search: searchTerm.trim() } }),
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        // take and cursor are required: the endpoint is cursor-based and
+        // defaults to 5 rows, which is why the picker stopped at 5 videos.
+        body: JSON.stringify({
+          filters: {
+            search: searchTerm.trim(),
+            take: PER_PAGE,
+            ...(cursor ? { cursor, direction: "next" } : {}),
+          },
+        }),
       });
-      const payload = await res.json();
-      if (payload.success) {
-        setVideos(payload.data?.videosData?.videos ?? []);
-        setTotal(payload.data?.total ?? 0);
-        setLoading(false);
+
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload?.success) {
+        throw new Error(payload?.error || `Could not load videos (${res.status})`);
       }
+
+      const data = payload.data?.videosData ?? {};
+      const batch = data.videos ?? [];
+      setVideos((prev) => (isAppend ? [...prev, ...batch] : batch));
+      setNextCursor(data.nextCursor ?? null);
+      setHasNext(Boolean(data.hasNext));
     } catch (err) {
+      // Superseded by a newer request, which now owns the state — say nothing.
+      if (err.name === "AbortError") return;
       console.error("Library fetch error:", err);
+      // Previously loading was cleared only inside `if (payload.success)`, so
+      // any failure left the modal spinning on "Loading…" forever.
+      setError(err.message || "Could not load your video library.");
+      if (!isAppend) setVideos([]);
+    } finally {
+      // Only the current request may clear the flags; a superseded one would
+      // otherwise release the lock belonging to the request that replaced it.
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        inFlightRef.current = false;
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }, []);
 
@@ -172,21 +263,30 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
     if (!el) return;
     if (open) {
       el.showOverlay?.();
-      setPage(1);
       setSearch("");
       setSearchInput("");
-      setSelectedIds(new Set());
-      fetchVideos("");
+      setSelected(new Map());
+      setNextCursor(null);
+      setHasNext(false);
+      fetchVideos({ searchTerm: "" });
     } else {
       el.hideOverlay?.();
+      // This component is rendered unconditionally by VideoUploader and never
+      // unmounts, so without this every video ever scrolled past stays resident
+      // for the life of the page.
+      setVideos([]);
+      setNextCursor(null);
+      setHasNext(false);
     }
   }, [open, fetchVideos]);
 
   useEffect(() => {
     const el = modalRef.current;
     if (!el) return;
+    // Single source of truth for teardown: hideOverlay() dispatches 'afterhide',
+    // so callers must not also clear state and call onClose themselves.
     const handleAfterHide = () => {
-      setSelectedIds(new Set());
+      setSelected(new Map());
       onClose?.();
     };
     el.addEventListener("afterhide", handleAfterHide);
@@ -195,62 +295,82 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
 
   const handleSearchSubmit = useCallback(() => {
     setSearch(searchInput);
-    setPage(1);
-    fetchVideos(searchInput);
+    fetchVideos({ searchTerm: searchInput });
   }, [searchInput, fetchVideos]);
 
-  const handlePageChange = useCallback(
-    (newPage) => {
-      setPage(newPage);
-      fetchVideos(search);
-    },
-    [search, fetchVideos]
-  );
+  const handleLoadMore = useCallback(() => {
+    if (!nextCursor) return;
+    fetchVideos({ searchTerm: search, cursor: nextCursor });
+  }, [nextCursor, search, fetchVideos]);
 
-  const toggleSelect = useCallback((id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  // Keeps the observer callback current without rebuilding the observer — it
+  // captures its callback at registration, so a plain closure would go stale.
+  const loadMoreRef = useRef(handleLoadMore);
+  useEffect(() => {
+    loadMoreRef.current = handleLoadMore;
+  });
+
+  // Infinite scroll. Keyed on the NODES so it re-attaches whenever the grid
+  // remounts, and so `root` is guaranteed non-null (a null root silently falls
+  // back to the viewport, which measures the wrong box).
+  useEffect(() => {
+    if (!rootEl || !sentinelEl) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMoreRef.current?.();
+      },
+      // Fire a little before the true bottom so the next batch is usually
+      // already there by the time the merchant reaches it.
+      { root: rootEl, rootMargin: "200px" },
+    );
+    observer.observe(sentinelEl);
+    return () => observer.disconnect();
+    // videos.length matters: IntersectionObserver reports TRANSITIONS, not
+    // state. After a batch is appended the sentinel is usually STILL visible,
+    // which produces no new callback — so without re-registering here, loading
+    // stalls as soon as one batch fails to fill the container, and the rest of
+    // the library becomes unreachable.
+  }, [rootEl, sentinelEl, videos.length]);
+
+  // A new search replaces the list, so return to the top.
+  useEffect(() => {
+    rootEl?.scrollTo({ top: 0 });
+  }, [search, rootEl]);
+
+  const toggleSelect = useCallback((video) => {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(video.id)) next.delete(video.id);
+      else next.set(video.id, video);
       return next;
     });
   }, []);
 
-  // "Select all remaining" = select all videos on the current page
-  // that are not yet selected. If all are selected, deselect all.
   const allCurrentSelected =
-    videos.length > 0 && videos.every((v) => selectedIds.has(v.id));
+    videos.length > 0 && videos.every((v) => selected.has(v.id));
 
   const handleSelectAll = useCallback(() => {
-    if (allCurrentSelected) {
-      // Deselect all on current page
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        videos.forEach((v) => next.delete(v.id));
-        return next;
-      });
-    } else {
-      // Select all on current page
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        videos.forEach((v) => next.add(v.id));
-        return next;
-      });
-    }
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (allCurrentSelected) videos.forEach((v) => next.delete(v.id));
+      else videos.forEach((v) => next.set(v.id, v));
+      return next;
+    });
   }, [allCurrentSelected, videos]);
 
   const handleAddSelected = useCallback(() => {
-    const selected = videos.filter((v) => selectedIds.has(v.id));
-    const feedVideos = selected.map((v) => libraryVideoToFeedVideo(v));
+    // Values come from the Map, so videos selected before a search are included
+    // even though they are no longer in the visible list.
+    const feedVideos = [...selected.values()].map((v) => libraryVideoToFeedVideo(v));
     if (feedVideos.length > 0) {
       onSelected?.(feedVideos);
     }
-    setSelectedIds(new Set());
+    // hideOverlay fires 'afterhide', which clears selection and calls onClose —
+    // doing either here as well would run both twice.
     modalRef.current?.hideOverlay?.();
-    onClose?.();
-  }, [videos, selectedIds, onSelected, onClose]);
+  }, [selected, onSelected]);
 
-  const isImportDisabled = selectedIds.size === 0;
+  const isImportDisabled = selected.size === 0;
 
   return (
     <s-modal
@@ -261,8 +381,8 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
     >
       <BlockStack gap="400">
         {/* Search bar */}
-          <InlineStack gap="300" align="center" blockAlign="center">
-            <TextField
+        <InlineStack gap="300" align="center" blockAlign="center">
+          <TextField
             label="Search"
             labelHidden
             value={searchInput}
@@ -273,85 +393,103 @@ export default function UploadFromLibraryModal({ open, onClose, onSelected }) {
             onClearButtonClick={() => {
               setSearchInput("");
               setSearch("");
-              setPage(1);
-              fetchVideos("");
+              fetchVideos({ searchTerm: "" });
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") handleSearchSubmit();
             }}
           />
           <Button variant="primary" icon={SearchIcon} onClick={handleSearchSubmit} />
-          </InlineStack>
+        </InlineStack>
 
-          {loading ? (
-            <Box padding="800">
-              <InlineStack gap="300" blockAlign="center">
-                <Spinner size="small" />
-                <Text as="span" tone="subdued">
-                  Loading…
-                </Text>
-              </InlineStack>
-            </Box>
-          ) : videos.length === 0 ? (
-            <EmptyState
-              heading={
-                search ? "No videos match your search" : "No videos in library"
-              }
-              image="/search-not-found.svg"
-            >
-              <Text as="p" variant="bodyMd" tone="subdued">
-                {search
-                  ? "Try a different search term."
-                  : "Upload or import videos first, then they'll appear here."}
+        {error && (
+          <Banner tone="critical" onDismiss={() => setError(null)}>
+            {error}
+          </Banner>
+        )}
+
+        {/* Selections survive a search, so they would otherwise be invisible
+            once the merchant searches away from them. */}
+        {selected.size > 0 && (
+          <Text as="p" variant="bodySm" tone="subdued">
+            {selected.size} selected
+          </Text>
+        )}
+
+        {loading ? (
+          <Box padding="800">
+            <InlineStack gap="300" blockAlign="center">
+              <Spinner size="small" />
+              <Text as="span" tone="subdued">
+                Loading…
               </Text>
-            </EmptyState>
-          ) : (
-            <>
-              {/* Select all remaining */}
-              <Box>
-                <Checkbox
-                  label="Select all remaining videos"
-                  checked={allCurrentSelected}
-                  onChange={handleSelectAll}
+            </InlineStack>
+          </Box>
+        ) : videos.length === 0 ? (
+          <EmptyState
+            heading={
+              search ? "No videos match your search" : "No videos in library"
+            }
+            image="/search-not-found.svg"
+          >
+            <Text as="p" variant="bodyMd" tone="subdued">
+              {search
+                ? "Try a different search term."
+                : "Upload or import videos first, then they'll appear here."}
+            </Text>
+          </EmptyState>
+        ) : (
+          <>
+            <Box>
+              <Checkbox
+                label="Select all loaded videos"
+                checked={allCurrentSelected}
+                onChange={handleSelectAll}
+              />
+            </Box>
+
+            {/* Video grid — its own scroll container */}
+            <div
+              ref={setRootEl}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(auto-fill, minmax(${CARD_MIN_WIDTH}px, 1fr))`,
+                gap: "12px",
+                // maxHeight is what makes overflowY meaningful — without it the
+                // grid grows to fit its content and never scrolls.
+                maxHeight: GRID_MAX_HEIGHT,
+                overflowY: "auto",
+              }}
+            >
+              {videos.map((video) => (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  isSelected={selected.has(video.id)}
+                  onToggle={toggleSelect}
                 />
-              </Box>
+              ))}
 
-              {/* Video grid — 4-across layout matching the screenshot */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(4, 1fr)",
-                  gap: "16px",
-                  minHeight: "320px",
-                  overflowY: "auto",
-                }}
-              >
-                {videos.map((video) => (
-                  <VideoCard
-                    key={video.id}
-                    video={video}
-                    isSelected={selectedIds.has(video.id)}
-                    onToggle={toggleSelect}
-                  />
-                ))}
-              </div>
-
-              {totalPages > 1 && (
-                <InlineStack align="center" blockAlign="center" gap="300">
-                  <Pagination
-                    hasPrevious={page > 1}
-                    onPrevious={() => handlePageChange(page - 1)}
-                    hasNext={page < totalPages}
-                    onNext={() => handlePageChange(page + 1)}
-                    label={`Page ${page} of ${totalPages}`}
-                  />
-                  <Text as="span" variant="bodySm" tone="subdued">
-                    {total} video{total !== 1 ? "s" : ""}
-                  </Text>
-                </InlineStack>
+              {hasNext && (
+                <div
+                  ref={setSentinelEl}
+                  // Spans the full row so it is reliably crossed on scroll
+                  // rather than sitting in one narrow column.
+                  style={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    justifyContent: "center",
+                    padding: "16px",
+                  }}
+                >
+                  {loadingMore && (
+                    <Spinner size="small" accessibilityLabel="Loading more videos" />
+                  )}
+                </div>
               )}
-            </>
-          )}
+            </div>
+          </>
+        )}
       </BlockStack>
 
       <s-button

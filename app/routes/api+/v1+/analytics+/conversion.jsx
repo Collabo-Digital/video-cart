@@ -70,17 +70,37 @@ export const action = async ({ request }) => {
     }
 
     const items = Array.isArray(body?.items) ? body.items : [];
-    const orderId = (typeof body?.orderId === "string" ? body.orderId : body?.order_id)?.trim() || null;
+    // The pixel's checkout.order.id arrives as a bare numeric string (e.g.
+    // "7196559180055") while the orders/create webhook uses the full GID —
+    // normalize both to the GID form so the two paths share one row key.
+    // Anything else is junk or a spoof attempt → treated as "no id" so it
+    // can't squat a real order's row identity (the endpoint is public).
+    const rawOrderId = body?.orderId ?? body?.order_id;
+    const orderIdStr = rawOrderId != null ? String(rawOrderId).trim() : "";
+    const orderId = /^gid:\/\/shopify\/Order\/\d+$/.test(orderIdStr)
+      ? orderIdStr
+      : /^\d+$/.test(orderIdStr)
+        ? `gid://shopify/Order/${orderIdStr}`
+        : null;
     const orderNumber = (typeof body?.orderNumber === "string" ? body.orderNumber : body?.order_number) != null ? String(body.orderNumber ?? body.order_number).trim() || null : null;
     const currency = (typeof body?.currency === "string" ? body.currency : null)?.trim() || null;
+    const checkoutToken = (typeof body?.checkout_token === "string" ? body.checkout_token : null)?.trim() || null;
 
 
     if (items.length === 0) {
       return Response.json({ success: true, recorded: 0 }, { status: 200, headers: JSON_HEADERS });
     }
 
-    await upsertOrderWithItems(shop, orderId, orderNumber, items, currency);
-    await recordConversionFromPixel(shop, items);
+    // Counters bump only when the order is NEW. The order table is idempotent
+    // on orderId, but recordConversionFromPixel is a blind increment — without
+    // this gate a replayed checkout_completed double-counts feed/video
+    // orders and revenue while the orders table stays correct.
+    // overwrite: false — if the orders/create webhook already recorded this
+    // order (authoritative data), a late pixel event must not degrade it.
+    const { existed } = await upsertOrderWithItems(shop, orderId, orderNumber, items, currency, { overwrite: false, checkoutToken });
+    if (!existed) {
+      await recordConversionFromPixel(shop, items);
+    }
 
     return Response.json(
       { success: true, recorded: items.length },

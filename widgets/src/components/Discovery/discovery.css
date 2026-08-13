@@ -8,10 +8,12 @@
   align-items: center;
 }
 
-.vc-discovery-nav-item {
+/* Both the <li> wrapper and the bare mount used everywhere else need to
+   inherit the theme's nav typography. */
+.vc-discovery-nav-item,
+.vc-discovery-nav-host {
   display: flex;
   align-items: center;
-  list-style: none;
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
@@ -19,7 +21,12 @@
   color: inherit;
 }
 
-.vc-discovery-nav-item .vc-discovery-inline {
+.vc-discovery-nav-item {
+  list-style: none;
+}
+
+.vc-discovery-nav-item .vc-discovery-inline,
+.vc-discovery-nav-host .vc-discovery-inline {
   margin-left: 0;
 }
 

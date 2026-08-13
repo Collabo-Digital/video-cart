@@ -1,8 +1,10 @@
 export const DEFAULT_ADD_TO_CART = 'Check this out';
 export const LABEL_SOLD_OUT = 'Sold out';
 
-export const TOAST_ADDED = 'Added to cart';
-export const TOAST_ADD_FAILED = 'Could not add to cart';
+/** Add-to-cart button faces, in the order they flip past. */
+export const LABEL_ADDING = 'Adding';
+export const LABEL_ADDED = 'Added';
+export const LABEL_ADD_FAILED = 'Try again';
 
 export const EMPTY_VIDEOS = 'No videos available in this feed.';
 export const EMPTY_VIDEOS_SHORT = 'No videos available.';
