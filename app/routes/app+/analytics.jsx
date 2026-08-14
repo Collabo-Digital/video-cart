@@ -38,6 +38,7 @@ import Chart from "../../components/Chart/Chart.jsx";
 import SparkLine from "../../components/Chart/SparkLine.jsx";
 import { getOverallDataMetricsForVideoIds } from "../../services/mux/mux-metrics.service.server.js";
 import { parseDateRange, formatRevenue, mergeDailyChartData, toLocalDateString } from "../../lib/utils/common.js";
+import { SHOW_REVENUE } from "../../lib/constants/features.js";
 import { captureRouteError } from "../../lib/utils/observability/errorCapture.server";
 import { apiError, apiSuccess } from "../../lib/utils/apiResponse.js";
 
@@ -244,7 +245,7 @@ const METRIC_CHOICES = [
   { label: "Views", value: "videoViews" },
   { label: "Add to cart", value: "addToCart" },
   { label: "Orders", value: "orders" },
-  { label: "Revenue", value: "revenue" },
+  ...(SHOW_REVENUE ? [{ label: "Revenue", value: "revenue" }] : []),
   { label: "ATC rate", value: "atcRate" },
   { label: "Product Clicks", value: "productClicks" },
 ];
@@ -265,7 +266,7 @@ export default function AnalyticsPage() {
   // Previous can walk back (hard refresh loses it → Previous returns to page 1).
   const [ordersCursorTrail, setOrdersCursorTrail] = useState([]);
   const currentOrdersCursor = searchParams.get("ordersCursor");
-  const [selectedMetrics, setSelectedMetrics] = useState(["orders", "revenue"]);
+  const [selectedMetrics, setSelectedMetrics] = useState(SHOW_REVENUE ? ["orders", "revenue"] : ["orders"]);
   const [popoverActive, setPopoverActive] = useState(false);
   const [tableView, setTableView] = useState("feeds");
 
@@ -277,13 +278,13 @@ export default function AnalyticsPage() {
 
   const feedsTableHeadings = [
     { title: "Feed name" },
-    { title: "Revenue" },
+    ...(SHOW_REVENUE ? [{ title: "Revenue" }] : []),
     { title: "Orders" },
   ];
 
   const videosTableHeadings = [
     { title: "Video title" },
-    { title: "Revenue" },
+    ...(SHOW_REVENUE ? [{ title: "Revenue" }] : []),
     { title: "Orders" },
   ];
 
@@ -444,12 +445,14 @@ export default function AnalyticsPage() {
       change: analytics.percentChange?.orders,
       sparkline: chartData.map((d) => d.orders ?? 0),
     },
-    {
-      title: "Revenue",
-      value: formatRevenue(analytics.totalRevenue, analytics.currencyCode),
-      change: analytics.percentChange?.revenue,
-      sparkline: chartData.map((d) => d.revenue ?? 0),
-    },
+    ...(SHOW_REVENUE
+      ? [{
+          title: "Revenue",
+          value: formatRevenue(analytics.totalRevenue, analytics.currencyCode),
+          change: analytics.percentChange?.revenue,
+          sparkline: chartData.map((d) => d.revenue ?? 0),
+        }]
+      : []),
     {
       title: "Add to cart",
       value: analytics.totalAddToCart ?? 0,
@@ -478,11 +481,13 @@ export default function AnalyticsPage() {
           {feed?.feed?.feedName}
         </Text>
       </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span">
-          {feed?.widgetRevenue ? formatRevenue(feed.widgetRevenue, analytics.currencyCode) : "—"}
-        </Text>
-      </IndexTable.Cell>
+      {SHOW_REVENUE && (
+        <IndexTable.Cell>
+          <Text variant="bodyMd" fontWeight="bold" as="span">
+            {feed?.widgetRevenue ? formatRevenue(feed.widgetRevenue, analytics.currencyCode) : "—"}
+          </Text>
+        </IndexTable.Cell>
+      )}
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="bold" as="span">
           {feed?.widgetOrders}
@@ -498,11 +503,13 @@ export default function AnalyticsPage() {
           {video?.video?.title}
         </Text>
       </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span">
-          {video?.videoRevenue ? formatRevenue(video.videoRevenue, analytics.currencyCode) : "—"}
-        </Text>
-      </IndexTable.Cell>
+      {SHOW_REVENUE && (
+        <IndexTable.Cell>
+          <Text variant="bodyMd" fontWeight="bold" as="span">
+            {video?.videoRevenue ? formatRevenue(video.videoRevenue, analytics.currencyCode) : "—"}
+          </Text>
+        </IndexTable.Cell>
+      )}
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="bold" as="span">
           {video?.videoOrders}
@@ -553,13 +560,15 @@ export default function AnalyticsPage() {
           {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : "—"}
         </Text>
       </IndexTable.Cell>
-      <IndexTable.Cell>
-        <Text as="span" numeric>
-          {typeof order.totalRevenue === "number"
-            ? formatRevenue(order.totalRevenue, order.currency ?? analytics.currencyCode)
-            : "—"}
-        </Text>
-      </IndexTable.Cell>
+      {SHOW_REVENUE && (
+        <IndexTable.Cell>
+          <Text as="span" numeric>
+            {typeof order.totalRevenue === "number"
+              ? formatRevenue(order.totalRevenue, order.currency ?? analytics.currencyCode)
+              : "—"}
+          </Text>
+        </IndexTable.Cell>
+      )}
       <IndexTable.Cell>
         <Text as="span" numeric>
           {Array.isArray(order.items) ? order.items.length : 0}
@@ -582,7 +591,7 @@ export default function AnalyticsPage() {
 
         {/* ── Top summary strip ── */}
         <Card>
-          <InlineGrid columns={4} gap={300}>
+          <InlineGrid columns={metricCards.length} gap={300}>
             {metricCards.map((card) => (
               <MetricCard key={card.title} {...card} />
             ))}
@@ -721,7 +730,7 @@ export default function AnalyticsPage() {
               headings={[
                 { title: "Order" },
                 { title: "Date" },
-                { title: "Revenue" },
+                ...(SHOW_REVENUE ? [{ title: "Revenue" }] : []),
                 { title: "Items" },
               ]}
               selectable={false}

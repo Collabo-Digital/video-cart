@@ -14,6 +14,7 @@ import { ExternalIcon } from "@shopify/polaris-icons";
 import { useFetcher, useNavigate } from "react-router";
 import DateRangePicker from "../DatePicker/DatePicker";
 import { toLocalDateString } from "../../lib/utils/common.js";
+import { SHOW_REVENUE } from "../../lib/constants/features.js";
 
 function formatSales(n, currencyCode) {
   if (n == null || Number.isNaN(n)) return "—";
@@ -67,7 +68,7 @@ function AnalyticsTab({ feedId }) {
     return (
       <Card>
         <Banner tone="info">
-          Save your feed to view analytics for impressions, views, clicks, purchases, and sales.
+          Save your feed to view analytics for impressions, views, clicks, purchases{SHOW_REVENUE ? ", and sales" : ""}.
         </Banner>
       </Card>
     );
@@ -165,7 +166,8 @@ function AnalyticsTab({ feedId }) {
           </Card>
           
         </InlineGrid>
-        <Card sectioned padding="500">
+        {SHOW_REVENUE && (
+          <Card sectioned padding="500">
             <BlockStack gap="200">
               <Text as="h2" variant="bodyLg">
                 Revenue
@@ -179,6 +181,7 @@ function AnalyticsTab({ feedId }) {
               )}
             </BlockStack>
           </Card>
+        )}
 
         <Button variant="secondary" icon={ExternalIcon} onClick={() => {
           navigate(`/app/analytics`);
