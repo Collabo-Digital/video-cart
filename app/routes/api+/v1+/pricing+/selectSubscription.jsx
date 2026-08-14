@@ -21,7 +21,7 @@ export const action = async ({ request }) => {
 
     const billingResponse = await billing.request({
       plan,
-      isTest: true,
+      isTest: false,
       returnUrl: `https://admin.shopify.com/store/${storeSlug}/apps/${process.env.SHOPIFY_APP_NAME}/app/pricing`,
     });
 

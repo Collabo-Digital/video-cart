@@ -139,7 +139,7 @@ export function VideoStories({ feed, videos, settings, onEvent, isPreview }) {
               return (
                 <button
                   type="button"
-                  className={`video-story ${isActive() ? 'is-active' : ''}`}
+                  className={`video-story vd-crt-stry-${index() + 1} ${isActive() ? 'is-active' : ''}`}
                   onClick={() => openStory(video, index())}
                   aria-label={video?.title || `Story ${index() + 1}`}
                   onMouseEnter={() => handleStoryMouseEnter(index())}

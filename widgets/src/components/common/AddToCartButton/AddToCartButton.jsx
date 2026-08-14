@@ -4,6 +4,7 @@ import { LABEL_ADDING, LABEL_ADDED, LABEL_ADD_FAILED } from '../../../constants/
 import ATCAddIcon from '../../../assets/Icons/ATCAddIcon';
 import ATCSuccessIcon from '../../../assets/Icons/ATCSuccessIcon';
 import ATCFailedIcon from '../../../assets/Icons/ATCFailedIcon';
+import LoadingIcon from '../../../assets/Icons/Loading';
 import './addToCartButton.css';
 
 /** How long the terminal state holds before flipping back to idle. */
@@ -87,9 +88,7 @@ export function AddToCartButton({
       {/* The icon components own their <svg> and take no className, so each
           rides in a wrapper span that carries the slide state. */}
       <span className="vc-atc-icon" aria-hidden="true">
-        <svg className="vc-atc-ring" viewBox="0 0 16 16">
-          <circle cx="8" cy="8" r="7.5" />
-        </svg>
+        <span className="vc-atc-spinner"><LoadingIcon /></span>
         <span className="vc-atc-glyph vc-atc-glyph--idle"><ATCAddIcon /></span>
         <span className="vc-atc-glyph vc-atc-glyph--done"><ATCSuccessIcon /></span>
         <span className="vc-atc-glyph vc-atc-glyph--error"><ATCFailedIcon /></span>

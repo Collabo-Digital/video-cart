@@ -1,6 +1,6 @@
 /* Add-to-cart button state machine — idle → loading → done | error.
    Adapted from the "Activate Button" pattern: the label track is a 4-face
-   rotating cube and the icon disc hosts a dash-offset spinner. */
+   rotating cube and the icon slot hosts a rotating spinner glyph. */
 
 .vc-atc {
   --vc-atc-bg: #1a1a1a;
@@ -55,18 +55,20 @@
 .vc-atc-glyph--done,
 .vc-atc-glyph--error { transform: translateY(var(--vc-atc-ico)); }
 
-.vc-atc-ring {
+/* Spinner shares the icon slot with the cart glyphs; only present while loading. */
+.vc-atc-spinner {
   position: absolute;
   inset: 0;
   z-index: 1;
-  width: var(--vc-atc-ico);
-  height: var(--vc-atc-ico);
-  fill: none;
-  stroke: var(--vc-atc-fg);
-  stroke-width: 1px;
-  /* r=7.5 → circumference 47.124; offset 2× keeps it invisible at rest. */
-  stroke-dasharray: 47.124;
-  stroke-dashoffset: 94.248;
+  color: var(--vc-atc-fg);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.vc-atc-spinner svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* ── Label cube ────────────────────────────────────────────────────────── */
@@ -102,9 +104,12 @@
 .vc-atc.is-loading .vc-atc-labels { transform: rotateX(90deg); }
 
 .vc-atc.is-loading .vc-atc-glyph--idle { transform: translateY(calc(var(--vc-atc-ico) * -1)); }
-.vc-atc.is-loading .vc-atc-ring {
-  animation: vc-atc-turn 1.6s linear infinite forwards,
-             vc-atc-path 1.6s linear infinite forwards;
+.vc-atc.is-loading .vc-atc-spinner {
+  opacity: 1;
+  /* Linear, not steps(): the 8 spokes are identical and 45° apart, so any
+     stepped rotation lands each spoke exactly where the last one was and the
+     spinner reads as frozen. */
+  animation: vc-atc-turn 0.9s linear infinite;
 }
 
 /* ── Terminal states ───────────────────────────────────────────────────── */
@@ -117,9 +122,6 @@
 .vc-atc.is-done .vc-atc-labels { transform: rotateX(180deg); }
 .vc-atc.is-error .vc-atc-labels { transform: rotateX(270deg); }
 
-.vc-atc.is-done .vc-atc-ring,
-.vc-atc.is-error .vc-atc-ring { animation: none; }
-
 .vc-atc.is-done .vc-atc-glyph--idle,
 .vc-atc.is-error .vc-atc-glyph--idle { transform: translateY(calc(var(--vc-atc-ico) * -1)); }
 
@@ -130,7 +132,6 @@
 }
 
 @keyframes vc-atc-turn { 100% { transform: rotate(360deg); } }
-@keyframes vc-atc-path { 100% { stroke-dashoffset: 0; } }
 
 /* ── Variants ──────────────────────────────────────────────────────────── */
 .vc-atc--primary {
@@ -160,7 +161,7 @@
   .vc-atc-glyph,
   .vc-atc-labels { transition: none; }
 
-  .vc-atc-ring { animation: none !important; }
-  .vc-atc.is-loading .vc-atc-ring { stroke-dashoffset: 23.562; }
+  /* Still shown while loading via opacity, it just does not rotate. */
+  .vc-atc-spinner { animation: none !important; }
   .vc-atc:active:not(:disabled) { transform: none; }
 }
