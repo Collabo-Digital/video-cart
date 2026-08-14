@@ -594,7 +594,7 @@ export function VideoOverlayPlayer({
               aria-label={isMuted() ? 'Unmute' : 'Mute'}
               onClick={() => setIsMuted((m) => !m)}
             >
-              {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
+              {isMuted() ?  <MuteIcon /> : <UnMuteIcon /> }
             </button>
           </div>
         </Show>
@@ -711,7 +711,7 @@ export function VideoOverlayPlayer({
                 aria-label={isMuted() ? 'Unmute' : 'Mute'}
                 onClick={() => setIsMuted((m) => !m)}
               >
-                {isMuted() ? <UnMuteIcon /> : <MuteIcon />}
+                {isMuted() ? <MuteIcon /> : <UnMuteIcon /> }
               </button>
               <VideoProgressBar
                 videoEl={videoEl}
