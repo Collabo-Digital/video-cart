@@ -5,6 +5,7 @@ import {
   buildProductViewModel,
   defaultOptionValues,
   hasRealOptions,
+  imageIndexOf,
   matchVariant,
 } from '../../../utils/productService';
 import { formatMoney, getVariantId, htmlToText } from '../../../utils/widgetHelpers';
@@ -53,12 +54,10 @@ export function OverlayProductDetail({
 
   const matched = () => matchVariant(model(), selectedOptions());
 
-  // One-way sync: model.images already contains every variant image, so the
-  // thumbnail strip stays the source of truth and indexOf always hits.
+  // One-way sync: model.images carries every variant image, but dedup keeps
+  // only one spelling of each — match on canonical identity, not the string.
   createEffect(() => {
-    const img = matched()?.image;
-    if (!img) return;
-    const i = model().images.indexOf(img);
+    const i = imageIndexOf(model(), matched()?.image);
     if (i >= 0) setActiveImageIndex(i);
   });
 

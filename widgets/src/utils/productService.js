@@ -79,9 +79,38 @@ function imageUrl(img) {
   return img.src ?? img.originalSrc ?? null;
 }
 
+/**
+ * Canonical identity of an image URL, for dedup and lookup only — never for
+ * rendering.
+ *
+ * The same Shopify file reaches us in several spellings: the stored snapshot
+ * has Admin `originalSrc` (absolute, with its own ?v= token) while Ajax
+ * payloads are protocol-relative and variant images may carry a size suffix.
+ * Comparing raw strings therefore misses and the featured image renders twice.
+ */
+function imageKey(url) {
+  if (!url) return null;
+  return url
+    .replace(/^https?:/i, '')                                       // https://cdn… === //cdn…
+    .replace(/[?#].*$/, '')                                         // ?v=…, &width=…
+    .replace(/_(\d+x\d*|x\d+)(_crop_\w+)?(@\d+x)?(?=\.\w+$)/i, ''); // _400x400@2x
+}
+
+/** Order-preserving unique by derived key; nulls and empty strings dropped. */
+function uniqueBy(list, keyOf) {
+  const seen = new Set();
+  return list.filter((v) => {
+    if (v == null || v === '') return false;
+    const k = keyOf(v);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 /** Order-preserving unique; nulls and empty strings dropped. */
 function unique(list) {
-  return list.filter((v, i) => v != null && v !== '' && list.indexOf(v) === i);
+  return uniqueBy(list, (v) => v);
 }
 
 function toNumber(value) {
@@ -171,13 +200,18 @@ export function buildProductViewModel(snapshot, live) {
   const names = options.map((o) => o.name);
   const variants = live ? liveVariants(live) : snapshotVariants(snapshot, names);
 
-  // Union with every variant image, so the variant -> thumbnail sync can use
-  // indexOf and always find a match.
-  const images = unique([
-    ...(live ? live.images ?? [] : snapshot?.images ?? []).map(imageUrl),
-    snapshot?.image ?? null,
-    ...variants.map((v) => v.image),
-  ]);
+  // Union with every variant image so the variant -> thumbnail sync always
+  // finds a match. Dedup on canonical identity, not the raw string: the live
+  // branch mixes Ajax URLs with the snapshot's Admin `originalSrc`, which are
+  // the same files spelled differently.
+  const images = uniqueBy(
+    [
+      ...(live ? live.images ?? [] : snapshot?.images ?? []).map(imageUrl),
+      snapshot?.image ?? null,
+      ...variants.map((v) => v.image),
+    ],
+    imageKey
+  );
 
   const root = window.Shopify?.routes?.root || '/';
   const handle = snapshot?.handle ?? live?.handle ?? '';
@@ -192,6 +226,17 @@ export function buildProductViewModel(snapshot, live) {
     url: live?.url || (handle ? `${root}products/${handle}` : null),
     isLive: Boolean(live),
   };
+}
+
+/**
+ * Index of an image in `model.images`, matched on canonical identity so a
+ * variant image still resolves when dedup kept a different spelling of it.
+ * @returns {number} -1 when absent
+ */
+export function imageIndexOf(model, url) {
+  const key = imageKey(url);
+  if (!key) return -1;
+  return (model?.images ?? []).findIndex((src) => imageKey(src) === key);
 }
 
 /** The variant whose every option matches the current selection. */
