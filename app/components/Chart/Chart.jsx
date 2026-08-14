@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { BlockStack, Card, Text } from "@shopify/polaris";
+import { SHOW_REVENUE } from "../../lib/constants/features.js";
 
-export default function Chart({ chartData = [], title = "Video Views & Conversions", series = "views", metrics = ["orders", "revenue"] }) {
+export default function Chart({ chartData = [], title = "Video Views & Conversions", series = "views", metrics = SHOW_REVENUE ? ["orders", "revenue"] : ["orders"] }) {
   const [isClient, setIsClient] = useState(false);
   const [LineChart, setLineChart] = useState(null);
   useEffect(() => {
@@ -21,7 +22,7 @@ export default function Chart({ chartData = [], title = "Video Views & Conversio
     videoViews:    { name: "Views",          accessor: (d) => d.videoViews ?? 0 },
     addToCart:     { name: "Add to cart",    accessor: (d) => d.addToCart ?? 0 },
     orders:        { name: "Orders",         accessor: (d) => d.orders ?? 0 },
-    revenue:       { name: "Revenue",        accessor: (d) => d.revenue ?? 0 },
+    ...(SHOW_REVENUE ? { revenue: { name: "Revenue", accessor: (d) => d.revenue ?? 0 } } : {}),
     atcRate:       { name: "ATC rate",       accessor: (d) => d.atcRate ?? 0 },
     productClicks: { name: "Product Clicks", accessor: (d) => d.productClicks ?? 0 },
   };

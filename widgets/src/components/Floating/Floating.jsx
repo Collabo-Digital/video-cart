@@ -1,4 +1,6 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
+/* eslint-disable react/no-unknown-property -- SolidJS: `on:click` is a native
+   (non-delegated) event binding, which the React plugin does not know about. */
 import { Show, createSignal, createEffect, onCleanup } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
@@ -18,6 +20,7 @@ import { THUMB_FLOATING } from '../../core/constant';
 import { DEFAULT_TITLE_WATCH, EMPTY_VIDEOS_SHORT } from '../../constants/strings';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../utils/designStyles';
 import CloseIcon from '../../assets/Icons/CloseIcon';
+import { dismissFloating, isFloatingDismissed } from '../../utils/floatingDismissal';
 
 /**
  * Body-level host for the floating widget's portal.
@@ -48,7 +51,11 @@ function createFloatingHost(feedId) {
 export function VideoFloating({ feed, videos, settings, onEvent, isPreview }) {
   const [expandedIndex, setExpandedIndex] = createSignal(null);
   const [containerRef, setContainerRef] = createSignal(null);
-  const [isVisible, setIsVisible] = createSignal(true);
+  // Read once at creation. The component is re-created on every breakpoint
+  // cross (runtime.jsx:191 <Show when={deviceVisible()}>) and on every page
+  // navigation, so this is what makes a dismissal stick instead of bringing
+  // the widget back.
+  const [isVisible, setIsVisible] = createSignal(!isFloatingDismissed(feed?.id, isPreview));
   const [hoveredIndex, setHoveredIndex] = createSignal(null);
   const firstVideo = () => (Array.isArray(videos) && videos.length ? videos[0] : null);
 
@@ -131,8 +138,18 @@ export function VideoFloating({ feed, videos, settings, onEvent, isPreview }) {
             type="button"
             className="video-floating-close"
             aria-label="Close floating video"
-            onClick={(e) => {
+            /* on: — not onClick. Solid's onClick is delegated: one bubble-phase
+               listener on `document`, so the handler only runs if the native
+               click survives the whole bubble. Consent banners, "click outside
+               to close" drawers and sticky-ATC bars routinely stopPropagation()
+               on a capture-phase document listener and kill it. on:click binds a
+               real addEventListener on this element and fires first. It also
+               makes the stopPropagation below meaningful — under delegation it
+               was dead code, since the native event had already finished
+               bubbling by the time the handler ran. */
+            on:click={(e) => {
               e.stopPropagation();
+              dismissFloating(feed?.id, isPreview);
               setIsVisible(false);
             }}
           >

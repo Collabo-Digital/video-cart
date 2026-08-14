@@ -199,10 +199,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
     onCleanup(() => clearInterval(interval));
   });
 
-  // Nothing to page through when everything already fits.
-  const isPrevDisabled = () => !shouldLoop();
-  const isNextDisabled = () => !shouldLoop();
-
   const scrollProducts = (e, direction) => {
     e.preventDefault();
     e.stopPropagation();
@@ -331,13 +327,14 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
           <p className="video-carousel-subtitle">{subtitle()}</p>
         </div>
 
-        <Show when={videos?.length > 0}>
+        {/* Nothing to page through when everything already fits — the arrows
+            would be inert, so don't render them at all. */}
+        <Show when={shouldLoop()}>
           <nav className="video-carousel-nav" aria-label="Carousel navigation">
             <button
               type="button"
               className="video-carousel-nav-btn"
               aria-label="Previous"
-              disabled={isPrevDisabled()}
               onClick={() => handleNav('prev')}
             >
               <LeftToggleIcon />
@@ -346,7 +343,6 @@ export function ClassicCarousel({ feed, videos, settings, onEvent, isPreview }) 
               type="button"
               className="video-carousel-nav-btn"
               aria-label="Next"
-              disabled={isNextDisabled()}
               onClick={() => handleNav('next')}
             >
               <RightToggleIcon />

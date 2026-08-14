@@ -14,6 +14,7 @@ import { InfoIcon } from "@shopify/polaris-icons";
 import PropTypes from "prop-types";
 import { Controller } from "react-hook-form";
 import { WIDGET_TEMPLATES, getTemplatesForType } from "../../lib/constants/templates";
+import InfoTooltip from "../InfoTooltip/InfoTooltip.jsx";
 
 /**
  * Design settings tab. Placeholder for future design options.
@@ -134,12 +135,18 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
                     label={
                       <InlineStack gap="200">
                         <Text as="p">Widget Title Alignment</Text>
-                        <Tooltip
-                          dismissOnMouseOut
-                          content="Choose the alignment of the widget title."
-                        >
-                          <Icon source={InfoIcon} />
-                        </Tooltip>
+                        <InfoTooltip
+                          content="Choose how the widget title is aligned within the video section."
+                          items={[
+                            { term: "Start", description: "The title is aligned to the left." },
+                            { term: "Center", description: "The title is centered." },
+                            { term: "End", description: "The title is aligned to the right." },
+                          ]}
+                          media={{
+                            src: "/images/widget-alignment.webp",
+                            alt: "Widget title aligned to the left above a row of video cards",
+                          }}
+                        />
                       </InlineStack>
                     }
                     options={[
@@ -159,9 +166,19 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
               control={control}
               render={({ field }) => (
                 <BlockStack gap="300">
-                  <Text as="p">Card Corner Radius</Text>
                   <RangeSlider
-                    // label="Card Corner Radius"
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Card Corner Radius</Text>
+                        <InfoTooltip
+                          content="Adjust the roundness of the video card corners."
+                          media={{
+                            src: "/images/card-corner-radius.webp",
+                            alt: "Video cards in a carousel with their rounded corners highlighted",
+                          }}
+                        />
+                      </InlineStack>
+                    }
                     value={field.value}
                     onChange={(value) => field.onChange(value)}
                     output
@@ -180,12 +197,18 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
                       label={
                         <InlineStack gap="200">
                           <Text as="p">Card Hover Effect</Text>
-                          <Tooltip
-                            dismissOnMouseOut
-                            content="Choose what happens when a user hovers over a video card."
-                          >
-                            <Icon source={InfoIcon} />
-                          </Tooltip>
+                          <InfoTooltip
+                            content="Choose how video cards respond when a customer hovers over them."
+                            items={[
+                              { term: "Expand", description: "The video card smoothly expands when hovered." },
+                              { term: "Lift", description: "The video card slightly lifts upward when hovered." },
+                              { term: "None", description: "No hover effect is applied." },
+                            ]}
+                            media={{
+                              src: "/video/card-hover-effect.mp4",
+                              alt: "Video card lifting as the cursor moves over it",
+                            }}
+                          />
                         </InlineStack>
                       }
                       options={[
