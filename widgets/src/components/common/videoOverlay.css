@@ -129,7 +129,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.875rem;
+  gap: 18px;
 }
 
 /* One class plus one type, so this outranks the bare .video-carousel-control-mute
@@ -152,14 +152,14 @@
      default focus ring on tap and leave it there. Android also flashes
      -webkit-tap-highlight-color, and a long-press could select the button. */
   outline: none;
-  -webkit-tap-highlight-color: transparent;
+  /* -webkit-tap-highlight-color: transparent; */
   -webkit-user-select: none;
   user-select: none;
   transition: background 0.2s, border-color 0.2s, transform 0.15s;
 }
 
 .video-carousel-reels-rail > button:hover {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.359);
   border-color: rgba(255, 255, 255, 0.5);
 }
 

@@ -32,7 +32,7 @@
   display: flex;
   gap: var(--vdcrt-video-gap, 20px);
   overflow-x: auto;
-  padding: 0.25rem 0 0.125rem;
+  padding: 1px 1px 14px;
   /* scrollbar-width: thin; */
 }
 
@@ -101,7 +101,7 @@
 
 @media (max-width: 768px) {
   .video-story-ring {
-    width: 80px;
-    height: 80px;
+    width: 90%;
+    height: 90px;
   }
 }
