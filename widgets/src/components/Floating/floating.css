@@ -78,8 +78,10 @@
 .video-floating-close {
   all: unset;
   position: absolute;
-  top: 6px;
-  right: 6px;
+  /* Was 6px. 10px is what lets the ::before hit area below expand to a full
+     44px without any of it falling outside .video-floating's overflow: hidden. */
+  top: 10px;
+  right: 10px;
   z-index: 10;
   display: grid;
   width: 24px;
@@ -89,10 +91,37 @@
   background: rgba(0, 0, 0, 0.55);
   cursor: pointer;
   transition: background 0.2s ease;
+  /* `all: unset` computes pointer-events to `inherit` (it is an inherited
+     property), so the button silently adopts any ancestor's `none` — a theme
+     page-transition wrapper, a stuck drawer, a section mid-swap. Pin it. */
+  pointer-events: auto;
+  /* No 300ms tap delay, no double-tap zoom swallowing the second tap. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hit area only — never painted. A pseudo-element is hit-tested as part of its
+   originating element, so a tap anywhere in these 44x44 targets the button.
+   Visible chrome stays 24px and no layout box is added, so nothing shifts.
+   Chosen over padding + background-clip: content-box, which with
+   border-radius: 50% resolves the radius against the 44px border box while
+   clipping to the 24px content box — painting a square, not a circle. */
+.video-floating-close::before {
+  content: '';
+  position: absolute;
+  inset: -10px; /* 24 + 10 + 10 = 44 */
+  border-radius: 50%;
 }
 
 .video-floating-close:hover {
   background: rgba(0, 0, 0, 0.8);
+}
+
+/* `all: unset` also strips the UA focus ring — keyboard users currently get no
+   indication at all. */
+.video-floating-close:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }
 
 .video-floating-close svg {
@@ -104,7 +133,11 @@
   .video-floating {
     right: 12px;
     bottom: 12px;
-    width: calc(100vw - 250px);
-    max-width: 360px;
+    /* Was calc(100vw - 250px) — a typo that produced a 125px card on a 375px
+       phone against a hard-coded 250px .video-floating-thumb-wrap, i.e. a 1:2
+       crop instead of the desktop 3:5, and a computed width of 0 at or below a
+       250px viewport. 150px is the desktop width; the calc is only a floor for
+       the two 12px insets and engages below a 174px viewport. */
+    width: min(150px, calc(100vw - 24px));
   }
 }

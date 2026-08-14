@@ -104,3 +104,11 @@ export function getButtonStyle(feed, settings) {
 export function isAddToCartSuccess(response) {
     return response?.status === HTTP_OK;
 }
+
+/** Whether the shopper is paying for bytes or on a slow radio — used to skip
+ *  preloading video they may never watch. */
+export function isDataSaver() {
+    const c = typeof navigator !== 'undefined' ? navigator.connection : null;
+    if (!c) return false;
+    return c.saveData === true || /(^|-)2g$/.test(c.effectiveType || '');
+}

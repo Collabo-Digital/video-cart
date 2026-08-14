@@ -9,7 +9,6 @@ export const LABEL_ADD_FAILED = 'Try again';
 export const EMPTY_VIDEOS = 'No videos available in this feed.';
 export const EMPTY_VIDEOS_SHORT = 'No videos available.';
 export const EMPTY_STORIES = 'No stories available.';
-export const EMPTY_PRODUCTS = 'No products linked to this video.';
 
 export const DEFAULT_TITLE_WATCH = 'Watch now';
 export const DEFAULT_TITLE_STORIES = 'Stories';

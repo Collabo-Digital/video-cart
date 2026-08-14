@@ -7,18 +7,14 @@ import {
     InlineGrid,
     Box,
     Text,
-    Icon,
     BlockStack,
     InlineStack,
-    Tooltip,
     Checkbox,
     Banner,
     Tabs,
     Card,
 } from "@shopify/polaris";
-import {
-    InfoIcon,
-} from "@shopify/polaris-icons";
+import InfoTooltip from "../InfoTooltip/InfoTooltip.jsx";
 
 const WIDGET_TYPE_OPTIONS = [
     { label: "Carousel", value: "carousel" },
@@ -122,9 +118,16 @@ function DeviceSettings({ device, control }) {
                                     label={
                                         <InlineStack gap="200">
                                             <Text as="p">Display format</Text>
-                                            <Tooltip dismissOnMouseOut content="Choose how customers access Video Discovery on this device. Floating button: a persistent button fixed to the viewport. Inline navigation link: a link integrated within your theme header or menu.">
-                                                <Icon source={InfoIcon} />
-                                            </Tooltip>
+                                            <InfoTooltip
+                                                content="Choose how the Video Discovery entry point appears on your storefront."
+                                                items={[
+                                                    { term: "Floating button", description: "A button that floats on the screen, allowing customers to access Video Discovery from any page." },
+                                                    { term: "Inline navigation link", description: "A link that appears within your site's navigation menu, providing a more integrated experience." },
+                                                ]}
+                                                media={{
+                                                    src: "/images/inline-discovery.webp",
+                                                    alt: "A Videos link in the storefront navigation menu",
+                                                }} />
                                         </InlineStack>
                                     }
                                     options={LAYOUT_STYLE_OPTIONS}
@@ -144,9 +147,7 @@ function DeviceSettings({ device, control }) {
                                             label={
                                                 <InlineStack gap="200">
                                                     <Text as="p">Button placement</Text>
-                                                    <Tooltip dismissOnMouseOut content="Specify the screen position of the floating entry point.">
-                                                        <Icon source={InfoIcon} />
-                                                    </Tooltip>
+                                                    <InfoTooltip content="Specify the screen position of the floating entry point." />
                                                 </InlineStack>
                                             }
                                             options={FLOATING_POSITION_OPTIONS}
@@ -163,9 +164,7 @@ function DeviceSettings({ device, control }) {
                                         <BlockStack gap="100">
                                             <InlineStack gap="200">
                                                 <Text as="p">Button color</Text>
-                                                <Tooltip dismissOnMouseOut content="Set the background color of the floating discovery button.">
-                                                    <Icon source={InfoIcon} />
-                                                </Tooltip>
+                                                <InfoTooltip content="Set the background color of the floating discovery button." />
                                             </InlineStack>
                                             <s-color-field
                                                 placeholder="Select a color (e.g., #111827)"
@@ -193,9 +192,17 @@ function DeviceSettings({ device, control }) {
                                             label={
                                                 <InlineStack gap="200">
                                                     <Text as="p">Navigation target</Text>
-                                                    <Tooltip dismissOnMouseOut content="Enter the CSS selector or class name of the container where the discovery link should be rendered. Refer to your theme header or menu structure.">
-                                                        <Icon source={InfoIcon} />
-                                                    </Tooltip>
+                                                    <InfoTooltip
+                                                        content="Enter the CSS class of the theme element where you want the discovery link to be rendered."
+                                                        items={[
+                                                            "Open your storefront and right-click the element you want to use as the target.",
+                                                            "Select Inspect to open your browser's Developer Tools.",
+                                                            "Find the HTML element you want to target.",
+                                                            "Look for its class attribute.",
+                                                            "Copy the class name and enter it in this field.",
+                                                            "Add a . before the class name.",
+                                                        ]}
+                                                    />
                                                 </InlineStack>
                                             }
                                             placeholder="nav or .header__menu"
@@ -215,9 +222,7 @@ function DeviceSettings({ device, control }) {
                                             label={
                                                 <InlineStack gap="200">
                                                     <Text as="p">Insertion mode</Text>
-                                                    <Tooltip dismissOnMouseOut content="Where to place the link relative to the navigation target. Append and Prepend insert inside the target; Before and After insert outside it, as a sibling.">
-                                                        <Icon source={InfoIcon} />
-                                                    </Tooltip>
+                                                    <InfoTooltip content="Where to place the link relative to the navigation target. Append and Prepend insert inside the target; Before and After insert outside it, as a sibling." />
                                                 </InlineStack>
                                             }
                                             options={INLINE_INSERT_MODE_OPTIONS}
@@ -241,9 +246,7 @@ function DeviceSettings({ device, control }) {
                                     label={
                                         <InlineStack gap="200">
                                             <Text as="p">Display icon</Text>
-                                            <Tooltip dismissOnMouseOut content="Show a video icon alongside the entry point label.">
-                                                <Icon source={InfoIcon} />
-                                            </Tooltip>
+                                            <InfoTooltip content="Show a video icon alongside the entry point label." />
                                         </InlineStack>
                                     }
                                     checked={value !== false}
@@ -259,9 +262,7 @@ function DeviceSettings({ device, control }) {
                                     label={
                                         <InlineStack gap="200">
                                             <Text as="p">Navigation label</Text>
-                                            <Tooltip dismissOnMouseOut content="The text displayed on the floating button or navigation link.">
-                                                <Icon source={InfoIcon} />
-                                            </Tooltip>
+                                            <InfoTooltip content="The text displayed on the floating button or navigation link." />
                                         </InlineStack>
                                     }
                                     placeholder="Videos"
@@ -318,9 +319,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                         label={
                                             <InlineStack gap="200">
                                                 <Text as="p">Feed Name</Text>
-                                                <Tooltip dismissOnMouseOut content="Give your feed a name to help you identify it.">
-                                                    <Icon source={InfoIcon} />
-                                                </Tooltip>
+                                                <InfoTooltip content="Give your feed a name to help you identify it." />
                                             </InlineStack>
                                         }
                                         placeholder="e.g., Homepage Video Feed"
@@ -339,9 +338,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                         label={
                                             <InlineStack gap="200">
                                                 <Text as="p">Widget Layout</Text>
-                                                <Tooltip dismissOnMouseOut content="Choose the type of widget you want to create.">
-                                                    <Icon source={InfoIcon} />
-                                                </Tooltip>
+                                                <InfoTooltip content="Choose the type of widget you want to create." />
                                             </InlineStack>
                                         }
                                         options={WIDGET_TYPE_OPTIONS}
@@ -358,9 +355,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                         label={
                                             <InlineStack gap="200">
                                                 <Text as="p">Display Page</Text>
-                                                <Tooltip dismissOnMouseOut content="Choose the page where you want to display the widget.">
-                                                    <Icon source={InfoIcon} />
-                                                </Tooltip>
+                                                <InfoTooltip content="Choose the page where you want to display the widget." />
                                             </InlineStack>
                                         }
                                         options={WIDGET_DISPLAY_PAGE_OPTIONS}
@@ -397,109 +392,132 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
 
             {/* Widget Behavior — widget only */}
             {mode === "widget" && (
-            <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-                <BlockStack gap="400">
-                    <Text as="p" variant="bodyMd" fontWeight="semibold">
-                        Widget Behavior
-                    </Text>
-                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                        <Controller
-                            name="settings.general.buttonBehavior"
-                            control={control}
-                            render={({ field }) => (
-                                <Select
-                                    label={
-                                        <InlineStack gap="200">
-                                            <Text as="p">Button Action</Text>
-                                            <Tooltip dismissOnMouseOut content="Choose the behavior of the add to cart button.">
-                                                <Icon source={InfoIcon} />
-                                            </Tooltip>
-                                        </InlineStack>
-                                    }
-                                    options={ADD_TO_CART_BUTTON_BEHAVIOR_OPTIONS}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                />
-                            )}
-                        />
-                        <Controller
-                            name="settings.general.autoPlay"
-                            control={control}
-                            render={({ field }) => (
-                                <Select
-                                    label={
-                                        <InlineStack gap="200">
-                                            <Text as="p">Auto Play</Text>
-                                            <Tooltip dismissOnMouseOut content="Control video autoplay behavior.">
-                                                <Icon source={InfoIcon} />
-                                            </Tooltip>
-                                        </InlineStack>
-                                    }
-                                    options={AUTO_PLAY_OPTIONS}
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                />
-                            )}
-                        />
-                        <Controller
-                            name="settings.general.autoLoop"
-                            control={control}
-                            render={({ field: { value, onChange, ...field } }) => (
-                                <Checkbox
-                                    label={
-                                        <InlineStack gap="200">
-                                            <Text as="p">Auto Loop Video</Text>
-                                            <Tooltip
-                                                dismissOnMouseOut
-                                                content="When enabled, videos will loop automatically after they finish playing."
-                                            >
-                                                <Icon source={InfoIcon} />
-                                            </Tooltip>
-                                        </InlineStack>
-                                    }
-                                    checked={value}
-                                    onChange={onChange}
-                                    {...field}
-                                />
-                            )}
-                        />
-                        <BlockStack gap="200">
-                            <Text as="p">Device Visibility</Text>
-                            <InlineStack gap="600">
-                                <Controller
-                                    name="settings.general.visibleOnDesktop"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <Checkbox label="Desktop" checked={field.value} onChange={field.onChange} />
-                                    )}
-                                />
-                                <Controller
-                                    name="settings.general.visibleOnMobile"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <Checkbox label="Mobile" checked={field.value} onChange={field.onChange} />
-                                    )}
-                                />
-                            </InlineStack>
-                        </BlockStack>
-                        {mode === "widget" && widgetType === "grid" && (
+                <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+                    <BlockStack gap="400">
+                        <Text as="p" variant="bodyMd" fontWeight="semibold">
+                            Widget Behavior
+                        </Text>
+                        <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                             <Controller
-                                name="settings.general.videosPerRow"
+                                name="settings.general.buttonBehavior"
                                 control={control}
                                 render={({ field }) => (
-                                    <TextField
-                                        label="Videos Per Row"
-                                        type="number"
+                                    <Select
+                                        label={
+                                            <InlineStack gap="200">
+                                                <Text as="p">Button Action</Text>
+                                                <InfoTooltip content="Choose the behavior of the add to cart button." />
+                                            </InlineStack>
+                                        }
+                                        options={ADD_TO_CART_BUTTON_BEHAVIOR_OPTIONS}
                                         value={field.value}
                                         onChange={field.onChange}
-                                        autoComplete="off"
                                     />
                                 )}
                             />
-                        )}
-                    </InlineGrid>
-                </BlockStack>
-            </Box>
+                            <Controller
+                                name="settings.general.autoPlay"
+                                control={control}
+                                render={({ field }) => (
+                                    <Select
+                                        label={
+                                            <InlineStack gap="200">
+                                                <Text as="p">Auto Play</Text>
+                                                <InfoTooltip
+                                                    content="Choose when your videos should start playing automatically."
+                                                    items={[
+                                                        { term: "Always", description: "Videos play automatically and continuously, similar to a GIF." },
+                                                        { term: "On Hover", description: "Videos play only when the customer hovers over them." },
+                                                        { term: "Never", description: "Videos remain paused until the customer interacts with them." },
+                                                    ]}
+                                                    media={{
+                                                        src: "/video/auto-play.mp4",
+                                                        alt: "Video card in the widget playing on its own",
+                                                    }}
+                                                />
+                                            </InlineStack>
+                                        }
+                                        options={AUTO_PLAY_OPTIONS}
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                    />
+                                )}
+                            />
+                            <Controller
+                                name="settings.general.autoLoop"
+                                control={control}
+                                render={({ field: { value, onChange, ...field } }) => (
+                                    <Checkbox
+                                        label={
+                                            <InlineStack gap="200">
+                                                <Text as="p">Auto Loop Video</Text>
+                                                <InfoTooltip
+                                                    content="Automatically move through the videos in your carousel without requiring manual scrolling."
+                                                    items={[
+                                                        { term: "Enabled", description: "The carousel automatically moves to the next video." },
+                                                        { term: "Disabled", description: "Customers can move through the videos manually." },
+                                                    ]}
+                                                    media={{
+                                                        src: "/video/auto-loop.mp4",
+                                                        alt: "Carousel advancing through videos on its own",
+                                                    }}
+                                                />
+                                            </InlineStack>
+                                        }
+                                        checked={value}
+                                        onChange={onChange}
+                                        {...field}
+                                    />
+                                )}
+                            />
+                            <BlockStack gap="200">
+                                <Text as="p">Device Visibility</Text>
+                                <InlineStack gap="600">
+                                    <Controller
+                                        name="settings.general.visibleOnDesktop"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Checkbox label="Desktop" checked={field.value} onChange={field.onChange} />
+                                        )}
+                                    />
+                                    <Controller
+                                        name="settings.general.visibleOnMobile"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Checkbox label="Mobile" checked={field.value} onChange={field.onChange} />
+                                        )}
+                                    />
+                                </InlineStack>
+                            </BlockStack>
+                            {mode === "widget" && widgetType === "grid" && (
+                                <Controller
+                                    name="settings.general.videosPerRow"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Videos per row</Text>
+                                                    <InfoTooltip
+                                                        content="Set the number of videos displayed in each row to control the layout of your video feed."
+                                                        media={{
+                                                            src: "/images/videos-per-row.webp",
+                                                            alt: "Grid widget showing three videos per row",
+                                                        }}
+                                                    />
+                                                </InlineStack>
+                                            }
+                                            type="number"
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            autoComplete="off"
+                                        />
+                                    )}
+                                />
+                            )}
+                        </InlineGrid>
+                    </BlockStack>
+                </Box>
             )}
 
             {/* Video Discovery — global only */}
@@ -539,9 +557,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                                 label={
                                                     <InlineStack gap="200">
                                                         <Text as="p">Video source</Text>
-                                                        <Tooltip dismissOnMouseOut content="Select which video feeds are included in Video Discovery.">
-                                                            <Icon source={InfoIcon} />
-                                                        </Tooltip>
+                                                        <InfoTooltip content="Select which video feeds are included in Video Discovery." />
                                                     </InlineStack>
                                                 }
                                                 options={FEED_SOURCE_OPTIONS}
@@ -558,9 +574,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                                 label={
                                                     <InlineStack gap="200">
                                                         <Text as="p">Display order</Text>
-                                                        <Tooltip dismissOnMouseOut content="Define how videos are prioritized when customers browse your collection.">
-                                                            <Icon source={InfoIcon} />
-                                                        </Tooltip>
+                                                        <InfoTooltip content="Define how videos are prioritized when customers browse your collection." />
                                                     </InlineStack>
                                                 }
                                                 options={SORT_ORDER_OPTIONS}
@@ -599,21 +613,21 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                 )} */}
 
                                 <Text as="p" variant="bodyMd" fontWeight="semibold">Device configuration</Text>
-                                    <Card>
+                                <Card>
                                     <Tabs
                                         tabs={DEVICE_TABS}
                                         selected={deviceTab}
                                         onSelect={setDeviceTab}
                                         fitted
                                     />
-                                <Box borderRadius="200" background="bg-fill-secondary" padding="400">
-                                <DeviceSettings
-                                    key={deviceTab === 0 ? "desktop" : "mobile"}
-                                    device={deviceTab === 0 ? "desktop" : "mobile"}
-                                    control={control}
-                                    />
+                                    <Box borderRadius="200" background="bg-fill-secondary" padding="400">
+                                        <DeviceSettings
+                                            key={deviceTab === 0 ? "desktop" : "mobile"}
+                                            device={deviceTab === 0 ? "desktop" : "mobile"}
+                                            control={control}
+                                        />
                                     </Box>
-                                    </Card>
+                                </Card>
                             </BlockStack>
                         )}
                     </BlockStack>
