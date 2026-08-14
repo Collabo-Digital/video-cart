@@ -1,22 +1,14 @@
 /* eslint-disable react/prop-types -- shared overlay used by widget variants */
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
-// Full build, NOT 'hls.js/light'. The light build omits AudioTrackController, so
-// `altAudioEnabled = !!(config.audioStreamController && config.audioTrackController)`
-// (hls.light.js:20363) is permanently false and it never fetches a separate audio
-// rendition. Mux delivers CMAF, where audio is its own EXT-X-MEDIA:TYPE=AUDIO
-// rendition — so the light build played video with silence, no error and nothing
-// for the mute fallback to catch. Costs ~54 KB gzip; audio is not optional for a
-// shoppable video widget.
-import Hls from 'hls.js';
-import mux from 'mux-embed';
-import { getPlaybackUrl, getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
+import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
 import { useLiveProduct } from '../../hooks/useLiveProduct';
 import { OverlayProductPanel } from './OverlayProducts/OverlayProductPanel';
 import { OverlayProductDetail } from './OverlayProducts/OverlayProductDetail';
 import { VideoProgressBar } from './VideoProgressBar/VideoProgressBar';
+import { ReelSlideVideo } from './ReelSlideVideo';
+import { attachPlayback, startMuxMonitor } from './attachPlayback';
 import { EMPTY_PRODUCTS } from '../../constants/strings';
-import { MUX_DATA_ENV_KEY } from '../../core/config';
 import './videoOverlay.css';
 import CloseIcon from '../../assets/Icons/CloseIcon';
 import LeftToggleIcon from '../../assets/Icons/LeftToggleIcon';
@@ -26,6 +18,7 @@ import MuteIcon from '../../assets/Icons/MuteIcon';
 import HeartIcon from '../../assets/Icons/HeartIcon';
 import HeartFilledIcon from '../../assets/Icons/HeartFilledIcon';
 import { getLikedIds, likeKey, saveLikedIds } from '../../utils/likes';
+import { isDataSaver } from '../../utils/widgetHelpers';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -262,97 +255,22 @@ export function VideoOverlayPlayer({
 
   /** Attach HLS or native src when overlay video element and playbackId are set */
   createEffect(() => {
+    // Mobile reels slides own their own players — see ReelSlideVideo, which
+    // mounts one for the current video and one for the next, preloaded.
+    if (isMobile()) return;
+
     const el = videoEl();
     const video = currentVideo();
-    const playbackId = video?.playbackId;
-    const url = playbackId ? getPlaybackUrl(playbackId) : null;
-    if (!el || !url) return;
+    if (!el || !video?.playbackId) return;
 
     const playerInitTime = typeof window !== 'undefined' && window.performance?.now ? performance.now() : Date.now();
-    let hls = null;
-    let viewSent = false;
+    const { hls, dispose } = attachPlayback(el, video, { onFirstPlay });
+    const stopMonitor = startMuxMonitor(el, hls, video, playerInitTime);
 
-    const onPlay = async () => {
-      if (viewSent) return;
-      viewSent = true;
-      const sec = el.currentTime != null ? Math.floor(el.currentTime) : 0;
-      await onFirstPlay?.(video, sec);
-    };
-
-    if (Hls.isSupported()) {
-      hls = new Hls();
-      // Readable from the storefront console: if audio is ever silent again,
-      // this says whether the manifest carries an audio track at all, which
-      // separates a player bug from a silently-encoded source asset.
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        window.__videoCartAudio = { tracks: hls.audioTracks?.length ?? 0 };
-      });
-      hls.loadSource(url);
-      hls.attachMedia(el);
-
-      if (MUX_DATA_ENV_KEY) {
-        try {
-          mux.monitor(el, {
-            debug: false,
-            hlsjs: hls,
-            Hls,
-            data: {
-              env_key: MUX_DATA_ENV_KEY,
-              player_name: 'Video Cart Carousel',
-              player_init_time: playerInitTime,
-              video_id: video?.id ?? playbackId,
-              video_title: video?.title || 'Untitled',
-              video_duration: video?.duration != null ? Math.round(Number(video.duration) * 1000) : undefined,
-              video_stream_type: 'on-demand',
-            },
-          });
-        } catch (err) {
-          if (import.meta.env?.DEV) console.error('Mux monitoring init failed:', err);
-        }
-      }
-
-      el.addEventListener('play', onPlay);
-      onCleanup(() => {
-        el.removeEventListener('play', onPlay);
-        if (el.mux && typeof el.mux.destroy === 'function') {
-          try { el.mux.destroy(); } catch (_) { /* ignore */ }
-        }
-        if (hls) hls.destroy();
-      });
-    } else if (el.canPlayType?.('application/vnd.apple.mpegurl')) {
-      el.src = url;
-
-      if (MUX_DATA_ENV_KEY) {
-        try {
-          mux.monitor(el, {
-            debug: false,
-            data: {
-              env_key: MUX_DATA_ENV_KEY,
-              player_name: 'Video Cart Carousel',
-              player_init_time: playerInitTime,
-              video_id: video?.id ?? playbackId,
-              video_title: video?.title || 'Untitled',
-              video_duration: video?.duration != null ? Math.round(Number(video.duration) * 1000) : undefined,
-              video_stream_type: 'on-demand',
-            },
-          });
-        } catch (err) {
-          if (import.meta.env?.DEV) console.error('Mux monitoring (native) failed:', err);
-        }
-      }
-
-      el.addEventListener('play', onPlay);
-      onCleanup(() => {
-        el.removeEventListener('play', onPlay);
-        if (el.mux && typeof el.mux.destroy === 'function') {
-          try { el.mux.destroy(); } catch (_) { /* ignore */ }
-        }
-      });
-    } else {
-      el.src = url;
-      el.addEventListener('play', onPlay);
-      onCleanup(() => el.removeEventListener('play', onPlay));
-    }
+    onCleanup(() => {
+      stopMonitor();
+      dispose();
+    });
   });
 
   /** Reset the placeholder fade whenever the active video changes (before the ready listener runs) */
@@ -475,6 +393,38 @@ export function VideoOverlayPlayer({
    *  Layout-safe: the sheet and the placeholder are both position:absolute
    *  inside a slide whose height comes from CSS, so mounting or unmounting them
    *  cannot change a slide's height and the offsetTop scroll math above holds. */
+  /** Which slides own a <video> + Hls. Next-only, NOT ±1 like nearIndices: the
+   *  previous slide's segments are already in the browser's HTTP cache from when
+   *  it played, so a second instance for it buys nothing, and a third live
+   *  decoder risks MEDIA_ERR_DECODE on budget Android, where concurrent hardware
+   *  decoders cap as low as four. Modular, so the last slide's wrap target is
+   *  warm too. */
+  const videoIndices = createMemo(() => {
+    const idx = expandedIndex();
+    const n = videos?.length ?? 0;
+    if (idx == null || !n || !isMobile()) return new Set();
+    if (n < 2 || isDataSaver() || (navigator.deviceMemory ?? 4) <= 2) return new Set([idx]);
+    return new Set([idx, (idx + 1) % n]);
+  });
+
+  /** Preloaded neighbours never play, so they cannot fire onFirstPlay — but
+   *  scrolling past a video and back remounts its child, which would fire it
+   *  again. Deduped here, for the overlay's lifetime. Mobile only: desktop's
+   *  per-mount flag already lets it re-fire on revisit, and changing that is a
+   *  separate decision. */
+  const played = new Set();
+
+  const handleFirstPlay = async (video, watchTimeSeconds) => {
+    const key = video?.id ?? video?.playbackId;
+    if (!key || played.has(key)) return;
+    played.add(key);
+    await onFirstPlay?.(video, watchTimeSeconds);
+  };
+
+  createEffect(() => {
+    if (expandedIndex() == null) played.clear();
+  });
+
   const nearIndices = createMemo(() => {
     const idx = expandedIndex();
     const n = videos?.length ?? 0;
@@ -853,29 +803,27 @@ export function VideoOverlayPlayer({
                       }}
                       aria-hidden
                     />
-                    <Show when={index() === expandedIndex()}>
+                    <Show when={videoIndices().has(index())}>
                       <div className="video-carousel-overlay-video-wrap video-carousel-reels-video-wrap">
-                        {/* No text tracks available from Mux — see the desktop
-                            player above for the same gap. */}
-                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                        <video
-                          ref={setVideoEl}
-                          className="video-carousel-overlay-video"
+                        <ReelSlideVideo
+                          video={video}
+                          active={() => index() === expandedIndex()}
+                          registerActive={setVideoEl}
+                          onFirstPlay={handleFirstPlay}
                           poster={posterUrl(video)}
-                          preload="auto"
-                          playsInline
-                          autoPlay
-                          loop
                         />
-                        {/* Mute lives in the root-level action rail now, next to
-                            the like button — see the reels rail above.
+                        {/* Only the watched slide gets chrome — the preloading
+                            neighbour is a bare <video>. Mute lives in the
+                            root-level action rail now, next to the like button.
                             The scrubber is the same component desktop uses: it
                             already sets touch-action: none, so dragging it never
                             fights the vertical scroll-snap. */}
-                        <VideoProgressBar
-                          videoEl={videoEl}
-                          accent={() => addToCartButtonStyle()?.['background-color'] || '#fff'}
-                        />
+                        <Show when={index() === expandedIndex()}>
+                          <VideoProgressBar
+                            videoEl={videoEl}
+                            accent={() => addToCartButtonStyle()?.['background-color'] || '#fff'}
+                          />
+                        </Show>
                       </div>
                     </Show>
                     <Show when={nearIndices().has(index())}>
