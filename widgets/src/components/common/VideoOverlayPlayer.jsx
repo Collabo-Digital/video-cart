@@ -8,7 +8,6 @@ import { OverlayProductDetail } from './OverlayProducts/OverlayProductDetail';
 import { VideoProgressBar } from './VideoProgressBar/VideoProgressBar';
 import { ReelSlideVideo } from './ReelSlideVideo';
 import { attachPlayback, startMuxMonitor } from './attachPlayback';
-import { EMPTY_PRODUCTS } from '../../constants/strings';
 import './videoOverlay.css';
 import CloseIcon from '../../assets/Icons/CloseIcon';
 import LeftToggleIcon from '../../assets/Icons/LeftToggleIcon';
@@ -826,7 +825,12 @@ export function VideoOverlayPlayer({
                         </Show>
                       </div>
                     </Show>
-                    <Show when={nearIndices().has(index())}>
+                    {/* Nothing tagged: no panel at all, matching the desktop
+                        branch above. An empty aside still paints the base rule's
+                        background and border-left over the video (the reels
+                        override does not reset them), which reads as a rendering
+                        glitch rather than an empty state. */}
+                    <Show when={nearIndices().has(index()) && productsForVideo(video).length}>
                       <aside className="video-carousel-overlay-products video-carousel-overlay-products-reels">
                         {/* <h3 className="video-carousel-overlay-products-title">Products tagged</h3> */}
                         <div className="video-carousel-overlay-products-inner">
@@ -839,9 +843,6 @@ export function VideoOverlayPlayer({
                             )}
                           </For>
                         </div>
-                        <Show when={!productsForVideo(video).length}>
-                          <p className="video-carousel-overlay-products-empty">{EMPTY_PRODUCTS}</p>
-                        </Show>
                       </aside>
                     </Show>
                   </div>
