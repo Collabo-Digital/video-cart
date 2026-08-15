@@ -2,8 +2,23 @@
 import { createEffect, onCleanup } from 'solid-js';
 import { attachPlayback, startMuxMonitor } from './attachPlayback';
 
-/** Seconds the preloading neighbour buffers before going quiet. */
-const PRELOAD_SECONDS = 2;
+/** Seconds the preloading neighbour buffers before going quiet.
+ *
+ *  10, not 2. Two seconds is roughly ONE Mux fragment: the shopper swiped, the
+ *  video played for about a second, ran dry, and stalled while the next fragment
+ *  loaded — the "plays, pauses for a moment, plays" the reel was doing. Ten
+ *  seconds is enough runway that the fragment loader is comfortably ahead by the
+ *  time the buffer would have run out. */
+const PRELOAD_SECONDS = 10;
+
+/** What a neighbour targets for its first moment. Both instances pull over the
+ *  same connection, so a neighbour going straight for PRELOAD_SECONDS would
+ *  starve the video the shopper is actually watching while it is still filling
+ *  its own buffer. */
+const PRELOAD_INITIAL_SECONDS = 3;
+
+/** How long a neighbour stays at PRELOAD_INITIAL_SECONDS before ramping up. */
+const PRELOAD_RAMP_MS = 1200;
 
 /** hls.js default; restored on the slide the shopper is actually watching. */
 const ACTIVE_BUFFER_SECONDS = 30;
@@ -56,10 +71,25 @@ export function ReelSlideVideo(props) {
      with Mux's CMAF alt-audio that event fires per track, so a `once` handler
      can stop after an audio-only fragment and leave no video frame at all. */
   const { hls, dispose } = attachPlayback(mediaEl, props.video, {
-    hlsConfig: props.active() ? undefined : { maxBufferLength: PRELOAD_SECONDS },
+    hlsConfig: props.active() ? undefined : { maxBufferLength: PRELOAD_INITIAL_SECONDS },
     onFirstPlay: props.onFirstPlay,
   });
   onCleanup(dispose);
+
+  /* A neighbour ramps its target up instead of starting at the full
+     PRELOAD_SECONDS, so its first fragments do not compete with the video on
+     screen. hls.js re-reads maxBufferLength every tick, so raising it later just
+     continues the fetch. The `<` guard matters: if this slide went active inside
+     the ramp window, ACTIVE_BUFFER_SECONDS is already set and must not be
+     clobbered back down. */
+  if (hls && !props.active()) {
+    const ramp = setTimeout(() => {
+      if (hls.config.maxBufferLength < PRELOAD_SECONDS) {
+        hls.config.maxBufferLength = PRELOAD_SECONDS;
+      }
+    }, PRELOAD_RAMP_MS);
+    onCleanup(() => clearTimeout(ramp));
+  }
 
   /** Hand the parent this element while it is the one being watched. */
   createEffect(() => {
@@ -96,10 +126,16 @@ export function ReelSlideVideo(props) {
 
     onCleanup(() => {
       stopMonitor();
-      // Matches the old unmount-and-remount semantics, so coming back to a
-      // video starts it from the top.
       mediaEl.pause();
-      mediaEl.currentTime = 0;
+      // Deliberately NOT `currentTime = 0` inline. A seek makes hls.js flush and
+      // re-append its buffer, and this cleanup now runs mid-swipe (activation is
+      // driven by IntersectionObserver, not scrollend), so the flush would land on
+      // the same frame the incoming video is decoding its first frames. Deferred
+      // to idle, so revisiting a slide still starts from the top — the old
+      // unmount-and-remount semantics, just off the critical path.
+      const rewind = () => { if (!props.active()) mediaEl.currentTime = 0; };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(rewind, { timeout: 1000 });
+      else setTimeout(rewind, 400);
     });
   });
 

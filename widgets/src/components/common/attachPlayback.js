@@ -10,31 +10,53 @@ import mux from 'mux-embed';
 import { getPlaybackUrl } from '../../shared/mux';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 
-/** Startup-latency config, applied to every player on both platforms.
+/** Last throughput this device actually measured, carried between players.
+ *
+ *  Every slide builds its own Hls instance, and each one otherwise starts from
+ *  `abrEwmaDefaultEstimate` — a cold guess — then spends a fragment or two
+ *  working out what the connection can do. In a reel the shopper re-pays that
+ *  guess on every swipe. Seeding the next instance with what the last one
+ *  measured is what lets the second video onward open straight at the right
+ *  rendition; it is the same trick hls.js uses internally when it chains players
+ *  (`abrEwmaDefaultEstimate: primary.bandwidthEstimate`).
+ *
+ *  Module-level on purpose: it should survive the overlay closing and reopening. */
+let lastBandwidthEstimate = null;
+
+/** First guess, before any real measurement exists. hls.js defaults to 500 kbps,
+ *  which on any modern connection picks a rendition well below what the screen
+ *  can show — so the first video opened soft for no reason. */
+const COLD_BANDWIDTH_ESTIMATE = 2_500_000;
+
+/** Shared player config — deliberately close to hls.js's defaults.
+ *
+ *  An earlier pass tuned this for startup latency and paid for it in picture and
+ *  buffer headroom: `startLevel: 0` pinned every video to the SMALLEST rendition,
+ *  `maxBufferSize: 20MB` cut the default 60MB to a third (so it binds before
+ *  `maxBufferLength: 30` ever does and the video runs dry mid-playback),
+ *  `backBufferLength: 10` added a SourceBuffer.remove() every few seconds, and
+ *  `abrEwmaFastVoD: 1.0` (default 3) made ABR react inside one second so the
+ *  rendition oscillated. All four are gone. What is left is the part that helps
+ *  without costing picture: a realistic starting estimate and a size cap.
+ *
  *  Nothing here touches alt-audio: the CMAF audio rendition is fetched by
  *  audioStreamController / audioTrackController, which exist only in the FULL
  *  hls.js build — see the import note at the top of this file. */
 const HLS_BASE_CONFIG = {
-    // Never fetch a 1080p rendition for a 390px-wide element on a phone. On a
-    // weak connection that is the difference between a 2s and an 8s start, and
-    // it is what stops ABR climbing into a rendition that then stalls.
-    // Measures the ELEMENT, so never display:none a slide that owns a video.
+    // Never fetch a 1080p rendition for a 390px-wide element. Safe only now that
+    // video-owning reels slides are exempt from `content-visibility: auto` (see
+    // the -live rule in videoOverlay.css): this measures media.clientWidth, and a
+    // render-skipped subtree reports 0x0, which pinned hls.js to the lowest
+    // rendition for as much as a second after the slide came into view.
     capLevelToPlayerSize: true,
-    // Start on the smallest rendition so the first segment is tiny and decodes
-    // immediately, then let ABR climb. Costs 1-2s of soft picture, which is what
-    // every reels player does. The default (-1) makes hls.js guess from a cold
-    // bandwidth estimate — on mobile that is a coin flip.
-    startLevel: 0,
-    // hls.js assumes a healthy connection before it has measured one. 1 Mbps is
-    // a realistic mobile cold start and stops the first pick overshooting.
-    abrEwmaDefaultEstimate: 1_000_000,
-    // Default 3.0 holds the start level for ~3s; 1.0 climbs after about one
-    // segment, once real throughput is known.
-    abrEwmaFastVoD: 1.0,
-    abrEwmaSlowVoD: 6.0,
-    // Bounded because the reel keeps two instances alive at once.
-    backBufferLength: 10,
-    maxBufferSize: 20 * 1000 * 1000,
+    // The cap above multiplies by devicePixelRatio, and the default here is
+    // Infinity — so on a 3x phone a 390px element still allows 1080p and the cap
+    // saves nothing. Clamping at 2x is where the bandwidth actually comes back;
+    // 720p on a phone-sized element is indistinguishable and starts faster.
+    maxDevicePixelRatio: 2,
+    // startLevel is deliberately ABSENT. Undefined means "choose from the
+    // bandwidth estimate", which thanks to the seeding above is a measured number
+    // rather than a guess.
 };
 
 /**
@@ -69,9 +91,21 @@ export function attachPlayback(el, video, { hlsConfig, onFirstPlay } = {}) {
     };
 
     if (Hls.isSupported()) {
-        // Caller config wins, so ReelSlideVideo's neighbour maxBufferLength: 2
-        // still overrides the default.
-        hls = new Hls({ ...HLS_BASE_CONFIG, ...hlsConfig });
+        hls = new Hls({
+            ...HLS_BASE_CONFIG,
+            // Set per instance, not in HLS_BASE_CONFIG, because it changes as the
+            // shopper moves through the reel.
+            abrEwmaDefaultEstimate: lastBandwidthEstimate ?? COLD_BANDWIDTH_ESTIMATE,
+            // Caller config wins, so ReelSlideVideo's neighbour maxBufferLength
+            // still overrides the default.
+            ...hlsConfig,
+        });
+        // Hand what this player measures to the next slide's instance. destroy()
+        // drops the listener, so there is nothing to unhook in dispose().
+        hls.on(Hls.Events.FRAG_BUFFERED, () => {
+            const bw = hls.bandwidthEstimate;
+            if (Number.isFinite(bw) && bw > 0) lastBandwidthEstimate = bw;
+        });
         // Readable from the storefront console: if audio is ever silent again,
         // this says whether the manifest carries an audio track at all, which
         // separates a player bug from a silently-encoded source asset.

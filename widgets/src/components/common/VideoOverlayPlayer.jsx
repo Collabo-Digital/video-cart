@@ -29,6 +29,10 @@ const CLOSE_ANIMATION_MS = 400;
 /** Must match the video-carousel-slide-* keyframe duration in videoOverlay.css. */
 const SLIDE_ANIMATION_MS = 400;
 
+/** How much of a slide must be visible before it becomes the one being watched.
+ *  0.6 is past the snap point's tipping point, so the decision never flips back. */
+const ACTIVATION_RATIO = 0.6;
+
 /**
  * One tagged product in the mobile card strip. Shows the stored title/image
  * immediately, then the live price from Shopify so shoppers never see a price
@@ -443,46 +447,55 @@ export function VideoOverlayPlayer({
     }
   });
 
-  /** On mobile reels: commit expandedIndex only after the snap scroll settles,
-   * so native scroll-snap fully owns the gesture (no mid-swipe video remount). */
+  /** On mobile reels: commit expandedIndex as soon as a slide dominates the
+   * viewport, rather than waiting for the scroll to settle.
+   *
+   * Everything that starts playback hangs off expandedIndex — ReelSlideVideo's
+   * active() raises the buffer target and the autoplay effect calls play() — and
+   * scrollend fires only once the snap animation AND the momentum have finished,
+   * 300-600ms after the finger lifts. So the shopper watched a frozen poster for
+   * the whole swipe and the video started afterwards. IntersectionObserver
+   * reports the crossing mid-scroll, off the main thread, so play() is invoked
+   * while the slide is still travelling and the video is already running when the
+   * snap lands.
+   *
+   * Replaces the old scrollend / 120ms-debounce pair: IntersectionObserver has
+   * been in Safari since 12.1, so the iOS fallback is gone, and this reads no
+   * layout at all where the debounce read scrollTop and clientHeight. */
   createEffect(() => {
     if (!isMobile() || !videos?.length) return;
     const track = reelsTrackRef();
     if (!track) return;
 
-    // Same arithmetic as scrollToSlide, inverted. This runs at the end of every
-    // single swipe (scroll-snap-stop: always guarantees it), and used to do a
-    // querySelectorAll plus one offsetTop read per slide — N+1 forced layouts
-    // at the exact moment the snap was settling.
-    const commitNearestSlide = () => {
-      const h = track.clientHeight;
-      if (!h) return;
-      const best = Math.round(track.scrollTop / h);
-      if (best < 0 || best >= videos.length) return;
+    const slides = track.querySelectorAll('.video-carousel-reels-slide');
+    if (!slides.length) return;
+
+    const io = new IntersectionObserver((entries) => {
+      // Most-visible wins: mid-swipe both neighbours report partial visibility,
+      // and only one of them should take over.
+      let best = null;
+      entries.forEach((entry) => {
+        if (entry.intersectionRatio < ACTIVATION_RATIO) return;
+        if (!best || entry.intersectionRatio > best.intersectionRatio) best = entry;
+      });
+      if (!best) return;
+
+      const idx = Number(best.target.dataset.reelsIndex);
+      if (!Number.isInteger(idx) || idx === untrack(expandedIndex)) return;
+
+      // Same contract as the old commitNearestSlide: this index change came from
+      // the shopper's own scroll, so the scroll-sync effect must not fire a
+      // scrollTo and fight the snap that is still animating.
       suppressScrollSync = true;
       try {
-        setExpandedIndex(best);
+        setExpandedIndex(idx);
       } finally {
         suppressScrollSync = false;
       }
-    };
+    }, { root: track, threshold: [0, 0.3, ACTIVATION_RATIO, 0.9, 1] });
 
-    if ('onscrollend' in window) {
-      track.addEventListener('scrollend', commitNearestSlide);
-      onCleanup(() => track.removeEventListener('scrollend', commitNearestSlide));
-    } else {
-      // iOS Safari has no scrollend; treat 120ms of scroll silence as settled
-      let debounce = null;
-      const onScroll = () => {
-        if (debounce) clearTimeout(debounce);
-        debounce = setTimeout(commitNearestSlide, 120);
-      };
-      track.addEventListener('scroll', onScroll, { passive: true });
-      onCleanup(() => {
-        if (debounce) clearTimeout(debounce);
-        track.removeEventListener('scroll', onScroll);
-      });
-    }
+    slides.forEach((slide) => io.observe(slide));
+    onCleanup(() => io.disconnect());
   });
 
   /** Which slides get their heavy content: the products sheet and the animated
@@ -882,7 +895,9 @@ export function VideoOverlayPlayer({
             <For each={videos}>
               {(video, index) => (
                 <div
-                  className="video-carousel-reels-slide"
+                  className={`video-carousel-reels-slide${
+                    videoIndices().has(index()) ? ' video-carousel-reels-slide-live' : ''
+                  }`}
                   data-reels-index={index()}
                   role="listitem"
                 >
