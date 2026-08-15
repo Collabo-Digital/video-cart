@@ -39,6 +39,12 @@ export function getAppSettingsFormDefaults(saved) {
             },
             design: {
                 ...DEFAULT_SETTINGS.design,
+                // Global-only: the shop-identity header on the fullscreen player
+                // (logo + store name + verified badge). Deliberately not in
+                // DEFAULT_SETTINGS — that object is shared with
+                // getFeedFormDefaultValues and would write this key into every
+                // per-feed record on the next feed save.
+                showBranding: true,
                 ...saved?.design,
             },
             translation: {

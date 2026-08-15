@@ -9,6 +9,7 @@ import {
   Tooltip,
   RangeSlider,
   Select,
+  Checkbox,
 } from "@shopify/polaris";
 import { InfoIcon } from "@shopify/polaris-icons";
 import PropTypes from "prop-types";
@@ -24,71 +25,100 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
 
   if (mode === "global") {
     return (
-      <Box padding="400" background="bg-surface-secondary" borderRadius="200">
-        <BlockStack gap="400">
-          <BlockStack gap="100">
-            <Text as="p" variant="bodyMd" fontWeight="semibold">
-              Advanced styling
-            </Text>
-            <Text as="p" tone="subdued">
-              Apply custom CSS to refine the appearance of Video Discovery on your storefront.
-            </Text>
+      <BlockStack gap="200">
+        <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="400">
+            <BlockStack gap="100">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                Video player
+              </Text>
+              <Text as="p" tone="subdued">
+                Your logo and store name come from your Shopify brand settings — update
+                them under Settings → Brand.
+              </Text>
+            </BlockStack>
+            <Controller
+              name="settings.design.showBranding"
+              control={control}
+              render={({ field: { value, onChange, ...field } }) => (
+                <Checkbox
+                  label="Show store branding on videos"
+                  helpText="Display your logo, store name and verified badge at the top of the fullscreen video player. Turn this off to show nothing over the video."
+                  checked={value !== false}
+                  onChange={onChange}
+                  {...field}
+                />
+              )}
+            />
           </BlockStack>
-          <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
-            <Controller
-              name="settings.design.uniqueClassIdentifier"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Custom class name</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Assign a unique CSS class to the Video Discovery component for targeted styling."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  placeholder="video-discovery-custom"
-                  helpText="Use this class name to scope your CSS rules to Video Discovery only."
-                  autoComplete="off"
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  error={errors.uniqueClassIdentifier?.message}
-                />
-              )}
-            />
-            <Controller
-              name="settings.design.customCss"
-              control={control}
-              render={({ field }) => (
-                <TextField
-                  label={
-                    <InlineStack gap="200">
-                      <Text as="p">Custom stylesheet</Text>
-                      <Tooltip
-                        dismissOnMouseOut
-                        content="Enter CSS rules to customize Video Discovery. Scope styles using your custom class name."
-                      >
-                        <Icon source={InfoIcon} />
-                      </Tooltip>
-                    </InlineStack>
-                  }
-                  placeholder=".video-discovery-custom .vc-discovery-trigger { font-weight: 600; }"
-                  helpText="Supported selectors: .vc-discovery-trigger, .vc-discovery-label, .vc-discovery-floating, .vc-discovery-inline"
-                  multiline={4}
-                  autoComplete="off"
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  error={errors.customCss?.message}
-                />
-              )}
-            />
-          </InlineGrid>
-        </BlockStack>
-      </Box>
+        </Box>
+
+        <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="400">
+            <BlockStack gap="100">
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                Advanced styling
+              </Text>
+              <Text as="p" tone="subdued">
+                Apply custom CSS to refine the appearance of Video Discovery on your storefront.
+              </Text>
+            </BlockStack>
+            <InlineGrid columns={{ xs: 1, md: 1 }} gap="300">
+              <Controller
+                name="settings.design.uniqueClassIdentifier"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Custom class name</Text>
+                        <Tooltip
+                          dismissOnMouseOut
+                          content="Assign a unique CSS class to the Video Discovery component for targeted styling."
+                        >
+                          <Icon source={InfoIcon} />
+                        </Tooltip>
+                      </InlineStack>
+                    }
+                    placeholder="video-discovery-custom"
+                    helpText="Use this class name to scope your CSS rules to Video Discovery only."
+                    autoComplete="off"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    error={errors.uniqueClassIdentifier?.message}
+                  />
+                )}
+              />
+              <Controller
+                name="settings.design.customCss"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    label={
+                      <InlineStack gap="200">
+                        <Text as="p">Custom stylesheet</Text>
+                        <Tooltip
+                          dismissOnMouseOut
+                          content="Enter CSS rules to customize Video Discovery. Scope styles using your custom class name."
+                        >
+                          <Icon source={InfoIcon} />
+                        </Tooltip>
+                      </InlineStack>
+                    }
+                    placeholder=".video-discovery-custom .vc-discovery-trigger { font-weight: 600; }"
+                    helpText="Supported selectors: .vc-discovery-trigger, .vc-discovery-label, .vc-discovery-floating, .vc-discovery-inline"
+                    multiline={4}
+                    autoComplete="off"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    error={errors.customCss?.message}
+                  />
+                )}
+              />
+            </InlineGrid>
+          </BlockStack>
+        </Box>
+      </BlockStack>
     );
   }
 

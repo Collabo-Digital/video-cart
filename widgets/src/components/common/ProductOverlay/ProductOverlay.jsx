@@ -19,28 +19,30 @@ function ProductItem({ product, video, addToCartButtonLabel, addToCartButtonStyl
 
   return (
     <div className="vd-product-overlay-item">
-      <img src={product.image} alt={product.title} loading="lazy" />
-      <div className="vd-product-overlay-item-info">
-        <span className="vd-product-overlay-item-title">
-          {product.title}
-        </span>
-        <div className="vd-product-overlay-item-info-inner">
+      <div className="vd-product-overlay-item-media">
+        <img src={product.image} alt={product.title} loading="lazy" />
+        <div className="vd-product-overlay-item-info">
+          <span className="vd-product-overlay-item-title">
+            {product.title}
+          </span>
           <Show when={price()}>
             <span className="vd-product-overlay-item-price">
               {price()}
             </span>
           </Show>
-          <AddToCartButton
-            className="vd-product-overlay-item-button"
-            variant="compact"
-            label={addToCartButtonLabel}
-            disabledLabel={LABEL_SOLD_OUT}
-            disabled={() => !available()}
-            style={addToCartButtonStyle}
-            onAdd={onProductClick ? () => onProductClick(product, video) : undefined}
-          />
         </div>
       </div>
+      {/* Sibling of the media block, not of the price: on a narrow tile the
+          card stacks and the button takes the full width. */}
+      <AddToCartButton
+        className="vd-product-overlay-item-button"
+        variant="compact"
+        label={addToCartButtonLabel}
+        disabledLabel={LABEL_SOLD_OUT}
+        disabled={() => !available()}
+        style={addToCartButtonStyle}
+        onAdd={onProductClick ? () => onProductClick(product, video) : undefined}
+      />
     </div>
   );
 }
@@ -60,8 +62,10 @@ export function ProductOverlay({
     e.preventDefault();
     e.stopPropagation();
     if (!stripRef) return;
+    // Items are `flex: 0 0 100%`, so one step is one strip width plus the gap.
+    const step = stripRef.clientWidth + PRODUCT_ITEM_GAP;
     stripRef.scrollBy({
-      left: direction === 'next' ? PRODUCT_ITEM_GAP : -PRODUCT_ITEM_GAP,
+      left: direction === 'next' ? step : -step,
       behavior: 'smooth',
     });
   };

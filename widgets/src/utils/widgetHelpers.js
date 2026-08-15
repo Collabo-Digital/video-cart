@@ -15,6 +15,35 @@ function activeCurrency() {
     );
 }
 
+/**
+ * Storefront identity for the overlay header, injected synchronously by
+ * app-embed.liquid in <head> — so unlike the global settings it is a page
+ * constant from first paint and needs no reactivity.
+ *
+ * Returns null when there is no shop name: that is the admin preview iframe
+ * (generatePreviewHTML never sets __video_cart_config__) and local harnesses.
+ * A header captioned with a placeholder reads worse than no header, so the
+ * caller renders nothing.
+ */
+export function shopBrand() {
+    const brand = window.__video_cart_config__?.brand;
+    const name = typeof brand?.name === 'string' ? brand.name.trim() : '';
+    if (!name) return null;
+
+    // image_url returns a protocol-relative URL. Fine in an <img src> on an
+    // https storefront, but normalised so the value is usable in any context.
+    const raw = typeof brand?.logoUrl === 'string' ? brand.logoUrl.trim() : '';
+    const logoUrl = raw.startsWith('//') ? `https:${raw}` : raw;
+
+    return {
+        name,
+        logoUrl: logoUrl || null,
+        // Array.from, not charAt: a store called "🌿 Fern Co" should get the
+        // leaf, not half a surrogate pair.
+        initial: (Array.from(name)[0] || '').toUpperCase(),
+    };
+}
+
 /** Format an amount in the storefront's currency, e.g. ₹499, $12.50, ¥1,200 */
 export function formatMoney(num) {
     const currency = activeCurrency();
