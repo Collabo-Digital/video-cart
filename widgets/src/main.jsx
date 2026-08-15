@@ -3,6 +3,7 @@ import { initFeeds } from './runtime';
 import { api } from './api';
 import { mountDiscovery } from './components/Discovery/Discovery';
 import { applyGlobalClass, injectGlobalCustomCss } from './utils/designStyles';
+import { setGlobalSettings } from './utils/globalSettings';
 
 if (typeof window !== 'undefined') {
   window.__video_cart_config__ = window.__video_cart_config__ || {};
@@ -22,6 +23,7 @@ async function init() {
     .fetchSettings()
     .then(({ settings }) => {
       window.__video_cart_config__.settings = settings;
+      setGlobalSettings(settings);
       // Before the stylesheet, so the CSS never lands against a body that
       // doesn't carry the hook yet.
       applyGlobalClass(settings?.design);

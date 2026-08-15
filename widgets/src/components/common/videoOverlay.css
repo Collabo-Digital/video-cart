@@ -94,25 +94,104 @@
   height: 20px;
 }
 
-/* Desktop only: the mute button floats at the video's top-left, mirroring the
-   close button. Scoped by parent so the mobile mute, which lives in the reels
-   action rail, keeps the rail's own sizing. The base rule's `border: none;
-   background: transparent` is deliberately overridden — standing alone over
-   video it needs the same chip treatment the close button gets. */
-.video-carousel-overlay-center > .video-carousel-control-mute {
+/* The desktop-only top-left mute chip is gone: both platforms now render the
+   same action rail, and the mute lives inside it. Its two rules here were
+   scoped `.video-carousel-overlay-center > .video-carousel-control-mute`,
+   which can no longer match. */
+
+/* --- storefront identity header ------------------------------------------ */
+
+/* Shared box for both platforms; the two rules below only own placement. */
+.video-carousel-overlay-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;          /* same as the mute/close chips, so they baseline-match */
+  min-width: 0;          /* load-bearing: lets the name shrink and ellipsis */
+  /* Nothing in here is interactive. Letting it take events would break
+     tap-to-dismiss on the backdrop and swallow taps meant for the video. */
+  pointer-events: none;
+}
+
+/* Desktop: flush to the video pane's top-left, now that the mute chip has moved
+   into the action rail and there is nothing to dodge on that side. The right
+   inset stays: when a video has no tagged products the card is just this pane,
+   so the close button sits at the video's own top-right (12 + 36 + 8).
+   Absolute, not in flow: this pane is a single-cell grid and an in-flow child
+   would be auto-placed into a new implicit row — the same reason the rail and
+   the scrubber are absolute. */
+.video-carousel-overlay-center > .video-carousel-overlay-header {
   position: absolute;
   top: 12px;
   left: 12px;
+  right: 56px;
   z-index: 10;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  transition: background 0.2s, border-color 0.2s;
 }
 
-.video-carousel-overlay-center > .video-carousel-control-mute:hover {
-  background: rgba(255, 255, 255, 0.25);
-  border-color: rgba(255, 255, 255, 0.5);
+/* Mobile: fixed at the overlay root, matching the close button and the action
+   rail. Right inset clears the close button (1rem + 36px + 12px). */
+.video-carousel-overlay-header-reels {
+  position: fixed;
+  top: 15px;
+  left: 20px;
+  right: 12px;
+  z-index: 11;
+}
+
+.video-carousel-overlay-header-avatar {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.video-carousel-overlay-header-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-carousel-overlay-header-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #fff;
+  /* Carries over any video frame. Deliberately a text-shadow and not a scrim
+     or a backdrop-filter — the reels work removed every filter from the
+     scrolling surface on purpose. */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+}
+
+.video-carousel-overlay-header-verified {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* VerifiedIcon ships at 16px and may be reused; constrain it here, the same way
+   the close button constrains CloseIcon's hardcoded width="64". */
+.video-carousel-overlay-header-verified svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
 /* Mobile action rail: right edge, vertically centred, clear of the close button
@@ -130,6 +209,19 @@
   flex-direction: column;
   align-items: center;
   gap: 18px;
+}
+
+/* Desktop: the same rail, anchored to the video pane's right edge instead of
+   the viewport's — the pane is already position: relative. Two classes plus a
+   child combinator, so it outranks the base `fixed` placement above; it must
+   also stay below it in source order. The `reels` in the class name is
+   historical — the rail is shared chrome now, and every button rule below
+   applies on both platforms. */
+.video-carousel-overlay-center > .video-carousel-reels-rail {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* One class plus one type, so this outranks the bare .video-carousel-control-mute
@@ -564,7 +656,9 @@
   flex-direction: row;
   align-items: center;
   gap: 0.625rem;
-  min-width: 240px;
+  /* Room for the chevron and its gap on top of the 56px thumbnail and 22px of
+     padding + border, without squeezing the title under ~120px. */
+  min-width: 260px;
   max-width: 280px;
   padding: 0.625rem;
   /* Dark and opaque enough to carry white text over any video frame, now that
@@ -589,7 +683,9 @@
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.15);
+  /* Only the box behind the photo. Product shots are usually on white, so a
+     paler box than this reads as one larger white block with them. */
+  background: rgb(255 255 255 / 8%);
 }
 
 .video-carousel-overlay-products-reels .video-carousel-overlay-product-image-wrap img {
@@ -624,6 +720,26 @@
   font-size: 1rem;
   font-weight: 700;
   color: #fff;
+}
+
+/* `flex: none` pins this to the right edge while -info (flex: 1) takes the slack. */
+.video-carousel-overlay-products-reels .video-carousel-overlay-product-chevron {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 16%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-carousel-overlay-products-reels .video-carousel-overlay-product-chevron svg {
+  width: 14px;
+  height: 14px;
+  /* RightToggleIcon hardcodes fill="#e0e0e0" as a presentation attribute, which
+     any CSS declaration beats. */
+  fill: #fff;
 }
 
 /* --- mobile product detail sheet ---------------------------------------- */
