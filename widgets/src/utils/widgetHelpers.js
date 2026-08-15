@@ -141,3 +141,13 @@ export function isDataSaver() {
     if (!c) return false;
     return c.saveData === true || /(^|-)2g$/.test(c.effectiveType || '');
 }
+
+/** Slower than 4g, or explicitly data-saving. Deliberately wider than
+ *  isDataSaver: dropping an animated poster is cheap and worth doing on 3g too,
+ *  whereas skipping video preload entirely is reserved for the worst links.
+ *  navigator.connection is Chromium-only, so Safari keeps the richer default. */
+export function isSlowConnection() {
+    const c = typeof navigator !== 'undefined' ? navigator.connection : null;
+    if (!c) return false;
+    return c.saveData === true || /(^|-)(2g|3g)$/.test(c.effectiveType || '');
+}

@@ -7,6 +7,7 @@ import { render } from 'solid-js/web';
 import { getWidget, registerWidget } from './core/registry';
 import { CONTAINER_SELECTOR } from './core/config';
 import { useDeviceVisible } from './hooks/useDeviceVisible';
+import { getPlaybackUrl } from './shared/mux';
 import { api } from './api';
 import { VideoCarousel } from './components/Carousel/Carousel';
 import { VideoStories } from './components/Stories/Stories';
@@ -14,6 +15,24 @@ import { VideoFloating } from './components/Floating/Floating';
 import { VideoGrid } from './components/Grid/Grid';
 
 const DEFAULT_WIDGET_TYPE = 'carousel';
+
+/**
+ * Warm the first video's master playlist as soon as feed data lands, before the
+ * shopper opens anything.
+ *
+ * Parsing this playlist is what resolves Mux's region-specific Fastly hostnames
+ * — the ones a <link rel=preconnect> cannot reach, because they are not known
+ * until the master playlist has been fetched. So the first tap starts at
+ * "download a segment" instead of "resolve three hostnames". ~2KB, cacheable,
+ * no video bytes.
+ *
+ * Deliberately NOT skipped on slow connections: 2KB is nothing, and the round
+ * trips it saves are worth more the higher the latency.
+ */
+function warmFirstPlaylist(feed) {
+  const url = getPlaybackUrl(feed?.videos?.[0]?.playbackId);
+  if (url) fetch(url, { mode: 'cors', credentials: 'omit' }).catch(() => {});
+}
 
 function registerStorefrontWidgets() {
   registerWidget({ type: 'carousel', component: VideoCarousel });
@@ -180,6 +199,7 @@ export async function initFeeds() {
       }
 
       job.mountEl.innerHTML = '';
+      warmFirstPlaylist(feed);
       render(() => {
         const settings = feed.settings || {};
         const deviceVisible = useDeviceVisible(settings);

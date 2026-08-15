@@ -704,7 +704,7 @@
 }
 
 .video-carousel-overlay-products-reels .video-carousel-overlay-product-title {
-  font-size: 0.875rem;
+  font-size: 12px;
   font-weight: 600;
   color: #fff;
   line-height: 1.3;
@@ -717,7 +717,7 @@
 }
 
 .video-carousel-overlay-products-reels .video-carousel-overlay-product-price {
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
 }

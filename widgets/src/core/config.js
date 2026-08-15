@@ -27,4 +27,4 @@ export const DEMO_PLAYBACK_ID = '7O7RsL2n51IHLTkYLPQ2GqrmEYez00DyevmpNUSgG024A';
  * Set VITE_MUX_DATA_ENV_KEY at build time or in .env. Get key from Mux dashboard > Data > Environments.
  */
 export const MUX_DATA_ENV_KEY =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MUX_DATA_ENV_KEY) || 'jqlne8peh4hfbhvdqrv59u9jv';
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_MUX_DATA_ENV_KEY) || '59tpgeu55i4c62qo9umutkff6';

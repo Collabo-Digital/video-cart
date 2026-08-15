@@ -18,7 +18,7 @@ import HeartIcon from '../../assets/Icons/HeartIcon';
 import HeartFilledIcon from '../../assets/Icons/HeartFilledIcon';
 import VerifiedIcon from '../../assets/Icons/VerifiedIcon';
 import { getLikedIds, likeKey, saveLikedIds } from '../../utils/likes';
-import { isDataSaver, shopBrand } from '../../utils/widgetHelpers';
+import { isDataSaver, isSlowConnection, shopBrand } from '../../utils/widgetHelpers';
 import { globalSettings } from '../../utils/globalSettings';
 
 const MOBILE_BREAKPOINT = 768;
@@ -184,6 +184,14 @@ export function VideoOverlayPlayer({
   });
 
   const posterUrl = (v) => getThumbnailUrl(v?.playbackId, 560, 748) || undefined;
+
+  /** Animated previews run to several hundred KB each and the near-slide window
+   *  covers three of them — on a weak connection they download alongside the
+   *  video segments over the same pipe, so the video is slow partly because its
+   *  own thumbnails are starving it. Fall back to the static JPEG there. */
+  const slidePosterUrl = (v) => (isSlowConnection()
+    ? getThumbnailUrl(v?.playbackId, 560, 748)
+    : getThumbnailPreviewUrl(v?.playbackId, 560, 748));
 
   const total = () => videos?.length ?? 0;
 
@@ -888,7 +896,7 @@ export function VideoOverlayPlayer({
                          URL as before for near slides, so no new cache entry. */
                       style={{
                         'background-image': nearIndices().has(index())
-                          ? `url(${getThumbnailPreviewUrl(video.playbackId, 560, 748) || ''})`
+                          ? `url(${slidePosterUrl(video) || ''})`
                           : 'none',
                       }}
                       aria-hidden

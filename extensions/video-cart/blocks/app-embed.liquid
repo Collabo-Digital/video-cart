@@ -44,6 +44,25 @@
   };
 </script>
 
+{% comment %}
+  hls.js fetches segments in CORS mode, so the stream preconnect MUST carry
+  `crossorigin` — a non-CORS preconnect opens a separate connection-pool entry
+  and the warmed socket goes unused. Poster images load as plain <img> and CSS
+  backgrounds, so image.mux.com must NOT have it, for the same reason inverted.
+
+  Only the master playlist and the images are covered: the variant playlist and
+  the media segments come from region-specific *.fastly.mux.com hosts that are
+  not known until the master playlist has been fetched and parsed, so they still
+  pay a full handshake. This is a real win for posters and a marginal one for
+  video start — warming the playlist itself is what would fix that.
+
+  dns-prefetch is the fallback for browsers that ignore preconnect.
+{% endcomment %}
+<link rel="preconnect" href="https://stream.mux.com" crossorigin>
+<link rel="preconnect" href="https://image.mux.com">
+<link rel="dns-prefetch" href="https://stream.mux.com">
+<link rel="dns-prefetch" href="https://image.mux.com">
+
 <script src="{{ 'bundle-video-cart.iife.js' | asset_url }}" defer></script>
 
 
