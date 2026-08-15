@@ -81,11 +81,10 @@
   display: grid;
   padding: 0;
   margin: 0;
-  /* The track sizes to the widest of four nowrap faces and cannot shrink, so a
-     long merchant label would otherwise push the whole card past the tile. */
-  min-width: 0;
-  overflow: hidden;
   list-style: none;
+  /* Never give this element `overflow` (or any other grouping property): it
+     forces transform-style to `flat`, which collapses the cube and makes every
+     rotated state show the wrong face. Clip on a wrapper around it instead. */
   height: var(--vc-atc-line);
   line-height: var(--vc-atc-line);
   text-align: center;
@@ -96,8 +95,6 @@
 .vc-atc-labels li {
   grid-area: 1 / 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   backface-visibility: hidden;
   transform-origin: 50% 50%;
   /* Depth is half the line box, so faces meet on the horizontal centre axis. */

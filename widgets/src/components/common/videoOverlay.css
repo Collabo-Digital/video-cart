@@ -656,7 +656,9 @@
   flex-direction: row;
   align-items: center;
   gap: 0.625rem;
-  min-width: 240px;
+  /* Room for the chevron and its gap on top of the 56px thumbnail and 22px of
+     padding + border, without squeezing the title under ~120px. */
+  min-width: 260px;
   max-width: 280px;
   padding: 0.625rem;
   /* Dark and opaque enough to carry white text over any video frame, now that
@@ -681,7 +683,9 @@
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.15);
+  /* Only the box behind the photo. Product shots are usually on white, so a
+     paler box than this reads as one larger white block with them. */
+  background: rgb(255 255 255 / 8%);
 }
 
 .video-carousel-overlay-products-reels .video-carousel-overlay-product-image-wrap img {
@@ -716,6 +720,26 @@
   font-size: 1rem;
   font-weight: 700;
   color: #fff;
+}
+
+/* `flex: none` pins this to the right edge while -info (flex: 1) takes the slack. */
+.video-carousel-overlay-products-reels .video-carousel-overlay-product-chevron {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 16%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-carousel-overlay-products-reels .video-carousel-overlay-product-chevron svg {
+  width: 14px;
+  height: 14px;
+  /* RightToggleIcon hardcodes fill="#e0e0e0" as a presentation attribute, which
+     any CSS declaration beats. */
+  fill: #fff;
 }
 
 /* --- mobile product detail sheet ---------------------------------------- */

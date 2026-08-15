@@ -56,6 +56,11 @@ function OverlayProductItem({ product, onOpen }) {
           <span className="video-carousel-overlay-product-price">{price()}</span>
         </Show>
       </span>
+      {/* Decorative: the button is already named by the title. Anchors the right
+          edge so the card's width reads as intentional and looks tappable. */}
+      <span className="video-carousel-overlay-product-chevron" aria-hidden="true">
+        <RightToggleIcon />
+      </span>
     </button>
   );
 }
