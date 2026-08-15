@@ -555,6 +555,21 @@
   contain-intrinsic-size: auto 100dvh;
 }
 
+/* Slides that own a <video> opt out of the skip above.
+   content-visibility: auto gives descendants `contain: size layout style paint`,
+   so an off-screen preloaded <video> has no box: it cannot paint its first frame
+   (the preload buys nothing visually), it measures 0x0 so capLevelToPlayerSize
+   pins hls.js to the LOWEST rendition, and its whole subtree needs layout and
+   paint in the single frame the slide scrolls in. That is the `display: none`
+   case attachPlayback.js warns about, reached by a different route.
+   Only the far slides keep the optimisation — they are a background-colour and
+   nothing else, which is where the win came from anyway.
+   Must stay AFTER the rule above: same specificity, so source order decides. */
+.video-carousel-reels-slide-live {
+  content-visibility: visible;
+  contain-intrinsic-size: none;
+}
+
 .video-carousel-reels-slide-video {
   height: 100%;
   width: 100%;
