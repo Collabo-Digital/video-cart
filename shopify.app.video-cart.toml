@@ -9,12 +9,12 @@ embedded = true
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "orders/create" ]
-  uri = "/webhooks/orders/create"
-
-  [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
   uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
 
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/shopify-webhooks"
@@ -35,6 +35,3 @@ redirect_urls = [ "https://video-cart.vercel.app/api/auth" ]
 url = "https://video-cart.vercel.app/proxy"
 subpath = "video-widget"
 prefix = "apps"
-
-[build]
-automatically_update_urls_on_dev = false

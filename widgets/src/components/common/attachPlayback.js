@@ -10,6 +10,33 @@ import mux from 'mux-embed';
 import { getPlaybackUrl } from '../../shared/mux';
 import { MUX_DATA_ENV_KEY } from '../../core/config';
 
+/** Startup-latency config, applied to every player on both platforms.
+ *  Nothing here touches alt-audio: the CMAF audio rendition is fetched by
+ *  audioStreamController / audioTrackController, which exist only in the FULL
+ *  hls.js build — see the import note at the top of this file. */
+const HLS_BASE_CONFIG = {
+    // Never fetch a 1080p rendition for a 390px-wide element on a phone. On a
+    // weak connection that is the difference between a 2s and an 8s start, and
+    // it is what stops ABR climbing into a rendition that then stalls.
+    // Measures the ELEMENT, so never display:none a slide that owns a video.
+    capLevelToPlayerSize: true,
+    // Start on the smallest rendition so the first segment is tiny and decodes
+    // immediately, then let ABR climb. Costs 1-2s of soft picture, which is what
+    // every reels player does. The default (-1) makes hls.js guess from a cold
+    // bandwidth estimate — on mobile that is a coin flip.
+    startLevel: 0,
+    // hls.js assumes a healthy connection before it has measured one. 1 Mbps is
+    // a realistic mobile cold start and stops the first pick overshooting.
+    abrEwmaDefaultEstimate: 1_000_000,
+    // Default 3.0 holds the start level for ~3s; 1.0 climbs after about one
+    // segment, once real throughput is known.
+    abrEwmaFastVoD: 1.0,
+    abrEwmaSlowVoD: 6.0,
+    // Bounded because the reel keeps two instances alive at once.
+    backBufferLength: 10,
+    maxBufferSize: 20 * 1000 * 1000,
+};
+
 /**
  * Attach a Mux playback source to a <video> and wire the first-play callback.
  *
@@ -42,7 +69,9 @@ export function attachPlayback(el, video, { hlsConfig, onFirstPlay } = {}) {
     };
 
     if (Hls.isSupported()) {
-        hls = new Hls(hlsConfig);
+        // Caller config wins, so ReelSlideVideo's neighbour maxBufferLength: 2
+        // still overrides the default.
+        hls = new Hls({ ...HLS_BASE_CONFIG, ...hlsConfig });
         // Readable from the storefront console: if audio is ever silent again,
         // this says whether the manifest carries an audio track at all, which
         // separates a player bug from a silently-encoded source asset.
