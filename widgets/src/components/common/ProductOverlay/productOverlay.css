@@ -11,8 +11,18 @@
   gap: 0.25rem;
   opacity: 0;
   transform: translateY(12px);
-  pointer-events: all;
+  /* Hover-only, so a hidden card must not eat clicks: it spans the bottom of
+     the tile and would otherwise swallow taps meant for the video. Each
+     template re-enables this in its own :hover rule. */
+  pointer-events: none;
   transition: opacity 0.25s ease, transform 0.25s ease;
+  /* The card is squeezed by the *tile* width, not the viewport — a 2-up mobile
+     grid and a 6-up desktop grid both land near 175px. So query the tile.
+     This sits on the overlay rather than the card because `container-type`
+     implies `contain: layout`, which would flatten the spotlight card's
+     `transform-style: preserve-3d`. Same width either way. */
+  container-type: inline-size;
+  container-name: vdcard;
 }
 
 /* ── Products strip ─────────────────────────────────────────────────────── */
@@ -47,6 +57,10 @@
   flex: 0 0 100%;
   width: 100%;
   min-width: 0;
+  /* There is no global reset, so without this the `width: 100%` excludes the
+     padding and border and the card renders wider than the tile, which is what
+     clipped the button's right edge. */
+  box-sizing: border-box;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   display: flex;
@@ -55,8 +69,13 @@
   gap: 10px;
   padding: 10px;
   transition: opacity 0.2s ease;
-  background: #f3f4f664;
-  border-radius: 10px;
+  /* Dark glass, not a pale wash: the card sits over arbitrary video frames and
+     black-on-translucent-light was unreadable on dark footage. */
+  background: rgb(18 18 20 / 62%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 12px;
 }
 
 .vd-product-overlay-item:hover {
@@ -76,26 +95,28 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.vd-product-overlay-item-info {
+.vd-product-overlay-item-media {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: inherit;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
 
-.vd-product-overlay-item-info-inner {
+.vd-product-overlay-item-info {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
 }
 
 .vd-product-overlay-item-title {
   font-size: 12px;
   font-weight: 600;
-  color: #000;
+  color: #fff;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -107,7 +128,7 @@
 .vd-product-overlay-item-price {
   font-size: 12px;
   font-weight: 600;
-  color: #000000;
+  color: rgb(255 255 255 / 78%);
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -118,6 +139,7 @@
 
 /* Layout only — see .vc-atc--compact for the visuals. */
 .vd-product-overlay-item-button {
+  flex: none;
   white-space: nowrap;
 }
 
@@ -143,4 +165,49 @@
 
 .vd-overlay-nav-btn svg {
   fill: #fff;
+}
+
+/* ── Narrow tiles: stack, so the button owns a full row ─────────────────── */
+/* Measured on the container's content box, so the overlay's own 6px padding is
+   excluded — 210px here fires at a tile width of ~222px. That covers the 2-up
+   mobile grid (~175px), the mobile carousel (~177px) and spotlight (~180px),
+   plus dense desktop column counts, while a 270px desktop tile stays a row. */
+@container vdcard (max-width: 210px) {
+  .vd-product-overlay-products {
+    margin-bottom: 6px;
+  }
+
+  .vd-product-overlay-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .vd-product-overlay-item img {
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+  }
+
+  .vd-product-overlay-item-media {
+    gap: 8px;
+  }
+
+  .vd-product-overlay-item-title,
+  .vd-product-overlay-item-price {
+    font-size: 11px;
+  }
+
+  .vd-product-overlay-item-button {
+    width: 100%;
+    justify-content: center;
+    padding: 7px;
+    font-size: 11px;
+  }
+
+  .vd-overlay-nav-btn {
+    width: 22px;
+    height: 22px;
+  }
 }

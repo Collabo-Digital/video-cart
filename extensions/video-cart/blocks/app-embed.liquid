@@ -6,6 +6,21 @@
 }
 {% endschema %}
 
+{%- liquid
+  # shop.brand and either logo can be nil. Nil property lookups are safe, but
+  # image_url raises when it cannot resolve a dimension, hence the guard.
+  # square_logo is Shopify's documented "preferred logo for square UI elements";
+  # logo is the fallback for merchants who only filled the wide one.
+  assign vc_brand_logo = shop.brand.square_logo
+  unless vc_brand_logo
+    assign vc_brand_logo = shop.brand.logo
+  endunless
+  assign vc_brand_logo_url = ''
+  if vc_brand_logo
+    assign vc_brand_logo_url = vc_brand_logo | image_url: width: 96, height: 96, crop: 'center'
+  endif
+-%}
+
 <script>
   // Set app URL - this should be your app's public URL
   // You can set this via environment variable or app metafield
@@ -18,6 +33,10 @@
   
   window.__video_cart_config__ = {
     shop: {{ shop.permanent_domain | json }},
+    brand: {
+      name: {{ shop.name | json }},
+      logoUrl: {{ vc_brand_logo_url | json }}
+    },
     enabled: {{ block.settings.enabled | json }},
     isActive: true,
     position: 'video-carousel',
