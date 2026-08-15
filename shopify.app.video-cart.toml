@@ -9,8 +9,8 @@ embedded = true
 api_version = "2026-04"
 
   [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
+  topics = [ "orders/create" ]
+  uri = "/webhooks/orders/create"
 
   [[webhooks.subscriptions]]
   topics = [ "app/uninstalled" ]
@@ -21,8 +21,8 @@ api_version = "2026-04"
   compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
   [[webhooks.subscriptions]]
-  topics = [ "orders/create" ]
-  uri = "/webhooks/orders/create"
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -35,3 +35,6 @@ redirect_urls = [ "https://video-cart.vercel.app/api/auth" ]
 url = "https://video-cart.vercel.app/proxy"
 subpath = "video-widget"
 prefix = "apps"
+
+[build]
+automatically_update_urls_on_dev = false

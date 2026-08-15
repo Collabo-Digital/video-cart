@@ -16,8 +16,10 @@ import UnMuteIcon from '../../assets/Icons/UnmuteIcon';
 import MuteIcon from '../../assets/Icons/MuteIcon';
 import HeartIcon from '../../assets/Icons/HeartIcon';
 import HeartFilledIcon from '../../assets/Icons/HeartFilledIcon';
+import VerifiedIcon from '../../assets/Icons/VerifiedIcon';
 import { getLikedIds, likeKey, saveLikedIds } from '../../utils/likes';
-import { isDataSaver } from '../../utils/widgetHelpers';
+import { isDataSaver, shopBrand } from '../../utils/widgetHelpers';
+import { globalSettings } from '../../utils/globalSettings';
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -58,6 +60,83 @@ function OverlayProductItem({ product, onOpen }) {
   );
 }
 
+/**
+ * Instagram-style storefront identity strip over the video: avatar, shop name,
+ * verified tick. Deliberately inert (pointer-events: none in CSS) — on mobile
+ * it is a fixed child of the overlay root, and if it could become an event
+ * target the root's `e.target === e.currentTarget` backdrop-dismiss check would
+ * misfire; on desktop it would swallow taps meant for the video.
+ */
+function OverlayHeader(props) {
+  return (
+    <Show when={props.show() && props.brand}>
+      <div
+        className={`video-carousel-overlay-header${
+          props.reels ? ' video-carousel-overlay-header-reels' : ''
+        }`}
+      >
+        <span className="video-carousel-overlay-header-avatar">
+          <Show
+            when={props.brand.logoUrl}
+            fallback={<span aria-hidden="true">{props.brand.initial}</span>}
+          >
+            {/* alt="" — the shop name sits right beside it. */}
+            <img
+              src={props.brand.logoUrl}
+              alt=""
+              width="32"
+              height="32"
+              loading="lazy"
+              decoding="async"
+            />
+          </Show>
+        </span>
+        <span className="video-carousel-overlay-header-name">{props.brand.name}</span>
+        <span
+          className="video-carousel-overlay-header-verified"
+          role="img"
+          aria-label="Verified"
+        >
+          <VerifiedIcon />
+        </span>
+      </div>
+    </Show>
+  );
+}
+
+/**
+ * Like + mute, stacked. Shared chrome: on mobile it is a fixed child of the
+ * overlay root (so it does not ride the reels track), on desktop an absolute
+ * child of the video pane. Same markup either way — only the placement rule
+ * differs, keyed off the parent in CSS.
+ */
+function OverlayRail(props) {
+  return (
+    <div className="video-carousel-reels-rail">
+      <button
+        type="button"
+        className={`${props.isCurrentLiked() ? 'video-carousel-reels-like-on' : ''}${props.likePulse() ? ' video-carousel-reels-like-pulse' : ''}`}
+        aria-label={props.isCurrentLiked() ? 'Unlike' : 'Like'}
+        aria-pressed={props.isCurrentLiked()}
+        onClick={props.toggleCurrentLike}
+        /* Clears the class from the CSS duration itself, so there is no
+           timer to keep in sync with the keyframes. */
+        onAnimationEnd={() => props.setLikePulse(false)}
+      >
+        {props.isCurrentLiked() ? <HeartFilledIcon /> : <HeartIcon />}
+      </button>
+      <button
+        type="button"
+        className="video-carousel-control-mute"
+        aria-label={props.isMuted() ? 'Unmute' : 'Mute'}
+        onClick={() => props.setIsMuted((m) => !m)}
+      >
+        {props.isMuted() ? <MuteIcon /> : <UnMuteIcon />}
+      </button>
+    </div>
+  );
+}
+
 export function VideoOverlayPlayer({
   videos,
   expandedIndex,
@@ -76,6 +155,20 @@ export function VideoOverlayPlayer({
   const [videoReady, setVideoReady] = createSignal(false);
   const [isMobile, setIsMobile] = createSignal(
     typeof window !== 'undefined' && window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches
+  );
+
+  /** Liquid injects this in <head>, so it is a page constant — read once. */
+  const brand = shopBrand();
+
+  /** Rides the global settings fetch, which resolves AFTER this component
+   *  mounts (main.jsx runs it in parallel with initFeeds), so it has to stay an
+   *  accessor — a value read once would latch undefined.
+   *
+   *  `!== false`, not `=== true`: the setting defaults to on, so an unread or
+   *  failed settings fetch should still show branding rather than silently
+   *  stripping it from every storefront. Only an explicit opt-out hides it. */
+  const showBranding = createMemo(
+    () => globalSettings()?.design?.showBranding !== false
   );
 
   const currentVideo = createMemo(() => {
@@ -571,32 +664,24 @@ export function VideoOverlayPlayer({
           </button>
         </Show>
 
-        {/* Mobile action rail. Lives at the overlay root, not inside a slide, so
-            there is exactly one of it and it does not move while the reels track
-            scrolls. The close button stays pinned top-right above it. */}
+        {/* Root-level, like the close button and the action rail: exactly one
+            instance, and `fixed` so it does not travel with the reels track. */}
         <Show when={isMobile()}>
-          <div className="video-carousel-reels-rail">
-            <button
-              type="button"
-              className={`${isCurrentLiked() ? 'video-carousel-reels-like-on' : ''}${likePulse() ? ' video-carousel-reels-like-pulse' : ''}`}
-              aria-label={isCurrentLiked() ? 'Unlike' : 'Like'}
-              aria-pressed={isCurrentLiked()}
-              onClick={toggleCurrentLike}
-              /* Clears the class from the CSS duration itself, so there is no
-                 timer to keep in sync with the keyframes. */
-              onAnimationEnd={() => setLikePulse(false)}
-            >
-              {isCurrentLiked() ? <HeartFilledIcon /> : <HeartIcon />}
-            </button>
-            <button
-              type="button"
-              className="video-carousel-control-mute"
-              aria-label={isMuted() ? 'Unmute' : 'Mute'}
-              onClick={() => setIsMuted((m) => !m)}
-            >
-              {isMuted() ?  <MuteIcon /> : <UnMuteIcon /> }
-            </button>
-          </div>
+          <OverlayHeader brand={brand} show={showBranding} reels />
+        </Show>
+
+        {/* Lives at the overlay root, not inside a slide, so there is exactly
+            one of it and it does not move while the reels track scrolls. The
+            close button stays pinned top-right above it. */}
+        <Show when={isMobile()}>
+          <OverlayRail
+            isCurrentLiked={isCurrentLiked}
+            likePulse={likePulse}
+            setLikePulse={setLikePulse}
+            toggleCurrentLike={toggleCurrentLike}
+            isMuted={isMuted}
+            setIsMuted={setIsMuted}
+          />
         </Show>
 
         {/* Mobile product detail, as a bottom sheet. Rendered here at the overlay
@@ -702,17 +787,18 @@ export function VideoOverlayPlayer({
               </Show>
 
               {/* Chrome sits outside the sliding layers so it stays put, and so
-                  it isn't duplicated across the two panes. Both are absolutely
-                  positioned: this pane is a single-cell grid, so an in-flow
-                  child would be auto-placed into a new implicit row. */}
-              <button
-                type="button"
-                className="video-carousel-control-mute"
-                aria-label={isMuted() ? 'Unmute' : 'Mute'}
-                onClick={() => setIsMuted((m) => !m)}
-              >
-                {isMuted() ? <MuteIcon /> : <UnMuteIcon /> }
-              </button>
+                  it isn't duplicated across the two panes. All of it is
+                  absolutely positioned: this pane is a single-cell grid, so an
+                  in-flow child would be auto-placed into a new implicit row. */}
+              <OverlayRail
+                isCurrentLiked={isCurrentLiked}
+                likePulse={likePulse}
+                setLikePulse={setLikePulse}
+                toggleCurrentLike={toggleCurrentLike}
+                isMuted={isMuted}
+                setIsMuted={setIsMuted}
+              />
+              <OverlayHeader brand={brand} show={showBranding} />
               <VideoProgressBar
                 videoEl={videoEl}
                 accent={() => addToCartButtonStyle()?.['background-color'] || '#fff'}
