@@ -13,6 +13,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* No global reset — matters when a caller sets `width: 100%` (the stacked
+     product overlay), where padding + border would otherwise overflow. */
+  box-sizing: border-box;
   border: none;
   cursor: pointer;
   background: var(--vc-atc-bg);
@@ -78,6 +81,10 @@
   display: grid;
   padding: 0;
   margin: 0;
+  /* The track sizes to the widest of four nowrap faces and cannot shrink, so a
+     long merchant label would otherwise push the whole card past the tile. */
+  min-width: 0;
+  overflow: hidden;
   list-style: none;
   height: var(--vc-atc-line);
   line-height: var(--vc-atc-line);
@@ -89,6 +96,8 @@
 .vc-atc-labels li {
   grid-area: 1 / 1;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   backface-visibility: hidden;
   transform-origin: 50% 50%;
   /* Depth is half the line box, so faces meet on the horizontal centre axis. */
