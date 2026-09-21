@@ -1,4 +1,4 @@
-import { DEFAULT_ADD_TO_CART } from '../constants/strings';
+import { DEFAULT_ADD_TO_CART, DEFAULT_VIEW_PRODUCT } from '../constants/strings';
 import { HTTP_OK } from '../core/constant';
 
 /** Get products tagged to a video */
@@ -116,9 +116,19 @@ export function getProductHandle(productOrHandle) {
     return productOrHandle;
 }
 
-/** Add-to-cart button label from feed settings */
+/**
+ * Product button label for the configured button action. Each action keeps its
+ * own text, so switching to "Open product page" never leaves "Shop Now" on a
+ * button that navigates. Anything but 'addToCart' navigates, matching
+ * productClickHandler and OverlayProductDetail.
+ * @param {{ settings?: Object }} feed - a feed, or `{ settings }` for global settings
+ */
 export function getAddToCartLabel(feed) {
-    return feed?.settings?.translation?.addToCartText || DEFAULT_ADD_TO_CART;
+    const settings = feed?.settings;
+    if (settings?.general?.buttonBehavior === 'addToCart') {
+        return settings?.translation?.addToCartText || DEFAULT_ADD_TO_CART;
+    }
+    return settings?.translation?.viewProductText || DEFAULT_VIEW_PRODUCT;
 }
 
 /** Button background style from feed/settings design */

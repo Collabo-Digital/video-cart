@@ -759,11 +759,18 @@
 
 /* --- mobile product detail sheet ---------------------------------------- */
 
-.video-carousel-reels-sheet-backdrop {
+/* Parent class + explicit display: this div is empty, and Dawn-family themes
+   ship `div:empty { display: none }` at (0,1,1), which beats a lone class and
+   silently removes the backdrop, so tapping outside the sheet did nothing. */
+.video-carousel-overlay .video-carousel-reels-sheet-backdrop {
+  display: block;
   position: fixed;
   inset: 0;
   z-index: 12;
   background: rgba(0, 0, 0, 0.45);
+  /* iOS Safari only fires click on elements it considers clickable. */
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* z-index 12 clears the reels rail and the close button, both at 11 — the sheet

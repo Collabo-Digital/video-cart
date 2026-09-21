@@ -245,6 +245,7 @@ export function VideoGrid({ feed, videos, settings, onEvent, isPreview }) {
 
                   <ProductOverlay
                     video={video}
+                    buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
                     addToCartButtonLabel={addToCartButtonLabel}
                     addToCartButtonStyle={addToCartButtonStyle}
                     onProductClick={handleProductClick}

@@ -406,7 +406,7 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                         label={
                                             <InlineStack gap="200">
                                                 <Text as="p">Button Action</Text>
-                                                <InfoTooltip content="Choose the behavior of the add to cart button." />
+                                                <InfoTooltip content="Choose what the product button does: add the item to the cart, or open its product page." />
                                             </InlineStack>
                                         }
                                         options={ADD_TO_CART_BUTTON_BEHAVIOR_OPTIONS}

@@ -1,4 +1,6 @@
 /* eslint-disable react/prop-types -- shared overlay used by widget variants */
+/* eslint-disable react/no-unknown-property -- SolidJS: `on:click` is a native
+   (non-delegated) event binding, which the React plugin does not know about. */
 import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../shared/mux';
@@ -719,10 +721,15 @@ export function VideoOverlayPlayer({
         <Show when={isMobile() ? sheetProduct() : null} keyed>
           {(product) => (
             <>
+              {/* on:click, not onClick — a native listener on the element itself.
+                  Solid's onClick is delegated to `document`, which leaves this
+                  <div> with no listener of its own: iOS Safari then treats it as
+                  non-clickable and never fires the tap, and any theme script
+                  that stopPropagation()s on the way up to document kills it. */}
               {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
               <div
                 className="video-carousel-reels-sheet-backdrop"
-                onClick={() => setSelectedProductIndex(null)}
+                on:click={() => setSelectedProductIndex(null)}
                 aria-hidden
               />
               <div

@@ -5,6 +5,7 @@ import { VideoOverlayPlayer } from '../common/VideoOverlayPlayer';
 import {
   productsForVideo,
   productPrice,
+  getAddToCartLabel,
   getButtonStyle,
 } from '../../utils/widgetHelpers';
 import { createProductClickHandler } from '../../utils/productClickHandler';
@@ -132,7 +133,7 @@ export function VideoDiscovery({ videos, settings, layoutStyle = 'floating', sho
   );
   const fabBgColor = deviceSettings.floatingBgColor || '#111827';
 
-  const addToCartButtonLabel = () => settings?.translation?.addToCartText || 'Shop Now';
+  const addToCartButtonLabel = () => getAddToCartLabel({ settings });
   const addToCartButtonStyle = () => getButtonStyle(null, settings);
   const handleProductClick = createProductClickHandler({
     feed: null,

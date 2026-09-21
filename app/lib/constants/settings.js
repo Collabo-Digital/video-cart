@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS = {
         widgetHeading: "Check out these products",
         widgetDescription: "These products are available for purchase",
         addToCartText: "Shop Now",
+        // Button text when the button action is "Open product page".
+        viewProductText: "View product",
     },
 };
 
