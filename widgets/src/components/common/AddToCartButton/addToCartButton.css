@@ -161,6 +161,19 @@
   border-radius: 8px;
 }
 
+/* ── View product (ViewProductButton) ──────────────────────────────────── */
+/* A plain label instead of the cube: the copy never changes. */
+.vc-atc-label {
+  line-height: var(--vc-atc-line);
+  white-space: nowrap;
+}
+
+/* Hover-only: on touch a tap leaves :hover stuck, which would fight the
+   loading slide below. :not(.is-loading) lets that slide win on desktop too. */
+@media (hover: hover) {
+  .vc-atc--view:hover:not(.is-loading) .vc-atc-glyph--idle { transform: translateX(3px); }
+}
+
 /* Colour and copy still change; only the motion is dropped. */
 @media (prefers-reduced-motion: reduce) {
   .vc-atc,

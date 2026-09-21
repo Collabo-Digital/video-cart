@@ -13,12 +13,12 @@ import {
   LABEL_BACK_TO_PRODUCTS,
   LABEL_SOLD_OUT,
   LABEL_VIEW_FULL_DETAILS,
-  LABEL_VIEW_PRODUCT,
   labelVideoCounter,
 } from '../../../constants/strings';
 import { VariantSelector } from './VariantSelector';
 import { QuantityStepper } from './QuantityStepper';
 import { AddToCartButton } from '../AddToCartButton/AddToCartButton';
+import { ViewProductButton } from '../AddToCartButton/ViewProductButton';
 import LeftToggleIcon from '../../../assets/Icons/LeftToggleIcon';
 
 const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
@@ -70,12 +70,9 @@ export function OverlayProductDetail({
   const heroSrc = () => model().images[activeImageIndex()] ?? product.image ?? null;
 
   // Returns the handler's promise so the button can render the cart outcome.
-  const onPrimary = () => {
+  const onAdd = () => {
     if (soldOut()) return false;
     // handleProductClick is undefined in preview mode — always call it optionally.
-    if (!isAddToCart()) {
-      return handleProductClick?.(product, video);
-    }
     return handleProductClick?.(product, video, {
       intent: 'add',
       variantId: matched()?.id ?? getVariantId(product),
@@ -154,19 +151,31 @@ export function OverlayProductDetail({
       </Show>
 
       <div className="video-carousel-overlay-pdetail-buy">
-        {/* Quantity is meaningless when the button navigates instead of adding. */}
-        <Show when={isAddToCart()}>
+        {/* Navigating gets its own button: no quantity, no cart states, and
+            never disabled when sold out — the product page is still worth
+            visiting. addToCartButtonLabel already follows the action. */}
+        <Show
+          when={isAddToCart()}
+          fallback={(
+            <ViewProductButton
+              className="video-carousel-overlay-pdetail-atc"
+              label={addToCartButtonLabel}
+              style={addToCartButtonStyle}
+              onView={handleProductClick ? () => handleProductClick(product, video) : undefined}
+            />
+          )}
+        >
           <QuantityStepper quantity={quantity} setQuantity={setQuantity} />
+          <AddToCartButton
+            className="video-carousel-overlay-pdetail-atc"
+            variant="primary"
+            label={addToCartButtonLabel}
+            disabledLabel={LABEL_SOLD_OUT}
+            disabled={soldOut}
+            style={addToCartButtonStyle}
+            onAdd={handleProductClick ? onAdd : undefined}
+          />
         </Show>
-        <AddToCartButton
-          className="video-carousel-overlay-pdetail-atc"
-          variant="primary"
-          label={() => (isAddToCart() ? addToCartButtonLabel() : LABEL_VIEW_PRODUCT)}
-          disabledLabel={LABEL_SOLD_OUT}
-          disabled={soldOut}
-          style={addToCartButtonStyle}
-          onAdd={handleProductClick ? onPrimary : undefined}
-        />
       </div>
 
       <Show when={description()}>

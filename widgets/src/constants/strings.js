@@ -1,4 +1,6 @@
-export const DEFAULT_ADD_TO_CART = 'Check this out';
+/** Product button fallbacks, one per button action. */
+export const DEFAULT_ADD_TO_CART = 'Shop Now';
+export const DEFAULT_VIEW_PRODUCT = 'View product';
 export const LABEL_SOLD_OUT = 'Sold out';
 
 /** Add-to-cart button faces, in the order they flip past. */
@@ -15,7 +17,6 @@ export const DEFAULT_TITLE_STORIES = 'Stories';
 
 export const LABEL_WATCH = 'Watch';
 export const LABEL_SHOP_PRODUCT = 'Shop product';
-export const LABEL_VIEW_PRODUCT = 'View product';
 export const LABEL_PRODUCTS_TAGGED = 'Products tagged';
 export const LABEL_FREQUENTLY_BOUGHT = 'Frequently bought';
 

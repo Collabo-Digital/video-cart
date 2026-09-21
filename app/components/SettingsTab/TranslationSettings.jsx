@@ -9,6 +9,8 @@ import { InfoIcon } from '@shopify/polaris-icons';
  */
 export function TranslationSettings({ control, watch, errors = {}, mode = "widget" }) {
     const widgetType = watch("widgetType");
+    // Each button action keeps its own text; only the active one is editable.
+    const isProductPage = watch("settings.general.buttonBehavior") === "openProductPage";
 
     if (mode === "global") {
         return (
@@ -158,12 +160,16 @@ export function TranslationSettings({ control, watch, errors = {}, mode = "widge
                         )}
                     />
                 )}
+                {/* key: remount when the action flips, so react-hook-form binds the
+                    other field cleanly instead of reusing this one's registration. */}
                 <Controller
-                    name="settings.translation.addToCartText"
+                    key={isProductPage ? "viewProductText" : "addToCartText"}
+                    name={isProductPage ? "settings.translation.viewProductText" : "settings.translation.addToCartText"}
                     control={control}
                     render={({ field }) => (
                         <TextField
-                            label={<InlineStack gap="200"><Text as="p">Button Text</Text><Tooltip dismissOnMouseOut content="Choose the text of the button."><Icon source={InfoIcon} /></Tooltip></InlineStack>}
+                            label={<InlineStack gap="200"><Text as="p">Button Text</Text><Tooltip dismissOnMouseOut content={isProductPage ? "Text on the button that opens the product page." : "Text on the add to cart button."}><Icon source={InfoIcon} /></Tooltip></InlineStack>}
+                            placeholder={isProductPage ? "View product" : "Shop Now"}
                             value={field.value ?? ""}
                             onChange={field.onChange}
                             autoComplete="off"
