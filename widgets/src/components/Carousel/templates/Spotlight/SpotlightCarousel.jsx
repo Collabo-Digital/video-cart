@@ -206,6 +206,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
                     <ProductOverlay
                       video={video}
                       buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
+                      displayMode={() => feed?.settings?.general?.productOverlayDisplay}
                       addToCartButtonLabel={addToCartButtonLabel}
                       addToCartButtonStyle={addToCartButtonStyle}
                       onProductClick={handleProductClick}

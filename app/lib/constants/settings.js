@@ -5,6 +5,7 @@
 export const DEFAULT_SETTINGS = {
     general: {
         buttonBehavior: "addToCart",
+        productOverlayDisplay: "hover",
         autoPlay: "always",
         autoLoop: true,
         visibleOnDesktop: true,
