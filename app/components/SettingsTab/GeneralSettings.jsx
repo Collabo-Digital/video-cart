@@ -521,6 +521,31 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                     )}
                                 />
                             )}
+                            {widgetType === "carousel" && (
+                                <Controller
+                                    name="settings.general.showProductNavigator"
+                                    control={control}
+                                    render={({ field: { value, onChange, ...field } }) => (
+                                        <Checkbox
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Product Navigator</Text>
+                                                    <InfoTooltip
+                                                        content="Show the tagged products above the videos. Customers tap a product to jump to its video."
+                                                        items={[
+                                                            { term: "Enabled", description: "A row with each tagged product's image and name above the carousel. Available on the Spotlight and Showcase templates." },
+                                                            { term: "Disabled", description: "No product row above the videos." },
+                                                        ]}
+                                                    />
+                                                </InlineStack>
+                                            }
+                                            checked={value ?? false}
+                                            onChange={onChange}
+                                            {...field}
+                                        />
+                                    )}
+                                />
+                            )}
 
                             {mode === "widget" && widgetType === "grid" && (
                                 <Controller

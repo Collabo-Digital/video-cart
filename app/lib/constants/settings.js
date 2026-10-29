@@ -6,6 +6,7 @@ export const DEFAULT_SETTINGS = {
     general: {
         buttonBehavior: "addToCart",
         productOverlayDisplay: "hover",
+        showProductNavigator: false,
         autoPlay: "always",
         autoLoop: true,
         visibleOnDesktop: true,
@@ -19,6 +20,8 @@ export const DEFAULT_SETTINGS = {
         hoverEffect: "lift",
         buttonBackgroundColor: "#000080",
         buttonTextColor: "#ffffff",
+        productNavigatorRingColor: "#000080",
+        productNavigatorTextColor: "#1a1a1a",
         template: "default",
         uniqueClassIdentifier: "",
         customCss: "",

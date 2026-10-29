@@ -5,6 +5,7 @@ import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../../../shared/mux'
 import { EVENT_TYPES } from '../../../../api/services/analyticsService';
 import { ProductOverlay } from '../../../common/ProductOverlay/ProductOverlay';
 import { VideoOverlayPlayer } from '../../../common/VideoOverlayPlayer';
+import { ProductNavigator } from '../../../common/ProductNavigator/ProductNavigator';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../../../utils/designStyles';
 import { trackDbEvent } from '../../../../utils/analytics';
 import { observeWidgetImpression, trackVideoImpressionOnce } from '../../../../utils/impressionTracker';
@@ -46,6 +47,7 @@ export function ShowcaseCarousel({ feed, videos, settings, onEvent, isPreview })
   const autoPlayMode = () => settings?.general?.autoPlay ?? feed?.settings?.general?.autoPlay;
   const autoLoop = () => settings?.general?.autoLoop ?? feed?.settings?.general?.autoLoop ?? true;
   const buttonBehavior = () => feed?.settings?.general?.buttonBehavior;
+  const showProductNavigator = () => settings?.general?.showProductNavigator ?? feed?.settings?.general?.showProductNavigator ?? false;
   // The product card sits below the video here, so "hover" makes no sense: show it unless hidden.
   const productCardDisplayMode = () =>
     (feed?.settings?.general?.productOverlayDisplay === 'hidden' ? 'hidden' : 'always');
@@ -211,6 +213,10 @@ export function ShowcaseCarousel({ feed, videos, settings, onEvent, isPreview })
             <p className="showcase-subtitle">{subtitle()}</p>
           </Show>
         </header>
+      </Show>
+
+      <Show when={showProductNavigator() && videoCount() > 0}>
+        <ProductNavigator videos={videos} activeIndex={activeIndex} onSelect={setActiveIndex} />
       </Show>
 
       <Show when={videoCount() > 0} fallback={<p className="video-carousel-empty">{EMPTY_VIDEOS}</p>}>

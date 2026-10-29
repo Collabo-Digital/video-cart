@@ -1,0 +1,116 @@
+/* Product navigator: one round product image + name per tagged product, above
+   the videos. Clicking one moves the carousel to its video. */
+.vd-product-navigator {
+  margin-bottom: 16px;
+}
+
+/* Centred while the row fits, scrollable once it does not. `safe` keeps the
+   first item reachable when the row overflows. */
+.vd-product-navigator-strip {
+  display: flex;
+  justify-content: safe center;
+  gap: 20px;
+  padding: 4px 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vd-product-navigator-strip::-webkit-scrollbar {
+  display: none;
+}
+
+/* height/min-height/background are explicit: themes commonly reset <button>
+   to a fixed control height and a filled background. */
+.vd-product-navigator-item {
+  flex: 0 0 auto;
+  width: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.vd-product-navigator-item:hover,
+.vd-product-navigator-item.is-active {
+  opacity: 1;
+}
+
+.vd-product-navigator-media {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f3f4f6;
+  box-shadow: 0 0 0 2px transparent;
+  transition: box-shadow 0.2s ease;
+}
+
+.vd-product-navigator-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Ring in the merchant's chosen colour, with a white gap. Falls back to the
+   button colour for feeds saved before the option existed. */
+.vd-product-navigator-item.is-active .vd-product-navigator-media {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--vdcrt-navigator-ring-color, var(--vdcrt-button-bg, #1a1a1a));
+}
+
+.vd-product-navigator-item:focus-visible {
+  outline: none;
+}
+
+.vd-product-navigator-item:focus-visible .vd-product-navigator-media {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--vdcrt-navigator-ring-color, var(--vdcrt-button-bg, #1a1a1a));
+}
+
+.vd-product-navigator-name {
+  max-width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--vdcrt-navigator-text-color, #1a1a1a);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .vd-product-navigator-strip {
+    gap: 14px;
+  }
+
+  .vd-product-navigator-item {
+    width: 72px;
+  }
+
+  .vd-product-navigator-media {
+    width: 48px;
+    height: 48px;
+  }
+
+  .vd-product-navigator-name {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vd-product-navigator-item,
+  .vd-product-navigator-media {
+    transition: none;
+  }
+}
