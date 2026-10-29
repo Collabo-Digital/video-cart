@@ -5,6 +5,7 @@ import { getThumbnailPreviewUrl, getThumbnailUrl } from '../../../../shared/mux'
 import { EVENT_TYPES } from '../../../../api/services/analyticsService';
 import { ProductOverlay } from '../../../common/ProductOverlay/ProductOverlay';
 import { VideoOverlayPlayer } from '../../../common/VideoOverlayPlayer';
+import { ProductNavigator } from '../../../common/ProductNavigator/ProductNavigator';
 import { buildDesignStyles, getUniqueClassIdentifier, injectCustomCss } from '../../../../utils/designStyles';
 import { trackDbEvent } from '../../../../utils/analytics';
 import { observeWidgetImpression, trackVideoImpressionOnce } from '../../../../utils/impressionTracker';
@@ -35,6 +36,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
   const uniqueClass = getUniqueClassIdentifier(design);
   const autoplay = () => settings?.general?.autoPlay ?? feed?.settings?.general?.autoPlay;
   const autoLoop = () => settings?.general?.autoLoop ?? feed?.settings?.general?.autoLoop ?? true;
+  const showProductNavigator = () => settings?.general?.showProductNavigator ?? feed?.settings?.general?.showProductNavigator ?? false;
   const title = () => settings?.translation?.widgetHeading || feed?.name || '';
   const subtitle = () => settings?.translation?.widgetDescription || feed?.description || '';
 
@@ -158,6 +160,10 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
         </header>
       </Show>
 
+      <Show when={showProductNavigator() && videos?.length > 0}>
+        <ProductNavigator videos={videos} activeIndex={activeIndex} onSelect={setActiveIndex} />
+      </Show>
+
       <Show when={videos?.length > 0} fallback={<p className="video-carousel-empty">{EMPTY_VIDEOS}</p>}>
         <div className="spotlight-stage">
           <button
@@ -206,6 +212,7 @@ export function SpotlightCarousel({ feed, videos, settings, onEvent, isPreview }
                     <ProductOverlay
                       video={video}
                       buttonBehavior={() => feed?.settings?.general?.buttonBehavior}
+                      displayMode={() => feed?.settings?.general?.productOverlayDisplay}
                       addToCartButtonLabel={addToCartButtonLabel}
                       addToCartButtonStyle={addToCartButtonStyle}
                       onProductClick={handleProductClick}
