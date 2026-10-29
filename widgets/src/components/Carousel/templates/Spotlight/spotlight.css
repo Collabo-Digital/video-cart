@@ -140,12 +140,12 @@
 }
 
 /* Product overlay: visible on card hover */
-.template-spotlight .spotlight-card .vd-product-overlay {
+/* .template-spotlight .spotlight-card .vd-product-overlay {
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
   transition: opacity 0.25s ease, transform 0.25s ease;
-}
+} */
 
 .template-spotlight .spotlight-card:hover .vd-product-overlay {
   opacity: 1;

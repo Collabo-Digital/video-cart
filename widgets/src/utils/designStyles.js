@@ -33,6 +33,12 @@ export function buildDesignStyles(design, general) {
     if (d.ringColor != null && typeof d.ringColor === 'string') {
         styles['--vdcrt-story-ring-color'] = d.ringColor.trim();
     }
+    if (typeof d.productNavigatorRingColor === 'string' && d.productNavigatorRingColor.trim()) {
+        styles['--vdcrt-navigator-ring-color'] = d.productNavigatorRingColor.trim();
+    }
+    if (typeof d.productNavigatorTextColor === 'string' && d.productNavigatorTextColor.trim()) {
+        styles['--vdcrt-navigator-text-color'] = d.productNavigatorTextColor.trim();
+    }
     return styles;
 }
 

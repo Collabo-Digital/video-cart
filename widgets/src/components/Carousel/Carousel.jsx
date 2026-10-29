@@ -1,10 +1,12 @@
 /* eslint-disable react/prop-types -- widget contract: feed, videos, settings, onEvent */
 import { ClassicCarousel } from './templates/Default/ClassicCarousel';
 import { SpotlightCarousel } from './templates/Spotlight/SpotlightCarousel';
+import { ShowcaseCarousel } from './templates/Showcase/ShowcaseCarousel';
 
 const TEMPLATES = {
   default: ClassicCarousel,
   spotlight: SpotlightCarousel,
+  showcase: ShowcaseCarousel,
 };
 
 export function VideoCarousel(props) {

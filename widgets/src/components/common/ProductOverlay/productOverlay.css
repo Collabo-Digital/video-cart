@@ -25,6 +25,12 @@
   container-name: vdcard;
 }
 
+.vd-product-overlay--always {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
 /* ── Products strip ─────────────────────────────────────────────────────── */
 .vd-product-overlay-products {
   position: relative;
