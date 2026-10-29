@@ -11,6 +11,8 @@ import RightToggleIcon from '../../../assets/Icons/RightToggleIcon';
 import './productOverlay.css';
 
 const BUTTON_BEHAVIOR_ADD_TO_CART = 'addToCart';
+const OVERLAY_DISPLAY_ALWAYS = 'always';
+const OVERLAY_DISPLAY_HIDDEN = 'hidden';
 
 /**
  * One tagged product. Renders the stored title/image immediately (no layout
@@ -74,6 +76,7 @@ function ProductItem({
 export function ProductOverlay({
   video,
   buttonBehavior,
+  displayMode,
   addToCartButtonLabel,
   addToCartButtonStyle,
   onProductClick,
@@ -82,6 +85,7 @@ export function ProductOverlay({
 
   const products = () => productsForVideo(video);
   const hasMultiple = () => products().length > 1;
+  const mode = () => displayMode?.() ?? 'hover';
 
   const scrollStrip = (e, direction) => {
     e.preventDefault();
@@ -96,8 +100,8 @@ export function ProductOverlay({
   };
 
   return (
-    <Show when={products().length > 0}>
-      <span className="vd-product-overlay">
+    <Show when={mode() !== OVERLAY_DISPLAY_HIDDEN && products().length > 0}>
+      <span className={`vd-product-overlay${mode() === OVERLAY_DISPLAY_ALWAYS ? ' vd-product-overlay--always' : ''}`}>
         <div className="vd-product-overlay-nav">
           <Show when={hasMultiple()}>
             <button

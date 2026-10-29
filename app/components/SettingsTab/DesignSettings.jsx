@@ -22,6 +22,7 @@ import InfoTooltip from "../InfoTooltip/InfoTooltip.jsx";
  */
 export function DesignSettings({ control, watch, errors = {}, mode = "widget" }) {
   const widgetType = watch("widgetType");
+  const showProductNavigator = watch("settings.general.showProductNavigator");
 
   if (mode === "global") {
     return (
@@ -352,10 +353,68 @@ export function DesignSettings({ control, watch, errors = {}, mode = "widget" })
           </InlineGrid>
           {/* <Text as="p" tone="subdued">
         Design options will be available here in a future update.
-        
+
       </Text> */}
         </BlockStack>
       </Box>
+
+      {mode === "widget" && widgetType === "carousel" && showProductNavigator && (
+        <Box padding="400" background="bg-surface-secondary" borderRadius="200">
+          <BlockStack gap="400">
+            <Text as="p" variant="bodyMd" fontWeight="semibold">
+              Product Navigator
+            </Text>
+            <InlineGrid columns={{ xs: 1, md: 2 }} gap="300">
+              <Controller
+                name="settings.design.productNavigatorRingColor"
+                control={control}
+                defaultValue="#000080"
+                render={({ field }) => (
+                  <BlockStack gap="100">
+                    <InlineStack gap="200">
+                      <Text as="p">Ring Color</Text>
+                      <InfoTooltip content="The ring around the selected product's image." />
+                    </InlineStack>
+                    <s-color-field
+                      placeholder="Select a color (e.g., #FF0000)"
+                      value={field.value ?? "#000080"}
+                      onInput={(e) =>
+                        field.onChange(e.currentTarget?.value ?? field.value)
+                      }
+                      onChange={(e) =>
+                        field.onChange(e.currentTarget?.value ?? field.value)
+                      }
+                    />
+                  </BlockStack>
+                )}
+              />
+              <Controller
+                name="settings.design.productNavigatorTextColor"
+                control={control}
+                defaultValue="#1a1a1a"
+                render={({ field }) => (
+                  <BlockStack gap="100">
+                    <InlineStack gap="200">
+                      <Text as="p">Text Color</Text>
+                      <InfoTooltip content="The product name under each image." />
+                    </InlineStack>
+                    <s-color-field
+                      placeholder="Select a color (e.g., #FF0000)"
+                      value={field.value ?? "#1a1a1a"}
+                      onInput={(e) =>
+                        field.onChange(e.currentTarget?.value ?? field.value)
+                      }
+                      onChange={(e) =>
+                        field.onChange(e.currentTarget?.value ?? field.value)
+                      }
+                    />
+                  </BlockStack>
+                )}
+              />
+            </InlineGrid>
+          </BlockStack>
+        </Box>
+      )}
 
       <Box padding="400" background="bg-surface-secondary" borderRadius="200">
         <BlockStack gap="400">

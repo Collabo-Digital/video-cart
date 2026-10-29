@@ -3,6 +3,7 @@ export const WIDGET_TEMPLATES = {
         { id: "default", name: "Classic", description: "Horizontal scrollable cards with product overlay" },
         // { id: "lookbook", name: "Lookbook", description: "Editorial cards with heading and description overlay" },
         { id: "spotlight", name: "Spotlight", description: "3D coverflow layout with center card highlighted" },
+        { id: "showcase", name: "Showcase", description: "Flat row with the center card enlarged and the product card under each video" },
     ],
     stories: [
         {

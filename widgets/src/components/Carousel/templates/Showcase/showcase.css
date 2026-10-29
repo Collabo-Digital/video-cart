@@ -1,0 +1,220 @@
+/* Showcase template: flat row placed by transforms (like Spotlight), centre card
+   enlarged, the shared product card under each video. */
+
+/* Five cards fill the row, like the Classic template, within sane bounds.
+   cqw (not %) because the same width feeds the translateX step, and % inside
+   a transform would resolve against the card, not the container. */
+.template-showcase {
+  container-type: inline-size;
+  --vdsc-card-width: clamp(160px, calc((100cqw - 4 * var(--vdcrt-video-gap, 16px)) / 5), 260px);
+  /* Side cards render at 0.9, so a step of 0.95 widths + gap keeps the space
+     between the centre card and its neighbours equal to the merchant's gap. */
+  --vdsc-card-step: calc(var(--vdsc-card-width) * 0.95 + var(--vdcrt-video-gap, 16px));
+}
+
+/* Header */
+.template-showcase .showcase-header {
+  text-align: var(--vdcrt-header-align, center);
+  margin-bottom: 12px;
+}
+
+.template-showcase .showcase-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 6px;
+  line-height: 1.25;
+}
+
+.template-showcase .showcase-subtitle {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* Stage: every card sits in the same grid cell, so the stage is as tall as the
+   tallest card (thumbnail + product card) without guessing a min-height. The
+   bottom padding leaves room for the centre card's shadow. */
+.template-showcase .showcase-stage {
+  /* Own stacking context: the cards' z-indexes layer the centre over its
+     neighbours and must never reach the page (sticky theme headers sit at z 3). */
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  display: grid;
+  justify-items: center;
+  overflow: hidden;
+  padding: 12px 0 36px;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+/* Card column: thumbnail + product card. Every card has the same layout size;
+   the centre one shows at full size and full opacity, the others at 0.9 and
+   slightly faded, and a card returns to that when it leaves the centre. */
+.template-showcase .showcase-card {
+  --vdsc-card-offset: 0;
+  --vdsc-card-scale: 0.9;
+  grid-area: 1 / 1;
+  width: var(--vdsc-card-width);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  opacity: 0.7;
+  z-index: 2;
+  transform: translateX(calc(var(--vdsc-card-offset) * var(--vdsc-card-step) + var(--vdsc-drag-offset, 0px))) scale(var(--vdsc-card-scale));
+  transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s ease;
+}
+
+/* While the pointer is down the row tracks it 1:1; the snap animates on release. */
+.template-showcase .showcase-stage.is-dragging .showcase-card {
+  transition: opacity 0.4s ease;
+}
+
+.template-showcase .showcase-card.is-center { --vdsc-card-scale: 1; opacity: 1; z-index: 5; }
+.template-showcase .showcase-card.is-prev-1 { --vdsc-card-offset: -1; z-index: 4; }
+.template-showcase .showcase-card.is-next-1 { --vdsc-card-offset: 1; z-index: 4; }
+.template-showcase .showcase-card.is-prev-2 { --vdsc-card-offset: -2; z-index: 3; }
+.template-showcase .showcase-card.is-next-2 { --vdsc-card-offset: 2; z-index: 3; }
+
+/* More than 2 away: parked behind the centre card, as in Spotlight */
+.template-showcase .showcase-card.is-hidden {
+  --vdsc-card-scale: 0.5;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* height/min-height are explicit: themes commonly reset <button> to a fixed
+   control height, which would clip the 9:16 media inside. */
+.template-showcase .showcase-card-button {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--vdcrt-border-radius, 16px);
+  overflow: hidden;
+  background: #f3f4f6;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 8%);
+  transition: box-shadow 0.3s ease;
+}
+
+.template-showcase .showcase-card.is-center .showcase-card-button {
+  box-shadow: 0 16px 40px rgb(0 0 0 / 18%);
+}
+
+/* The 9:16 ratio lives on a plain span, as in the other templates: WebKit
+   ignores aspect-ratio on a <button>, and theme button resets can fight it. */
+.template-showcase .showcase-card-image-wrap {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+}
+
+.template-showcase .showcase-card-image,
+.template-showcase .showcase-card-image-fallback {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.template-showcase .showcase-card-image-fallback {
+  background: #e5e7eb;
+}
+
+/* The shared product card, in flow under the video instead of over it. Its
+   "always" class handles visibility; its container query gives the stacked
+   layout at this card width. */
+.template-showcase .vd-product-overlay {
+  position: static;
+  padding: 0;
+}
+
+/* Arrows + dots */
+.template-showcase .showcase-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.template-showcase .showcase-nav-btn {
+  width: 40px;
+  height: 40px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  color: #374151;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.template-showcase .showcase-nav-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: #000;
+}
+
+.template-showcase .showcase-nav-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.template-showcase .showcase-dots {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.template-showcase .showcase-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: #d1d5db;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s;
+}
+
+.template-showcase .showcase-dot.is-active {
+  background: var(--vdcrt-button-bg, #1a1a1a);
+  transform: scale(1.3);
+}
+
+/* Mobile: three cards visible */
+@media (max-width: 768px) {
+  .template-showcase {
+    --vdsc-card-width: min(150px, 42vw);
+  }
+
+  .template-showcase .showcase-stage {
+    padding: 12px 0 28px;
+  }
+
+  .template-showcase .showcase-card.is-prev-2,
+  .template-showcase .showcase-card.is-next-2 {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .template-showcase .showcase-card,
+  .template-showcase .showcase-dot {
+    transition: none;
+  }
+}

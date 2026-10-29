@@ -79,6 +79,12 @@ const DEVICE_TABS = [
     { id: "mobile", content: "Mobile", panelID: "mobile-panel" },
 ];
 
+const PRODUCT_OVERLAY_DISPLAY_OPTIONS = [
+    { label: "Show on hover", value: "hover" },
+    { label: "Always show", value: "always" },
+    { label: "Hidden", value: "hidden" },
+];
+
 function DeviceSettings({ device, control }) {
     const prefix = `settings.general.videoDiscovery.${device}`;
     const deviceValues = useWatch({ control, name: prefix }) ?? {};
@@ -489,6 +495,58 @@ export function GeneralSettings({ control, watch, errors = {}, setValue, mode = 
                                     />
                                 </InlineStack>
                             </BlockStack>
+                            {(widgetType === "carousel" || widgetType === "grid") && (
+                                <Controller
+                                    name="settings.general.productOverlayDisplay"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Select
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Product Card</Text>
+                                                    <InfoTooltip
+                                                        content="Choose when the product card appears on each video tile."
+                                                        items={[
+                                                            { term: "Show on hover", description: "The card appears when a customer hovers over the video (desktop only)." },
+                                                            { term: "Always show", description: "The card is always visible on the video, including on mobile." },
+                                                            { term: "Hidden", description: "No product card on the tiles. Products stay available inside the video player." },
+                                                        ]}
+                                                    />
+                                                </InlineStack>
+                                            }
+                                            options={PRODUCT_OVERLAY_DISPLAY_OPTIONS}
+                                            value={field.value ?? "hover"}
+                                            onChange={field.onChange}
+                                        />
+                                    )}
+                                />
+                            )}
+                            {widgetType === "carousel" && (
+                                <Controller
+                                    name="settings.general.showProductNavigator"
+                                    control={control}
+                                    render={({ field: { value, onChange, ...field } }) => (
+                                        <Checkbox
+                                            label={
+                                                <InlineStack gap="200">
+                                                    <Text as="p">Product Navigator</Text>
+                                                    <InfoTooltip
+                                                        content="Show the tagged products above the videos. Customers tap a product to jump to its video."
+                                                        items={[
+                                                            { term: "Enabled", description: "A row with each tagged product's image and name above the carousel. Available on the Spotlight and Showcase templates." },
+                                                            { term: "Disabled", description: "No product row above the videos." },
+                                                        ]}
+                                                    />
+                                                </InlineStack>
+                                            }
+                                            checked={value ?? false}
+                                            onChange={onChange}
+                                            {...field}
+                                        />
+                                    )}
+                                />
+                            )}
+
                             {mode === "widget" && widgetType === "grid" && (
                                 <Controller
                                     name="settings.general.videosPerRow"
