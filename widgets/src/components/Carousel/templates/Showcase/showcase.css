@@ -198,7 +198,7 @@
 /* Mobile: three cards visible */
 @media (max-width: 768px) {
   .template-showcase {
-    --vdsc-card-width: min(150px, 42vw);
+    --vdsc-card-width: min(200px, 52cqw);
   }
 
   .template-showcase .showcase-stage {

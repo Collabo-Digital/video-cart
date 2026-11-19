@@ -33,6 +33,3 @@ redirect_urls = [
 url = "https://dsc-frederick-nightlife-smell.trycloudflare.com/proxy"
 subpath = "video-widget"
 prefix = "apps"
-
-[build]
-automatically_update_urls_on_dev = true
